@@ -61,7 +61,7 @@ export default {
   // Recharge Page
   purchase: {
     title: '充值',
-    description: '通过内嵌页面完成充值',
+    description: '通过选择充值金额完成充值',
     openInNewTab: '新窗口打开',
     notEnabledTitle: '该功能未开启',
     notEnabledDesc: '管理员暂未开启充值入口，请联系管理员。',
