@@ -277,17 +277,27 @@ func TestCalculateCreateOrderPayAmountForBalanceIgnoresSubscriptionRate(t *testi
 	}
 }
 
-func TestCalculateCreditedBalanceStillUsesRechargeMultiplier(t *testing.T) {
+func TestCalculateCreditedBalanceUsesFixedRechargeTiers(t *testing.T) {
 	t.Parallel()
 
-	got := calculateCreditedBalance(10, 0.14)
-	if got != 1.4 {
-		t.Fatalf("credited balance = %v, want 1.4", got)
+	cases := []struct {
+		paymentAmount float64
+		want          float64
+	}{
+		{paymentAmount: 10, want: 10},
+		{paymentAmount: 20, want: 25},
+		{paymentAmount: 50, want: 90},
+		{paymentAmount: 100, want: 200},
+		{paymentAmount: 200, want: 500},
+		{paymentAmount: 400, want: 1100},
+		{paymentAmount: 800, want: 2200},
 	}
 
-	got = calculateCreditedBalance(5, 10)
-	if got != 50 {
-		t.Fatalf("credited balance = %v, want 50", got)
+	for _, tc := range cases {
+		got := calculateCreditedBalance(tc.paymentAmount, 0.14)
+		if got != tc.want {
+			t.Fatalf("credited balance for payment %v = %v, want %v", tc.paymentAmount, got, tc.want)
+		}
 	}
 }
 

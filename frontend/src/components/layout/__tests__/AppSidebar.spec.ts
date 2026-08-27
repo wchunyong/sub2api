@@ -8,6 +8,8 @@ const componentPath = resolve(dirname(fileURLToPath(import.meta.url)), '../AppSi
 const componentSource = readFileSync(componentPath, 'utf8')
 const stylePath = resolve(dirname(fileURLToPath(import.meta.url)), '../../../style.css')
 const styleSource = readFileSync(stylePath, 'utf8')
+const zhCommonPath = resolve(dirname(fileURLToPath(import.meta.url)), '../../../i18n/locales/zh/common.ts')
+const zhCommonSource = readFileSync(zhCommonPath, 'utf8')
 
 describe('AppSidebar custom SVG styles', () => {
   it('does not override uploaded SVG fill or stroke colors', () => {
@@ -39,6 +41,18 @@ describe('AppSidebar scroll position persistence', () => {
     expect(componentSource).toContain('onMounted')
     expect(componentSource).toContain('appStore.sidebarScrollTop')
     expect(componentSource).toContain('nextTick')
+  })
+})
+
+describe('AppSidebar user billing navigation', () => {
+  it('hides the user subscriptions entry while keeping the purchase entry', () => {
+    expect(componentSource).not.toContain("path: '/subscriptions', label: t('nav.mySubscriptions')")
+    expect(componentSource).toContain("path: '/purchase', label: t('nav.buySubscription')")
+  })
+
+  it('labels the user purchase entry as recharge in Chinese', () => {
+    expect(zhCommonSource).toContain("buySubscription: '充值'")
+    expect(zhCommonSource).not.toContain("buySubscription: '充值/订阅'")
   })
 })
 

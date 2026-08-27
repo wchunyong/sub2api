@@ -3,6 +3,7 @@ import { flushPromises, shallowMount } from '@vue/test-utils'
 import PaymentView from '../PaymentView.vue'
 import { PAYMENT_RECOVERY_STORAGE_KEY } from '@/components/payment/paymentFlow'
 import { formatPaymentAmount } from '@/components/payment/currency'
+import AmountInput from '@/components/payment/AmountInput.vue'
 import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
 import type { CheckoutInfoResponse, MethodLimit, SubscriptionPlan } from '@/types/payment'
 
@@ -276,6 +277,69 @@ async function mountSubscriptionPlanList(planCount: number) {
   await flushPromises()
   return wrapper
 }
+
+async function mountRechargePage(options: { checkout?: Partial<CheckoutInfoResponse> } = {}) {
+  vi.useRealTimers()
+  routeState.path = '/purchase'
+  routeState.query = {}
+  routerReplace.mockReset().mockResolvedValue(undefined)
+  routerPush.mockReset().mockResolvedValue(undefined)
+  routerResolve.mockClear()
+  createOrder.mockReset()
+  refreshUser.mockReset()
+  fetchActiveSubscriptions.mockReset().mockResolvedValue(undefined)
+  showError.mockReset()
+  showInfo.mockReset()
+  showWarning.mockReset()
+  getCheckoutInfo.mockReset().mockResolvedValue(checkoutInfoFixture(options.checkout))
+  bridgeInvoke.mockReset()
+  window.localStorage.clear()
+  ;(window as Window & { WeixinJSBridge?: { invoke: typeof bridgeInvoke } }).WeixinJSBridge = undefined
+
+  const wrapper = shallowMount(PaymentView, {
+    global: {
+      stubs: {
+        AppLayout: {
+          template: '<div><slot /></div>',
+        },
+        Teleport: true,
+        Transition: false,
+      },
+    },
+  })
+  await flushPromises()
+  await flushPromises()
+  return wrapper
+}
+
+describe('PaymentView recharge-only user checkout', () => {
+  it('does not show the subscription tab and keeps recharge presets fixed', async () => {
+    const wrapper = await mountRechargePage({
+      checkout: checkoutInfoWithPlansFixture().data,
+    })
+
+    expect(wrapper.text()).not.toContain('payment.tabSubscribe')
+    expect(wrapper.text()).not.toContain('payment.tabTopUp')
+
+    const amountInput = wrapper.findComponent(AmountInput)
+    expect(amountInput.exists()).toBe(true)
+    expect(amountInput.props('amounts')).toEqual([10, 20, 50, 100, 200, 400, 800])
+  })
+
+  it('previews the credited balance bonus for fixed recharge tiers', async () => {
+    const wrapper = await mountRechargePage()
+
+    const amountInput = wrapper.findComponent(AmountInput)
+    await amountInput.vm.$emit('update:modelValue', 100)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('payment.paymentAmount')
+    expect(wrapper.text()).toContain(formatPaymentAmount(100, 'CNY'))
+    expect(wrapper.text()).toContain('payment.creditedBalance')
+    expect(wrapper.text()).toContain('$200.00')
+    expect(wrapper.text()).toContain('payment.rechargeBonusPreview')
+  })
+})
 
 describe('PaymentView subscription plan grid', () => {
   it.each([3, 4, 6])('keeps %i plans on the existing mobile/tablet/desktop grid', async (planCount) => {

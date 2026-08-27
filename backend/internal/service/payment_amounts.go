@@ -9,6 +9,16 @@ import (
 
 const defaultBalanceRechargeMultiplier = 1.0
 
+var fixedBalanceRechargeCredits = map[float64]float64{
+	10:  10,
+	20:  25,
+	50:  90,
+	100: 200,
+	200: 500,
+	400: 1100,
+	800: 2200,
+}
+
 func normalizeBalanceRechargeMultiplier(multiplier float64) float64 {
 	if math.IsNaN(multiplier) || math.IsInf(multiplier, 0) || multiplier <= 0 {
 		return defaultBalanceRechargeMultiplier
@@ -26,6 +36,9 @@ func normalizeSubscriptionUSDToCNYRate(rate float64) float64 {
 }
 
 func calculateCreditedBalance(paymentAmount, multiplier float64) float64 {
+	if credited, ok := fixedBalanceRechargeCredits[paymentAmount]; ok {
+		return credited
+	}
 	return decimal.NewFromFloat(paymentAmount).
 		Mul(decimal.NewFromFloat(normalizeBalanceRechargeMultiplier(multiplier))).
 		Round(2).
