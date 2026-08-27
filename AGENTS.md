@@ -36,6 +36,15 @@
 - `frontend/src/i18n/`：国际化文案。
 - `frontend/src/router/`：路由配置。
 
+### 用户端订阅隐藏策略
+
+- 当前产品线刻意在用户端隐藏“订阅”概念，只对用户展示“充值”。
+- 用户端侧边栏隐藏入口位于 `frontend/src/components/layout/AppSidebar.vue`：`buildSelfNavItems` 不展示 `/subscriptions`，`/purchase` 文案使用 `nav.buySubscription`，中文为“充值”。
+- 用户充值页位于 `frontend/src/views/user/PaymentView.vue`：默认不展示充值/订阅切换 tab，只展示充值；固定充值金额为 `10, 20, 50, 100, 200, 400, 800`。
+- 充值到账映射同时存在于前端预览和后端实际入账：前端见 `rechargeCreditByPaymentAmount`，后端见 `backend/internal/service/payment_amounts.go` 的 `fixedBalanceRechargeCredits`。
+- 如以后要恢复用户端订阅入口，需要同时恢复侧边栏 `/subscriptions`、购买页订阅 tab/套餐展示入口、相关 i18n 文案，并检查 `frontend/src/views/user/__tests__/PaymentView.spec.ts` 与 `frontend/src/components/layout/__tests__/AppSidebar.spec.ts` 的约束。
+- 管理员端订阅管理仍保留，不属于该隐藏策略的范围。
+
 ## 开发约定
 
 - 搜索文件和文本优先使用 `rg` 或 `rg --files`。

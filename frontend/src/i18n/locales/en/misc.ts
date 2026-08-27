@@ -59,16 +59,16 @@ export default {
     dockerRecreate: 'Recreate the container'
   },
 
-  // Recharge / Subscription Page
+  // Recharge Page
   purchase: {
-    title: 'Recharge / Subscription',
-    description: 'Recharge balance or purchase subscription via the embedded page',
+    title: 'Recharge',
+    description: 'Recharge balance via the embedded page',
     openInNewTab: 'Open in new tab',
     notEnabledTitle: 'Feature not enabled',
-    notEnabledDesc: 'The administrator has not enabled the recharge/subscription entry. Please contact admin.',
-    notConfiguredTitle: 'Recharge / Subscription URL not configured',
+    notEnabledDesc: 'The administrator has not enabled the recharge entry. Please contact admin.',
+    notConfiguredTitle: 'Recharge URL not configured',
     notConfiguredDesc:
-      'The administrator enabled the entry but has not configured a recharge/subscription URL. Please contact admin.'
+      'The administrator enabled the entry but has not configured a recharge URL. Please contact admin.'
   },
 
   // Custom Page (iframe embed)
@@ -285,17 +285,18 @@ export default {
 
   // Payment System
   payment: {
-    title: 'Recharge / Subscription',
+    title: 'Recharge',
     amountLabel: 'Amount',
     paymentAmount: 'Payment Amount',
     creditedBalance: 'Credited Balance',
-    quickAmounts: 'Quick Amounts',
-    customAmount: 'Custom Amount',
+    quickAmounts: 'Recharge Amount',
     enterAmount: 'Enter amount',
     paymentMethod: 'Payment Method',
     fee: 'Fee',
     actualPay: 'Actual Payment',
     createOrder: 'Confirm Payment',
+    rechargeBonusBadge: 'Bonus',
+    rechargeBonusPreview: 'Pay ¥{paid}, receive ${credited}',
     methods: {
       easypay: 'EasyPay',
       alipay: 'Alipay',
