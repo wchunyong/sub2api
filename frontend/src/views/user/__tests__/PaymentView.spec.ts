@@ -326,7 +326,7 @@ describe('PaymentView recharge-only user checkout', () => {
     expect(amountInput.props('amounts')).toEqual([10, 20, 50, 100, 200, 400, 800])
   })
 
-  it('previews the credited balance bonus for fixed recharge tiers', async () => {
+  it('does not show a bonus preview for recharge tiers up to 100', async () => {
     const wrapper = await mountRechargePage()
 
     const amountInput = wrapper.findComponent(AmountInput)
@@ -335,8 +335,21 @@ describe('PaymentView recharge-only user checkout', () => {
 
     expect(wrapper.text()).toContain('payment.paymentAmount')
     expect(wrapper.text()).toContain(formatPaymentAmount(100, 'CNY'))
+    expect(wrapper.text()).not.toContain('payment.creditedBalance')
+    expect(wrapper.text()).not.toContain('payment.rechargeBonusPreview')
+  })
+
+  it('previews the credited balance bonus for recharge tiers above 100', async () => {
+    const wrapper = await mountRechargePage()
+
+    const amountInput = wrapper.findComponent(AmountInput)
+    await amountInput.vm.$emit('update:modelValue', 200)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('payment.paymentAmount')
+    expect(wrapper.text()).toContain(formatPaymentAmount(200, 'CNY'))
     expect(wrapper.text()).toContain('payment.creditedBalance')
-    expect(wrapper.text()).toContain('$200.00')
+    expect(wrapper.text()).toContain('$210.00')
     expect(wrapper.text()).toContain('payment.rechargeBonusPreview')
   })
 })

@@ -285,12 +285,12 @@ func TestCalculateCreditedBalanceUsesFixedRechargeTiers(t *testing.T) {
 		want          float64
 	}{
 		{paymentAmount: 10, want: 10},
-		{paymentAmount: 20, want: 25},
-		{paymentAmount: 50, want: 90},
-		{paymentAmount: 100, want: 200},
-		{paymentAmount: 200, want: 500},
-		{paymentAmount: 400, want: 1100},
-		{paymentAmount: 800, want: 2200},
+		{paymentAmount: 20, want: 20},
+		{paymentAmount: 50, want: 50},
+		{paymentAmount: 100, want: 100},
+		{paymentAmount: 200, want: 210},
+		{paymentAmount: 400, want: 420},
+		{paymentAmount: 800, want: 840},
 	}
 
 	for _, tc := range cases {

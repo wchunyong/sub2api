@@ -504,12 +504,12 @@ const checkout = ref<CheckoutInfoResponse>({
 const rechargePaymentAmounts = [10, 20, 50, 100, 200, 400, 800]
 const rechargeCreditByPaymentAmount = new Map<number, number>([
   [10, 10],
-  [20, 25],
-  [50, 90],
-  [100, 200],
-  [200, 500],
-  [400, 1100],
-  [800, 2200],
+  [20, 20],
+  [50, 50],
+  [100, 100],
+  [200, 210],
+  [400, 420],
+  [800, 840],
 ])
 
 const visibleMethods = computed(() => getVisibleMethods(checkout.value.methods))

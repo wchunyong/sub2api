@@ -11,12 +11,12 @@ const defaultBalanceRechargeMultiplier = 1.0
 
 var fixedBalanceRechargeCredits = map[float64]float64{
 	10:  10,
-	20:  25,
-	50:  90,
-	100: 200,
-	200: 500,
-	400: 1100,
-	800: 2200,
+	20:  20,
+	50:  50,
+	100: 100,
+	200: 210,
+	400: 420,
+	800: 840,
 }
 
 func normalizeBalanceRechargeMultiplier(multiplier float64) float64 {
