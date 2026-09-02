@@ -428,6 +428,11 @@ func TestSyncUpstreamModelCatalogEnrichesOpenCodeIDOnlyListAndPersistsSnapshot(t
 		{
 			StatusCode: http.StatusOK,
 			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{}`)),
+		},
+		{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
 			Body: io.NopCloser(strings.NewReader(`{
 				"opencode": {
 					"id": "opencode",
@@ -471,13 +476,14 @@ func TestSyncUpstreamModelCatalogEnrichesOpenCodeIDOnlyListAndPersistsSnapshot(t
 	catalog, err := svc.SyncUpstreamModelCatalog(context.Background(), account)
 	require.NoError(t, err)
 	require.Equal(t, []string{"x-preview-f-free"}, catalog.Models)
-	require.Len(t, upstream.requests, 2)
+	require.Len(t, upstream.requests, 3)
 	require.Equal(t, "https://opencode.ai/zen/v1/models", upstream.requests[0].URL.String())
 	require.Equal(t, []string{"account-secret"}, headerValuesEqualFold(upstream.requests[0].Header, "X-Custom-Account-Header"))
-	require.Equal(t, modelsDevRegistryURL, upstream.requests[1].URL.String())
+	require.Equal(t, modelsDevModelRegistryURL, upstream.requests[1].URL.String())
 	require.Empty(t, upstream.requests[1].Header.Get("Authorization"))
 	require.Empty(t, upstream.requests[1].Header.Get("x-api-key"))
 	require.Empty(t, headerValuesEqualFold(upstream.requests[1].Header, "X-Custom-Account-Header"))
+	require.Equal(t, modelsDevRegistryURL, upstream.requests[2].URL.String())
 
 	metadata := catalog.Metadata["x-preview-f-free"]
 	require.Equal(t, "Ox Alpha Free (Unlimited)", metadata.DisplayName)
@@ -499,6 +505,158 @@ func TestSyncUpstreamModelCatalogEnrichesOpenCodeIDOnlyListAndPersistsSnapshot(t
 	require.Equal(t, metadata, snapshot.Models["x-preview-f-free"])
 }
 
+// Scenario: provider-agnostic models.dev/models.json can enrich relays whose
+// base URL does not appear in models.dev/api.json.
+func TestSyncUpstreamModelCatalogEnrichesFromModelsDevModelsJSON(t *testing.T) {
+	upstream := &httpUpstreamRecorder{responses: []*http.Response{
+		{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"data":[{"id":"deepseek/deepseek-v4-flash-0731"}]}`)),
+		},
+		{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body: io.NopCloser(strings.NewReader(`{
+				"deepseek/deepseek-v4-flash-0731":{
+					"id":"deepseek/deepseek-v4-flash-0731",
+					"name":"DeepSeek V4 Flash 0731",
+					"reasoning":true,
+					"modalities":{"input":["text"],"output":["text"]},
+					"limit":{"context":1000000,"output":384000}
+				}
+			}`)),
+		},
+	}}
+	repo := &upstreamModelMetadataRepoStub{}
+	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+
+	catalog, err := svc.SyncUpstreamModelCatalog(context.Background(), &Account{
+		ID: 112, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
+		Credentials: map[string]any{"api_key": "key", "base_url": "https://relay.example/v1"},
+	})
+	require.NoError(t, err)
+	require.Empty(t, catalog.Warnings)
+	require.Equal(t, int64(1_000_000), catalog.Metadata["deepseek/deepseek-v4-flash-0731"].ContextWindow)
+	require.Equal(t, "deepseek/deepseek-v4-flash-0731", catalog.Metadata["deepseek/deepseek-v4-flash-0731"].ID)
+	require.NotNil(t, repo.updates)
+}
+
+func TestModelsDevMetadataLookupKeys(t *testing.T) {
+	tests := []struct {
+		modelID string
+		want    []string
+	}{
+		{"deepseek-ai/deepseek-v4-pro-0813", []string{"deepseek-ai/deepseek-v4-pro-0813", "deepseek/deepseek-v4-pro-0813"}},
+		{"glm-5.3", []string{"glm-5.3", "zhipuai/glm-5.3"}},
+		{"kimi-k2.6:cloud", []string{"kimi-k2.6:cloud", "kimi-k2.6", "moonshotai/kimi-k2.6"}},
+		{"moonshotai/kimi-k3", []string{"moonshotai/kimi-k3"}},
+		{"minimaxai/minimax-m3", []string{"minimaxai/minimax-m3", "minimax/MiniMax-M3"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.modelID, func(t *testing.T) {
+			require.Equal(t, tt.want, modelsDevMetadataLookupKeys(tt.modelID))
+		})
+	}
+}
+
+func TestSyncUpstreamModelCatalogEnrichesModelsDevAlias(t *testing.T) {
+	upstream := &httpUpstreamRecorder{responses: []*http.Response{
+		{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"data":[{"id":"deepseek-ai/deepseek-v4-flash-0731"}]}`)),
+		},
+		{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body: io.NopCloser(strings.NewReader(`{
+				"deepseek/deepseek-v4-flash-0731":{
+					"id":"deepseek/deepseek-v4-flash-0731",
+					"name":"DeepSeek V4 Flash 0731",
+					"reasoning":true,
+					"modalities":{"input":["text"],"output":["text"]},
+					"limit":{"context":1000000,"output":384000}
+				}
+			}`)),
+		},
+	}}
+	repo := &upstreamModelMetadataRepoStub{}
+	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+
+	catalog, err := svc.SyncUpstreamModelCatalog(context.Background(), &Account{
+		ID: 115, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
+		Credentials: map[string]any{"api_key": "key", "base_url": "https://relay.example/v1"},
+	})
+	require.NoError(t, err)
+	require.Empty(t, catalog.Warnings)
+	require.Contains(t, catalog.Metadata, "deepseek-ai/deepseek-v4-flash-0731")
+	require.Equal(t, "deepseek/deepseek-v4-flash-0731", catalog.Metadata["deepseek-ai/deepseek-v4-flash-0731"].ID)
+}
+
+func TestSyncUpstreamModelCatalogUsesBundledFallbackWhenModelsDevUnavailable(t *testing.T) {
+	upstream := &httpUpstreamRecorder{responses: []*http.Response{
+		{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"data":[{"id":"kimi-k2.6:cloud"}]}`)),
+		},
+		{
+			StatusCode: http.StatusBadGateway,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"error":"models.dev unavailable"}`)),
+		},
+		{
+			StatusCode: http.StatusBadGateway,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"error":"api registry unavailable"}`)),
+		},
+	}}
+	repo := &upstreamModelMetadataRepoStub{}
+	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+
+	catalog, err := svc.SyncUpstreamModelCatalog(context.Background(), &Account{
+		ID: 113, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
+		Credentials: map[string]any{"api_key": "key", "base_url": "https://relay.example/v1"},
+	})
+	require.NoError(t, err)
+	require.Empty(t, catalog.Warnings)
+	require.Equal(t, int64(262_144), catalog.Metadata["kimi-k2.6:cloud"].ContextWindow)
+	require.NotNil(t, repo.updates)
+}
+
+func TestSyncUpstreamModelCatalogPersistsResolvedMetadataAndWarnsForUnresolved(t *testing.T) {
+	upstream := &httpUpstreamRecorder{responses: []*http.Response{
+		{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"data":[{"id":"glm-5.3"},{"id":"unknown-relay-model"}]}`)),
+		},
+		{
+			StatusCode: http.StatusBadGateway,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"error":"models.dev unavailable"}`)),
+		},
+		{
+			StatusCode: http.StatusBadGateway,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"error":"api registry unavailable"}`)),
+		},
+	}}
+	repo := &upstreamModelMetadataRepoStub{}
+	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+
+	catalog, err := svc.SyncUpstreamModelCatalog(context.Background(), &Account{
+		ID: 114, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
+		Credentials: map[string]any{"api_key": "key", "base_url": "https://relay.example/v1"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, UpstreamModelMetadataIncompleteCode, catalog.Warnings[0].Code)
+	require.Contains(t, catalog.Metadata, "glm-5.3")
+	require.NotContains(t, catalog.Metadata, "unknown-relay-model")
+	require.NotNil(t, repo.updates)
+}
+
 // Scenario: 不提供 /models 的兼容上游使用管理员已配置模型继续同步能力。
 func TestSyncUpstreamModelCatalogUsesConfiguredModelsWhenListEndpointUnsupported(t *testing.T) {
 	upstream := &httpUpstreamRecorder{responses: []*http.Response{
@@ -506,6 +664,11 @@ func TestSyncUpstreamModelCatalogUsesConfiguredModelsWhenListEndpointUnsupported
 			StatusCode: http.StatusNotFound,
 			Header:     http.Header{"Content-Type": []string{"application/json"}},
 			Body:       io.NopCloser(strings.NewReader(`{"error":"not found"}`)),
+		},
+		{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{}`)),
 		},
 		{
 			StatusCode: http.StatusOK,
@@ -549,9 +712,10 @@ func TestSyncUpstreamModelCatalogUsesConfiguredModelsWhenListEndpointUnsupported
 	require.NoError(t, err)
 	require.Equal(t, []string{"glm-5.3"}, catalog.Models)
 	require.Empty(t, catalog.Warnings)
-	require.Len(t, upstream.requests, 2)
+	require.Len(t, upstream.requests, 3)
 	require.Equal(t, "https://provider.example/v1/models", upstream.requests[0].URL.String())
-	require.Equal(t, modelsDevRegistryURL, upstream.requests[1].URL.String())
+	require.Equal(t, modelsDevModelRegistryURL, upstream.requests[1].URL.String())
+	require.Equal(t, modelsDevRegistryURL, upstream.requests[2].URL.String())
 	metadata := catalog.Metadata["glm-5.3"]
 	require.Equal(t, []string{"low", "medium", "high"}, metadata.SupportedReasoningLevels)
 	require.Equal(t, []string{"text"}, metadata.InputModalities)
@@ -716,6 +880,32 @@ func TestSyncUpstreamModelCatalogPersistsExplicitNonReasoningCapability(t *testi
 	require.Equal(t, []string{"text"}, metadata.InputModalities)
 	require.Equal(t, int64(64_000), metadata.ContextWindow)
 	require.NotNil(t, repo.updates)
+}
+
+// Scenario: provider-agnostic registries can identify reasoning capability
+// without knowing a supplier's exact effort-level contract.
+func TestSyncUpstreamModelCatalogAcceptsReasoningWithoutEffortLevels(t *testing.T) {
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body: io.NopCloser(strings.NewReader(`{"models":[{
+			"id":"provider-agnostic-thinking-model",
+			"reasoning":true,
+			"input_modalities":["text"],
+			"context_window":128000
+		}]}`)),
+	}}
+	repo := &upstreamModelMetadataRepoStub{}
+	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+
+	catalog, err := svc.SyncUpstreamModelCatalog(context.Background(), &Account{
+		ID: 111, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
+		Credentials: map[string]any{"api_key": "key", "base_url": "https://provider.example/v1"},
+	})
+	require.NoError(t, err)
+	require.Empty(t, catalog.Warnings)
+	require.NotNil(t, repo.updates)
+	require.Empty(t, catalog.Metadata["provider-agnostic-thinking-model"].SupportedReasoningLevels)
 }
 
 func TestSyncUpstreamModelCatalogClassifiesSnapshotPersistenceFailureAsInternal(t *testing.T) {
