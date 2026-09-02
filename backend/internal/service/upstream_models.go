@@ -11,16 +11,19 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
+	"github.com/Wei-Shaw/sub2api/resources/modelmetadata"
 )
 
 const (
 	upstreamModelsBodyLimit             int64 = 8 << 20
 	modelsDevRegistryURL                      = "https://models.dev/api.json"
+	modelsDevModelRegistryURL                 = "https://models.dev/models.json"
 	modelsDevRegistryTTL                      = 6 * time.Hour
 	UpstreamModelMetadataExtraKey             = "upstream_model_metadata"
 	UpstreamModelMetadataIncompleteCode       = "upstream_model_metadata_incomplete"
@@ -86,6 +89,26 @@ type modelsDevLimit struct {
 	Context int64 `json:"context"`
 	Output  int64 `json:"output"`
 }
+
+var modelsDevNamespaceAliases = map[string]string{
+	"deepseek-ai": "deepseek",
+	"minimaxai":   "minimax",
+}
+
+var modelsDevBarePrefixAliases = map[string]string{
+	"glm-":  "zhipuai/",
+	"kimi-": "moonshotai/",
+}
+
+var modelsDevExactAliases = map[string]string{
+	"minimax-m3":           "minimax/MiniMax-M3",
+	"minimaxai/minimax-m3": "minimax/MiniMax-M3",
+}
+
+var (
+	bundledModelsDevFallbackOnce     sync.Once
+	bundledModelsDevFallbackRegistry map[string]modelsDevModel
+)
 
 func (a *Account) SetUpstreamModelMetadataSnapshot(snapshot UpstreamModelMetadataSnapshot) {
 	if a == nil {
@@ -225,13 +248,13 @@ func (s *AccountTestService) SyncUpstreamModelCatalog(ctx context.Context, accou
 	source := "upstream"
 	metadataIncomplete := upstreamCatalogNeedsRegistry(models, catalog.Metadata)
 	if metadataIncomplete {
-		if registryMetadata, registryErr := s.fetchModelsDevMetadata(ctx, account, models); registryErr == nil {
+		if registryMetadata, registryErr := s.fetchModelsDevModelMetadata(ctx, account, models); registryErr == nil {
 			for modelID, fallback := range registryMetadata {
 				current := catalog.Metadata[modelID]
 				merged, changed := mergeUpstreamModelMetadata(current, fallback)
 				catalog.Metadata[modelID] = merged
 				if changed {
-					source = "models.dev"
+					source = "models.dev/models"
 				}
 			}
 		} else {
@@ -242,26 +265,56 @@ func (s *AccountTestService) SyncUpstreamModelCatalog(ctx context.Context, accou
 			)
 		}
 	}
-
 	if upstreamCatalogNeedsRegistry(models, catalog.Metadata) {
+		if registryMetadata, registryErr := s.fetchModelsDevMetadata(ctx, account, models); registryErr == nil {
+			for modelID, fallback := range registryMetadata {
+				current := catalog.Metadata[modelID]
+				merged, changed := mergeUpstreamModelMetadata(current, fallback)
+				catalog.Metadata[modelID] = merged
+				if changed {
+					source = "models.dev"
+				}
+			}
+		} else {
+			slog.Warn("upstream model provider capability metadata enrichment failed",
+				"account_id", upstreamModelSyncAccountID(account),
+				"platform", upstreamModelSyncPlatform(account),
+				"error", registryErr,
+			)
+		}
+	}
+	if upstreamCatalogNeedsRegistry(models, catalog.Metadata) {
+		registryMetadata := modelsDevModelMetadataFromRegistry(loadBundledModelsDevModelRegistry(), models)
+		for modelID, fallback := range registryMetadata {
+			current := catalog.Metadata[modelID]
+			merged, changed := mergeUpstreamModelMetadata(current, fallback)
+			catalog.Metadata[modelID] = merged
+			if changed {
+				source = "models.dev/bundled"
+			}
+		}
+	}
+
+	metadataIncomplete = upstreamCatalogNeedsRegistry(models, catalog.Metadata)
+	completeMetadata := completeUpstreamModelMetadataForModels(models, catalog.Metadata)
+	if len(completeMetadata) > 0 && account != nil && account.ID > 0 && s.accountRepo != nil {
+		snapshot := UpstreamModelMetadataSnapshot{
+			Source:   source,
+			SyncedAt: time.Now().UTC().Format(time.RFC3339),
+			Models:   completeMetadata,
+		}
+		if err := s.accountRepo.UpdateExtra(ctx, account.ID, map[string]any{UpstreamModelMetadataExtraKey: snapshot}); err != nil {
+			return nil, newUpstreamModelSyncInternalError("Failed to save upstream model metadata", err)
+		}
+		account.SetUpstreamModelMetadataSnapshot(snapshot)
+	}
+	if metadataIncomplete {
 		catalog.Warnings = append(catalog.Warnings, UpstreamModelSyncWarning{
 			Code:    UpstreamModelMetadataIncompleteCode,
 			Message: "Model IDs were synced, but capability metadata is incomplete.",
 		})
 		return catalog, nil
 	}
-	if len(catalog.Metadata) == 0 || account == nil || account.ID <= 0 || s.accountRepo == nil {
-		return catalog, nil
-	}
-	snapshot := UpstreamModelMetadataSnapshot{
-		Source:   source,
-		SyncedAt: time.Now().UTC().Format(time.RFC3339),
-		Models:   catalog.Metadata,
-	}
-	if err := s.accountRepo.UpdateExtra(ctx, account.ID, map[string]any{UpstreamModelMetadataExtraKey: snapshot}); err != nil {
-		return nil, newUpstreamModelSyncInternalError("Failed to save upstream model metadata", err)
-	}
-	account.SetUpstreamModelMetadataSnapshot(snapshot)
 	return catalog, nil
 }
 
@@ -311,17 +364,34 @@ func upstreamCatalogNeedsRegistry(models []string, metadata map[string]UpstreamM
 	for _, modelID := range models {
 		modelID = strings.TrimSpace(modelID)
 		model, ok := metadata[modelID]
-		if !ok || !upstreamModelMetadataIsUseful(model) {
-			return true
-		}
-		if model.Reasoning == nil || len(model.InputModalities) == 0 || model.ContextWindow <= 0 {
-			return true
-		}
-		if *model.Reasoning && len(model.SupportedReasoningLevels) == 0 {
+		if !ok || !metadataCompleteForModel(model) {
 			return true
 		}
 	}
 	return false
+}
+
+func completeUpstreamModelMetadataForModels(models []string, metadata map[string]UpstreamModelMetadata) map[string]UpstreamModelMetadata {
+	complete := make(map[string]UpstreamModelMetadata)
+	for _, modelID := range models {
+		modelID = strings.TrimSpace(modelID)
+		if modelID == "" {
+			continue
+		}
+		modelMetadata, ok := metadata[modelID]
+		if !ok || !metadataCompleteForModel(modelMetadata) {
+			continue
+		}
+		complete[modelID] = modelMetadata
+	}
+	return complete
+}
+
+func metadataCompleteForModel(metadata UpstreamModelMetadata) bool {
+	return upstreamModelMetadataIsUseful(metadata) &&
+		metadata.Reasoning != nil &&
+		len(metadata.InputModalities) > 0 &&
+		metadata.ContextWindow > 0
 }
 
 func upstreamModelMetadataIsUseful(metadata UpstreamModelMetadata) bool {
@@ -418,6 +488,163 @@ func (s *AccountTestService) fetchModelsDevMetadata(
 	return metadata, nil
 }
 
+func (s *AccountTestService) fetchModelsDevModelMetadata(
+	ctx context.Context,
+	account *Account,
+	modelIDs []string,
+) (map[string]UpstreamModelMetadata, error) {
+	registry, err := s.fetchModelsDevModelRegistry(ctx, account)
+	if err != nil {
+		return nil, err
+	}
+	return modelsDevModelMetadataFromRegistry(registry, modelIDs), nil
+}
+
+func modelsDevModelMetadataFromRegistry(registry map[string]modelsDevModel, modelIDs []string) map[string]UpstreamModelMetadata {
+	metadata := make(map[string]UpstreamModelMetadata)
+	for _, modelID := range modelIDs {
+		modelID = strings.TrimSpace(modelID)
+		if modelID == "" {
+			continue
+		}
+		var model modelsDevModel
+		found := false
+		for _, lookupID := range modelsDevMetadataLookupKeys(modelID) {
+			model, found = registry[lookupID]
+			if found {
+				break
+			}
+			for candidateID, candidate := range registry {
+				if strings.EqualFold(strings.TrimSpace(candidateID), lookupID) || strings.EqualFold(strings.TrimSpace(candidate.ID), lookupID) {
+					model = candidate
+					found = true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+		if !found {
+			continue
+		}
+		entry := upstreamMetadataFromModelsDevModel(modelID, model)
+		if upstreamModelMetadataIsUseful(entry) {
+			metadata[modelID] = entry
+		}
+	}
+	return metadata
+}
+
+func modelsDevMetadataLookupKeys(modelID string) []string {
+	modelID = strings.TrimSpace(modelID)
+	if modelID == "" {
+		return nil
+	}
+	keys := make([]string, 0, 4)
+	seen := make(map[string]struct{}, 4)
+	add := func(key string) {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			return
+		}
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		keys = append(keys, key)
+	}
+
+	add(modelID)
+	baseID := modelID
+	if strings.HasSuffix(strings.ToLower(baseID), ":cloud") {
+		baseID = strings.TrimSpace(baseID[:len(baseID)-len(":cloud")])
+		add(baseID)
+	}
+	if alias, ok := modelsDevExactAliases[strings.ToLower(baseID)]; ok {
+		add(alias)
+		return keys
+	}
+	if slash := strings.Index(baseID, "/"); slash > 0 {
+		namespace := strings.ToLower(strings.TrimSpace(baseID[:slash]))
+		if aliasNamespace, ok := modelsDevNamespaceAliases[namespace]; ok {
+			add(aliasNamespace + "/" + strings.TrimSpace(baseID[slash+1:]))
+		}
+	} else {
+		lowerBaseID := strings.ToLower(baseID)
+		for prefix, namespace := range modelsDevBarePrefixAliases {
+			if strings.HasPrefix(lowerBaseID, prefix) {
+				add(namespace + baseID)
+				break
+			}
+		}
+	}
+	return keys
+}
+
+func loadBundledModelsDevModelRegistry() map[string]modelsDevModel {
+	bundledModelsDevFallbackOnce.Do(func() {
+		var registry map[string]modelsDevModel
+		if err := json.Unmarshal(modelmetadata.ModelsDevFallbackJSON, &registry); err != nil {
+			slog.Warn("failed to parse bundled model capability metadata fallback", "error", err)
+			return
+		}
+		bundledModelsDevFallbackRegistry = registry
+	})
+	return bundledModelsDevFallbackRegistry
+}
+
+func (s *AccountTestService) fetchModelsDevModelRegistry(ctx context.Context, account *Account) (map[string]modelsDevModel, error) {
+	if s == nil || s.httpUpstream == nil || account == nil {
+		return nil, fmt.Errorf("model metadata registry is not configured")
+	}
+	now := time.Now()
+	s.modelMetadataRegistryMu.Lock()
+	if len(s.modelMetadataModels) > 0 && now.Sub(s.modelMetadataModelsAt) < modelsDevRegistryTTL {
+		cached := s.modelMetadataModels
+		s.modelMetadataRegistryMu.Unlock()
+		return cached, nil
+	}
+	s.modelMetadataRegistryMu.Unlock()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, modelsDevModelRegistryURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	resp, err := s.doUpstreamModelsRequest(req, upstreamModelsProxyURL(account), account)
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil {
+		return nil, fmt.Errorf("model metadata registry returned no response")
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("model metadata registry returned HTTP %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, upstreamModelsBodyLimit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(body)) > upstreamModelsBodyLimit {
+		return nil, fmt.Errorf("model metadata registry response exceeds %d bytes", upstreamModelsBodyLimit)
+	}
+	var registry map[string]modelsDevModel
+	if err := json.Unmarshal(body, &registry); err != nil {
+		return nil, fmt.Errorf("parse model metadata registry: %w", err)
+	}
+	if len(registry) == 0 {
+		return nil, fmt.Errorf("model metadata registry is empty")
+	}
+
+	s.modelMetadataRegistryMu.Lock()
+	s.modelMetadataModels = registry
+	s.modelMetadataModelsAt = now
+	s.modelMetadataRegistryMu.Unlock()
+	return registry, nil
+}
+
 func (s *AccountTestService) fetchModelsDevRegistry(ctx context.Context, account *Account) (map[string]modelsDevProvider, error) {
 	now := time.Now()
 	s.modelMetadataRegistryMu.Lock()
@@ -436,6 +663,9 @@ func (s *AccountTestService) fetchModelsDevRegistry(ctx context.Context, account
 	resp, err := s.doUpstreamModelsRequest(req, upstreamModelsProxyURL(account), account)
 	if err != nil {
 		return nil, err
+	}
+	if resp == nil {
+		return nil, fmt.Errorf("model metadata registry returned no response")
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
