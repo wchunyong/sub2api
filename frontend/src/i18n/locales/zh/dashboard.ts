@@ -127,6 +127,13 @@ export default {
     lastUsedAt: '上次使用时间',
     lastUsedIP: '最近使用 IP',
     quickImport: {
+      operationHelp: '操作提示',
+      powershellOnly: 'Windows 请使用 PowerShell 执行，不要使用 CMD。',
+      powershellHelp: '1. 按 Win 键，搜索并打开 Windows PowerShell（不是 CMD / 命令提示符）。\n2. 点击“复制导入命令”，粘贴到 PowerShell，按回车执行；请在 5 分钟内完成。\n3. 等待完成后重启 Agent。清理命令也在原电脑用户的 PowerShell 中执行。\n需要已安装 Agent 和 Python 3.11+；无需管理员权限。',
+      shellHelp: '打开 macOS / Linux 终端，点击“复制导入命令”并粘贴，按回车执行。请在 5 分钟内完成，成功后重启 Agent。清理命令在原导入环境执行。需要 Agent 和 Python 3.11+。',
+      ccsHelp: '先安装并打开 CC Switch，再点击“导入到 CCS”。允许浏览器打开应用，核对并保存配置。按钮置灰表示当前密钥或 Agent 不支持此方式。',
+      manualHelp: '点击“手动配置”，按页面说明复制密钥和配置内容，填写到对应 Agent，保存后重启。建议优先使用复制导入命令或 CCS。',
+
       ccsUnavailable: '当前密钥与此 Agent 暂不支持 CCS 导入',
       chooseAction: '选择操作',
       supportedOnly: '不支持当前密钥的 Agent 已置灰',
