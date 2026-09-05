@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('installer', Path(__file__).parents[1] / 'assets' / 'installer.py')
 installer = importlib.util.module_from_spec(spec)
@@ -60,5 +61,24 @@ class InstallerTests(unittest.TestCase):
         path = self.root / '.claude/settings.json'; path.parent.mkdir(parents=True); path.write_text('{bad')
         with self.assertRaises(ValueError): installer.install(self.root, self.payload('claude'))
         self.assertEqual(path.read_text(), '{bad')
+    def test_cleanup_journal_failure_rolls_back_and_can_retry(self):
+        installer.install(self.root, self.payload('claude'))
+        p = self.payload('claude'); p['api_key'] = 'second-mock-key'; installer.install(self.root, p)
+        original_write = installer.write_journal
+        count = 0
+        def fail_once(folder, records):
+            nonlocal count
+            count += 1
+            if count == 2: raise OSError('simulated disk failure')
+            original_write(folder, records)
+        with patch.object(installer, 'write_journal', fail_once):
+            with self.assertRaises(OSError): installer.clean(self.root, 'claude')
+        installer.clean(self.root, 'claude')
+        installer.clean(self.root, 'claude')
+        self.assertFalse((self.root / '.claude/settings.json').exists())
+    def test_missing_client_has_install_instructions(self):
+        with patch.object(installer.shutil, 'which', return_value=None):
+            with self.assertRaisesRegex(ValueError, 'Install Codex'):
+                installer.require_client('codex')
 
 if __name__ == '__main__': unittest.main()

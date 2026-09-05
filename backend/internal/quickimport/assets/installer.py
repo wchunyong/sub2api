@@ -163,7 +163,7 @@ def write_journal(folder, records):
 
 
 def check_pending(records):
-    if records and records[-1].get('pending'):
+    if records and (records[-1].get('pending') or records[-1].get('cleanup_pending')):
         raise ValueError('Interrupted operation: inspect journal and restore its before_text before retrying')
 
 
@@ -195,18 +195,51 @@ def install(root, payload):
 def clean(root, agent):
     path = target(root, agent)
     with locked(root, agent) as folder:
-        records = read_journal(folder); check_pending(records)
+        records = read_journal(folder)
         if not records: raise ValueError('No configuration to clean for this Agent')
         record = records[-1]
         if record['agent'] != agent: raise ValueError('Agent mismatch')
         current = path.read_text(encoding='utf-8-sig') if path.exists() else ''
+        if record.get('cleanup_pending'):
+            if current == record['cleanup_result_text'] or (not path.exists() and record['cleanup_delete']):
+                write_journal(folder, records[:-1])
+                return
+            if current != record['cleanup_before_text']:
+                raise ValueError('Interrupted cleanup conflict: subsequent edits preserved')
+            record.pop('cleanup_pending')
+            write_journal(folder, records)
+        check_pending(records)
         data = load(current, agent)
         for change in record['changes']:
             if get(data, change['path']) != change['value']: raise ValueError('Configuration conflict: later edits preserved. Restore the changed fields manually or revert them and retry.')
         result = record['before_text'] if current == record['after_text'] else render(current, agent, record['inverse'])
-        if not record['existed'] and not load(result, agent): path.unlink(missing_ok=True)
-        else: atomic_write(path, result)
-        records.pop(); write_journal(folder, records)
+        # Persist intent before touching the file; roll back if journal commit fails.
+        record['cleanup_pending'] = True
+        record['cleanup_before_text'] = current
+        record['cleanup_result_text'] = result
+        record['cleanup_delete'] = not record['existed'] and not load(result, agent)
+        write_journal(folder, records)
+        try:
+            if not record['existed'] and not load(result, agent): path.unlink(missing_ok=True)
+            else: atomic_write(path, result)
+            write_journal(folder, records[:-1])
+        except Exception:
+            atomic_write(path, current)
+            record.pop('cleanup_pending', None)
+            write_journal(folder, records)
+            raise
+
+
+def require_client(agent):
+    if shutil.which(agent): return
+    if agent == 'opencode':
+        candidates = [Path('/Applications/OpenCode.app'), Path.home() / 'Applications/OpenCode.app']
+        if os.name == 'nt':
+            local = Path(os.environ.get('LOCALAPPDATA', ''))
+            candidates += [local / 'Programs/@opencode-aidesktop/OpenCode.exe', local / 'OpenCode/OpenCode.exe']
+        if any(path.exists() for path in candidates): return
+    instructions = {'claude': 'Install Claude Code: https://code.claude.com/docs/en/setup', 'codex': 'Install Codex using its official instructions: https://developers.openai.com/codex/cli', 'opencode': 'Install OpenCode: https://opencode.ai/download'}
+    raise ValueError(instructions[agent] + '. Reopen the terminal and generate a new command afterwards.')
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -230,6 +263,9 @@ def main():
             clean(root, args.agent)
             print('Restored. Restart the client. Run again to undo an earlier import, if needed.')
         else:
+            require_client(args.agent)
+            overrides = {'opencode': ['OPENCODE_CONFIG', 'OPENCODE_CONFIG_CONTENT', 'XDG_CONFIG_HOME'], 'claude': ['CLAUDE_CONFIG_DIR', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY'], 'codex': ['CODEX_HOME']}[args.agent]
+            if any(os.environ.get(name) for name in overrides): raise ValueError('Custom configuration environment detected. Use manual setup or clear overrides first.')
             if args.stdin: payload = json.load(sys.stdin)
             else:
                 if not args.server or not args.ticket: raise ValueError('Missing server or ticket')
@@ -239,8 +275,6 @@ def main():
                 with urllib.request.build_opener(NoRedirect).open(request, timeout=30) as response:
                     payload = json.load(response)['data']
             if payload['agent'] != args.agent: raise ValueError('Agent mismatch')
-            overrides = {'opencode': ['OPENCODE_CONFIG', 'OPENCODE_CONFIG_CONTENT', 'XDG_CONFIG_HOME'], 'claude': ['CLAUDE_CONFIG_DIR', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY'], 'codex': ['CODEX_HOME']}[args.agent]
-            if any(os.environ.get(name) for name in overrides): raise ValueError('Custom configuration environment detected. Use manual setup or clear overrides first.')
             install(root, payload)
             print(f'Configured {args.agent}. Restart the client. A project configuration may override user settings.')
             print(f'Offline recovery: python "{root / ".sub2api-quick-import" / args.agent / "restore.py"}" clean --agent {args.agent}')

@@ -48,7 +48,7 @@ func (h *QuickImportHandler) Issue(c *gin.Context) {
 		return
 	}
 	key, ok := h.validKey(c.Request.Context(), request.KeyID, subject.UserID)
-	if !ok {
+	if !ok || key.Group.ClaudeCodeOnly && request.Agent != "claude" {
 		response.BadRequest(c, "Key is unavailable for import")
 		return
 	}
@@ -90,7 +90,7 @@ func (h *QuickImportHandler) Exchange(c *gin.Context) {
 		return
 	}
 	key, ok := h.validKey(c.Request.Context(), ticket.KeyID, ticket.UserID)
-	if !ok {
+	if !ok || key.Group.ClaudeCodeOnly && ticket.Agent != "claude" {
 		response.BadRequest(c, "Key is no longer available")
 		return
 	}

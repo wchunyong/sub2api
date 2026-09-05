@@ -82,6 +82,11 @@ func TestQuickImportOwnershipRevocationAndExchange(t *testing.T) {
 		t.Fatal("revoked key accepted")
 	}
 	keys.key.Status = service.StatusActive
+	keys.key.Group.ClaudeCodeOnly = true
+	if w = request(h.Issue, `{"key_id":2,"agent":"codex"}`, 1); w.Code == 200 {
+		t.Fatal("Claude-only group accepted a Codex import")
+	}
+	keys.key.Group.ClaudeCodeOnly = false
 	code = issue()
 	if w = request(h.Exchange, `{"ticket":"`+code+`","agent":"claude"}`, 0); w.Code == 200 {
 		t.Fatal("wrong agent accepted")
