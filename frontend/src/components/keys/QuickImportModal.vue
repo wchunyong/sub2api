@@ -94,7 +94,7 @@ async function generate() {
 }
 async function copyCommand(kind: 'import' | 'clean', current = generation) {
   if (!agent.value || !automaticAgent(agent.value)) return
-  const value = kind === 'clean' ? cleanupCommand(os.value, agent.value) : command.value
+  const value = kind === 'clean' ? cleanupCommand(os.value, agent.value, importServer()) : command.value
   try {
     const success = await copyToClipboard(value)
     if (current === generation) {

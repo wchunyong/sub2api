@@ -80,7 +80,7 @@ describe('QuickImportModal', () => {
     await wrapper.get('[data-testid="agent-claude"]').trigger('click')
     await wrapper.get('[data-testid="clean"]').trigger('click')
     await flushPromises()
-    expect(copy.mock.lastCall?.[0]).toContain('/claude/restore.py')
+    expect(copy.mock.lastCall?.[0]).toContain('/claude/restore.sh')
     wrapper.unmount()
   })
 })

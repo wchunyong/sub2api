@@ -129,8 +129,8 @@ export default {
     quickImport: {
       operationHelp: 'How to use',
       powershellOnly: 'Windows: run in PowerShell, not CMD.',
-      powershellHelp: '1. Open Windows PowerShell from Start (not CMD / Command Prompt).\n2. Copy the import command, paste into PowerShell and press Enter within 5 minutes.\n3. Restart the Agent when finished. Run cleanup in the original Windows user account using PowerShell.\nRequires the Agent and Python 3.11+. Administrator rights are not required.',
-      shellHelp: 'Open your macOS / Linux terminal. Copy and paste the import command and press Enter within 5 minutes. Restart the Agent afterwards. Run cleanup in the original environment. Requires the Agent and Python 3.11+.',
+      powershellHelp: '1. Open Windows PowerShell from Start (not CMD / Command Prompt).\n2. Copy the import command, paste into PowerShell and press Enter within 5 minutes.\n3. Restart the Agent when finished. Run cleanup in the original Windows user account using PowerShell.\nInstall the Agent first. No Python or administrator rights required. The helper is downloaded on first use.',
+      shellHelp: 'Open your macOS / Linux terminal. Copy and paste the import command and press Enter within 5 minutes. Restart the Agent afterwards. Run cleanup in the original environment. Install the Agent first. No Python required. The helper is downloaded on first use.',
       ccsHelp: 'Install and open CC Switch. Click Import to CCS, allow the browser to open the application, then review and save the configuration. A disabled button means this key or Agent is unsupported.',
       manualHelp: 'Open manual configuration and follow its instructions to copy and save the key and settings in your Agent, then restart it. Prefer command import or CCS.',
 
@@ -149,7 +149,7 @@ export default {
 
       manualOnly: 'This Agent currently supports manual configuration; automatic scripts are unavailable.',
       cleanHint: 'Undo the most recent import for this Agent only. Other Agents and later edits are preserved. Confirm in the terminal. Works offline without an active key.',
-      runtimeHint: 'Requires Python 3.11 or later. The script backs up and merges configuration. Restart your client afterwards.',
+      runtimeHint: 'No Python required. The verified native helper is downloaded on first use. The script backs up and merges configuration. Restart your client afterwards.',
       system: 'Operating system',
       model: 'Model (optional)',
       modelHint: 'Leave empty for the group default',
@@ -162,7 +162,7 @@ export default {
       terminalHelp: 'How do I open a terminal?',
       windowsHelp: 'Press Win, search for PowerShell, open it, paste the command and press Enter. Administrator access is not required.',
       unixHelp: 'On macOS find Terminal with Spotlight. On Linux open Terminal. For WSL use the Linux terminal.',
-      installHelp: 'If Python is missing, install version 3.11 or later from python.org and reopen the terminal. Install the selected client using its official instructions if it is not installed.',
+      installHelp: 'No Python or Node.js installation is required. Install the selected client using its official instructions if it is not installed.',
       title: 'Quick import',
       selectAgent: 'Choose an Agent',
       unsupported: 'This key does not support this Agent. Previous imports can still be cleaned up.',
