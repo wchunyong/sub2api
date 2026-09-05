@@ -994,6 +994,7 @@
       :key-name="selectedKey?.name"
       :active="selectedKey?.status === 'active'"
       :hide-ccs="publicSettings?.hide_ccs_import_button"
+      :claude-code-only="selectedKey?.group?.claude_code_only"
       :api-key="selectedKey?.key || ''"
       :base-url="publicSettings?.api_base_url || ''"
       :platform="selectedKey?.group?.platform || null"
