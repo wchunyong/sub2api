@@ -16,6 +16,7 @@ import sys
 import tempfile
 import tomllib
 import urllib.request
+import uuid
 from urllib.parse import urlparse
 from contextlib import contextmanager
 
@@ -125,15 +126,20 @@ def configuration(payload):
     if parsed.scheme != 'https' and not (parsed.scheme == 'http' and parsed.hostname in ('127.0.0.1', 'localhost')):
         raise ValueError('HTTPS gateway required')
     if parsed.username or parsed.password or parsed.query or parsed.fragment: raise ValueError('Invalid gateway URL')
+    catalog = normalize_models(payload.get('models', [{'id': model}]))
+    if model not in {item['id'] for item in catalog}: raise ValueError('Selected model is not in the gateway model list. Choose an available model and retry.')
     if agent == 'claude':
         fields = [(['env', 'ANTHROPIC_BASE_URL'], base), (['env', 'ANTHROPIC_AUTH_TOKEN'], key), (['env', 'ANTHROPIC_MODEL'], model)]
+        fields += [(['env', 'ANTHROPIC_CUSTOM_MODEL_OPTION'], model), (['env', 'ANTHROPIC_CUSTOM_MODEL_OPTION_NAME'], 'lianjieai · ' + model), (['env', 'ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION'], 'lianjieai gateway')]
+        if payload.get('claude_model_picker_supported', True):
+            fields.append((['modelPicker'], {'options': [{'model': item['id'], 'label': 'lianjieai · ' + item['name']} for item in catalog], 'replaceBuiltInOptions': True}))
     elif agent == 'codex':
-        fields = [(['model'], model), (['model_provider'], PROVIDER), (['model_providers', PROVIDER], dict(name='Sub2API', base_url=base, wire_api='responses', experimental_bearer_token=key, requires_openai_auth=False))]
+        fields = [(['model'], model), (['model_provider'], PROVIDER), (['model_providers', PROVIDER], dict(name='lianjieai', base_url=base, wire_api='responses', experimental_bearer_token=key, requires_openai_auth=False))]
+        if payload.get('catalog_path'): fields.append((['model_catalog_json'], payload['catalog_path']))
     else:
         protocol = payload.get('protocol', 'openai')
         npm = {'openai': '@ai-sdk/openai', 'anthropic': '@ai-sdk/anthropic', 'compatible': '@ai-sdk/openai-compatible', 'gemini': '@ai-sdk/google'}.get(protocol)
         if not npm: raise ValueError('Unsupported protocol')
-        catalog = normalize_models(payload.get('models', [{'id': model}]))
         models = {item['id']: {'name': item['name']} for item in catalog}
         if model not in models: raise ValueError('Selected model is not in the gateway model list. Choose an available model and retry.')
         provider = dict(npm=npm, name='lianjieai', options=dict(baseURL=base, apiKey=key), models=models)
@@ -171,7 +177,8 @@ def check_pending(records):
 
 
 def install(root, payload):
-    agent = payload['agent']; changes = configuration(payload); path = target(root, agent)
+    payload = copy.deepcopy(payload)
+    agent = payload['agent']; path = target(root, agent)
     if agent == 'opencode' and path.with_suffix('.jsonc').exists():
         # Desktop may create a schema-only JSONC file. Leave it intact when it
         # cannot override our provider/model; complex JSONC requires manual setup.
@@ -183,14 +190,23 @@ def install(root, payload):
             raise ValueError('Existing OpenCode JSONC configuration: use manual configuration to avoid precedence conflicts')
     with locked(root, agent) as folder:
         records = read_journal(folder); check_pending(records)
+        owned = []
+        if agent == 'codex' and payload.get('codex_manifest') is not None:
+            manifest = payload['codex_manifest']
+            validate_codex_manifest(manifest, payload['model'])
+            catalog_file = folder / ('models-' + uuid.uuid4().hex + '.json')
+            owned.append({'path': str(catalog_file.relative_to(root)), 'text': json.dumps(manifest, ensure_ascii=False, indent=2) + '\n'})
+            payload['catalog_path'] = str(catalog_file)
+        changes = configuration(payload)
         before = path.read_text(encoding='utf-8-sig') if path.exists() else ''
         original = load(before, agent)
         after = render(before, agent, changes)
         if after == before: return
         record = dict(agent=agent, existed=path.exists(), before_text=before, after_text=after,
-                      changes=changes, inverse=[dict(path=c['path'], value=get(original, c['path'])) for c in changes], pending=True)
+                      changes=changes, inverse=[dict(path=c['path'], value=get(original, c['path'])) for c in changes], pending=True, owned_files=owned)
         records.append(record); write_journal(folder, records)
         try:
+            for item in owned: atomic_write(owned_path(root, folder, item), item['text'])
             atomic_write(path, after)
             # Save the complete standard-library runner for offline recovery.
             atomic_write(folder / 'restore.py', Path(__file__).read_text(encoding='utf-8'))
@@ -198,8 +214,16 @@ def install(root, payload):
         except Exception:
             if record['existed']: atomic_write(path, before)
             else: path.unlink(missing_ok=True)
+            for item in owned: owned_path(root, folder, item).unlink(missing_ok=True)
             records.pop(); write_journal(folder, records)
             raise
+
+
+def owned_path(root, folder, item):
+    path = root / item['path']
+    if path.parent != folder or not re.fullmatch(r'models-[a-f0-9]{32}\.json', path.name) or path.is_symlink():
+        raise ValueError('Invalid recovery catalog path')
+    return path
 
 
 def clean(root, agent):
@@ -210,8 +234,15 @@ def clean(root, agent):
         record = records[-1]
         if record['agent'] != agent: raise ValueError('Agent mismatch')
         current = path.read_text(encoding='utf-8-sig') if path.exists() else ''
+        owned = record.get('owned_files', [])
+        for item in owned:
+            auxiliary = owned_path(root, folder, item)
+            if not auxiliary.exists() and record.get('cleanup_pending'): continue
+            if not auxiliary.exists() or auxiliary.read_text(encoding='utf-8') != item['text']:
+                raise ValueError('Model catalog conflict: later edits preserved')
         if record.get('cleanup_pending'):
             if current == record['cleanup_result_text'] or (not path.exists() and record['cleanup_delete']):
+                for item in owned: owned_path(root, folder, item).unlink(missing_ok=True)
                 write_journal(folder, records[:-1])
                 return
             if current != record['cleanup_before_text']:
@@ -232,8 +263,10 @@ def clean(root, agent):
         try:
             if not record['existed'] and not load(result, agent): path.unlink(missing_ok=True)
             else: atomic_write(path, result)
+            for item in owned: owned_path(root, folder, item).unlink(missing_ok=True)
             write_journal(folder, records[:-1])
         except Exception:
+            for item in owned: atomic_write(owned_path(root, folder, item), item['text'])
             atomic_write(path, current)
             record.pop('cleanup_pending', None)
             write_journal(folder, records)
@@ -283,6 +316,50 @@ def verify_connection(payload):
     return normalize_models(result['data'])
 
 
+def validate_codex_manifest(manifest, selected):
+    if not isinstance(manifest, dict) or not isinstance(manifest.get('models'), list):
+        raise ValueError('Gateway did not return a Codex model catalog')
+    if not any(isinstance(item, dict) and item.get('slug') == selected for item in manifest['models']):
+        raise ValueError('Selected model is not in the Codex model catalog')
+
+
+def compatible_codex_manifest(manifest):
+    manifest = copy.deepcopy(manifest)
+    for item in manifest['models']:
+        if not isinstance(item, dict): raise ValueError('Invalid Codex model descriptor')
+        messages = item.get('model_messages') or {}
+        if 'base_instructions' not in item and isinstance(messages.get('instructions_template'), str):
+            item['base_instructions'] = messages['instructions_template']
+        if 'supports_reasoning_summaries' not in item and isinstance(item.get('supports_reasoning_summary_parameter'), bool):
+            item['supports_reasoning_summaries'] = item['supports_reasoning_summary_parameter']
+    return manifest
+
+
+def client_version(agent):
+    executable = shutil.which(agent)
+    if not executable: return None
+    try:
+        result = subprocess.run([executable, '--version'], capture_output=True, text=True, timeout=10)
+        match = re.search(r'\b(\d+)\.(\d+)\.(\d+)\b', result.stdout)
+        return tuple(map(int, match.groups())) if result.returncode == 0 and match else None
+    except (OSError, subprocess.TimeoutExpired): return None
+
+
+def synchronize_models(payload):
+    payload['models'] = verify_connection(payload)
+    if payload['agent'] == 'claude':
+        payload['claude_model_picker_supported'] = (client_version('claude') or (0, 0, 0)) >= (2, 1, 242)
+        if not payload['claude_model_picker_supported']:
+            print('Claude Code < 2.1.242: selected model is configured. Upgrade for the full lianjieai /model menu, or rerun setup with another model.')
+    if payload['agent'] == 'codex':
+        version = '.'.join(map(str, client_version('codex') or (0, 147, 0)))
+        request = urllib.request.Request(payload['probe_url'] + '?client_version=' + version, headers={'Authorization': 'Bearer ' + payload['api_key'], 'User-Agent': 'lianjieai-quick-import/1.0', 'Accept': 'application/json'})
+        with urllib.request.build_opener(NoRedirect).open(request, timeout=30) as response:
+            manifest = json.loads(response.read(8 * 1024 * 1024))
+        validate_codex_manifest(manifest, payload['model'])
+        payload['codex_manifest'] = compatible_codex_manifest(manifest)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['install', 'clean'])
@@ -314,8 +391,7 @@ def main():
             if payload['agent'] != args.agent: raise ValueError('Agent mismatch')
             configuration(payload)
             if not args.stdin:
-                models = verify_connection(payload)
-                if payload['agent'] == 'opencode': payload['models'] = models
+                synchronize_models(payload)
             install(root, payload)
             print(f'Configured {args.agent}. Restart the client. A project configuration may override user settings.')
             print(f'Offline recovery: python "{root / ".sub2api-quick-import" / args.agent / "restore.py"}" clean --agent {args.agent}')

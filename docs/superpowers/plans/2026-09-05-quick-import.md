@@ -84,3 +84,16 @@ Implemented on `feature/quick-import-agents`. Changes have been committed by fea
 - Local user configuration synchronized with the gateway's 10 models; OpenCode CLI `models sub2api_quick` lists all 10. Default remains `gpt-5.5`. No generation request was made during this update.
 - Installer suite: 13 passing tests. Actual OpenCode mock invocation and cleanup pass.
 - This local update has a separate recovery record. Cleanup once undoes this refinement; a second cleanup undoes the initial import. No cleanup was executed on the user's configuration.
+
+## Claude Code / Codex 模型同步推广 — 2026-09-05
+
+- 用户确认 OpenCode 本地验证通过后，将命名、模型目录同步和可恢复导入推广到现有自动导入目标 Claude Code、Codex。
+- Claude Code：从当前密钥的 `/v1/models` 获取列表；2.1.242 及以上写入 `modelPicker`，标签使用 `lianjieai`。较旧版本仅配置所选模型和自定义模型名称，提示升级或重新导入以切换模型，不写入其不支持的新字段。
+- Codex：供应商名称为 `lianjieai`，按本机版本请求 `/v1/models?client_version=...`，将专用目录写入独立文件并配置 `model_catalog_json`。由网关已有指令模板和推理摘要标志补齐旧客户端要求的兼容字段。
+- Codex 目录文件随本次导入记录管理；清理恢复原目录引用并删除本次生成文件。发现用户修改目录时停止清理；清理提交失败时恢复目录和配置。
+- 本机 Codex 0.142.5 在临时 CODEX_HOME 下读取真实网关的 6 个模型，与响应集合一致，清理验证通过。仅读取模型接口，未发起生成请求。
+- 本机 Claude Code 2.1.215 走旧版配置分支；完整新版菜单尚未在新版实际客户端验收。配置与恢复由隔离测试覆盖。
+- OpenCode 实际 CLI 对本地 mock 网关的请求与清理回归通过；用户真实 OpenCode 配置未改动。
+- Gemini、Grok、Codex WebSocket 保持已有手动配置能力，本轮不增加未经验证的自动安装适配。macOS/Linux 实机验收仍待完成。
+- 参考 Claude 官方 model-config、settings-reference 与 Codex 官方 config-reference；模型列表在每次导入时更新，不启动后台常驻同步任务。
+- 最终验证：19 项 Python 安装器测试、quickimport Go 单元测试、实际 OpenCode mock 回归通过；独立代码审查无待修复问题。
