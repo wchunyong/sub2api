@@ -6,7 +6,7 @@
       <template v-if="!agent">
         <p class="qi-label">{{ t('keys.quickImport.selectAgent') }}</p>
         <div class="qi-agents">
-          <button v-for="item in availableAgents" :key="item.id" :data-testid="`agent-${item.id}`" class="qi-agent" @click="agent = item.id">
+          <button v-for="item in importAgents" :key="item.id" :data-testid="`agent-${item.id}`" class="qi-agent" :disabled="!agentSupported(item.id)" @click="agent = item.id">
             <span class="qi-logo" :class="{ 'qi-chatgpt': item.id === 'codex' }"><img v-if="agentIcons[item.id]" :src="agentIcons[item.id]" alt="" /><Icon v-else name="terminal" /></span>{{ item.name }}
           </button>
         </div>
@@ -16,12 +16,12 @@
         <div class="qi-selected"><span class="qi-logo" :class="{ 'qi-chatgpt': agent === 'codex' }"><img v-if="agentIcons[agent]" :src="agentIcons[agent]" alt="" /><Icon v-else name="terminal" /></span><strong>{{ agentName }}</strong><button class="qi-back" @click="back">← {{ t('keys.quickImport.back') }}</button></div>
         <template v-if="step === 'actions'">
           <div class="qi-actions">
-            <div v-if="automaticAgent(agent)" class="qi-choice qi-choice-main">
-              <button data-testid="auto" class="qi-action" :disabled="loading || !compatible" @click="generate"><span class="qi-badge">{{ t('keys.quickImport.recommended') }}</span><Icon name="terminal" size="lg" /><strong>{{ t(loading ? 'keys.quickImport.generating' : copied === 'import' ? 'keys.useKeyModal.copied' : 'keys.quickImport.copyImport') }}</strong><small>{{ t('keys.quickImport.autoHint') }}</small></button>
-              <button data-testid="clean" class="qi-clean" @click="clean"><Icon name="refresh" size="xs" />{{ t(copied === 'clean' ? 'keys.useKeyModal.copied' : 'keys.quickImport.copyClean') }}</button>
+            <div class="qi-choice qi-choice-main">
+              <button data-testid="auto" class="qi-action" :disabled="loading || !compatible || !automaticAgent(agent)" @click="generate"><span class="qi-badge">{{ t('keys.quickImport.recommended') }}</span><Icon name="terminal" size="lg" /><strong>{{ t(loading ? 'keys.quickImport.generating' : copied === 'import' ? 'keys.useKeyModal.copied' : 'keys.quickImport.copyImport') }}</strong><small>{{ t('keys.quickImport.autoHint') }}</small></button>
+              <button data-testid="clean" class="qi-clean" :disabled="!automaticAgent(agent)" @click="clean"><Icon name="refresh" size="xs" />{{ t(copied === 'clean' ? 'keys.useKeyModal.copied' : 'keys.quickImport.copyClean') }}</button>
             </div>
-            <div v-if="!hideCcs && supportsCcs(agent, platform)" class="qi-choice">
-              <button data-testid="ccs" class="qi-action" :disabled="!compatible" @click="openCcs"><span class="qi-badge">{{ t('keys.quickImport.recommended') }}</span><Icon name="externalLink" size="lg" /><strong>{{ t('keys.importToCcSwitch') }}</strong><small>{{ t('keys.quickImport.ccsHint') }}</small></button>
+            <div v-if="!hideCcs" class="qi-choice">
+              <button data-testid="ccs" class="qi-action" :disabled="!compatible || !supportsCcs(agent, platform)" @click="openCcs"><span class="qi-badge">{{ t('keys.quickImport.recommended') }}</span><Icon name="externalLink" size="lg" /><strong>{{ t('keys.importToCcSwitch') }}</strong><small>{{ t(supportsCcs(agent, platform) ? 'keys.quickImport.ccsHint' : 'keys.quickImport.ccsUnavailable') }}</small></button>
             </div>
             <div class="qi-choice"><button data-testid="manual" class="qi-action" :disabled="!compatible" @click="step = 'manual'"><span class="qi-badge qi-placeholder" aria-hidden="true">—</span><Icon name="cog" size="lg" /><strong>{{ t('keys.quickImport.manual') }}</strong><small>{{ t('keys.quickImport.manualHint') }}</small></button></div>
           </div>
@@ -104,7 +104,8 @@ async function clean() {
   await copyCommand('clean')
 }
 const agentIcons: Partial<Record<ImportAgent, string>> = { claude: claudeIcon, codex: chatgptIcon, opencode: opencodeIcon }
-const availableAgents = computed(() => importAgents.filter(item => (!props.claudeCodeOnly || item.id === 'claude') && supportsAgent(item.id, props.platform, props.allowMessagesDispatch)))
+function agentSupported(id: ImportAgent) { return (!props.claudeCodeOnly || id === 'claude') && supportsAgent(id, props.platform, props.allowMessagesDispatch) }
+const availableAgents = computed(() => importAgents.filter(item => agentSupported(item.id)))
 const agentName = computed(() => importAgents.find(item => item.id === agent.value)?.name)
 const compatible = computed(() => !!agent.value && props.active !== false && (!props.claudeCodeOnly || agent.value === 'claude') && supportsAgent(agent.value, props.platform, props.allowMessagesDispatch))
 watch(() => [props.show, props.keyId, props.apiKey, props.platform], () => { agent.value = null; step.value = 'actions'; ccsOpened.value = false })
@@ -128,4 +129,5 @@ function openCcs() {
 
 .qi-actions:has(>.qi-choice:nth-child(2):last-child){grid-template-columns:repeat(2,minmax(0,1fr))}.qi-actions:has(>.qi-choice:only-child){grid-template-columns:1fr}.qi-choice-main .qi-action>svg{color:#0dafa2}.qi-action:disabled{opacity:.5;cursor:not-allowed}.qi-action{min-height:190px}.qi-body .qi-clean{flex-shrink:0}.qi-chatgpt{background:#fff}.qi-chatgpt img{width:30px;height:30px}.qi-badge{font-size:11px;border-radius:5px;padding:2px 7px;color:var(--qi-sub);background:var(--qi-hover)}.qi-placeholder{visibility:hidden}.qi-step{display:block;font-size:12px;font-weight:400;color:#8190a4;margin-top:4px}.qi-body{padding:0;display:block}
 :global(.dark) .qi-body{--qi-bg:#1d293b;--qi-text:#f1f5fa;--qi-sub:#a2b0c3;--qi-line:#354357;--qi-hover:#25344a;--qi-soft:#173c40}
+.qi-agent:disabled,.qi-body .qi-clean:disabled{opacity:.4;cursor:not-allowed}.qi-agent:disabled:hover{background:transparent;border-color:var(--qi-line)}.qi-action{height:auto;min-height:190px;flex:1 0 auto;justify-content:flex-start}.qi-choice{min-height:236px}.qi-body .qi-clean{margin-top:auto}.qi-status{min-height:21px}
 </style>

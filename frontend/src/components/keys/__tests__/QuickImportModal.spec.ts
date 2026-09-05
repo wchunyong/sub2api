@@ -15,6 +15,13 @@ function render(extra = {}) {
   } } })
 }
 describe('QuickImportModal', () => {
+  it('keeps unavailable CCS visible and disabled without collapsing actions', async () => {
+    const wrapper = render({ platform: 'deepseek' })
+    await wrapper.get('[data-testid="agent-codex"]').trigger('click')
+    expect(wrapper.get('[data-testid="ccs"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.findAll('.qi-choice')).toHaveLength(3)
+    wrapper.unmount()
+  })
   it('clears the copy error on a successful retry', async () => {
     createTicket.mockResolvedValueOnce({ ticket: 'b'.repeat(64), agent: 'codex', expires_in: 300 })
     copy.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
@@ -29,9 +36,9 @@ describe('QuickImportModal', () => {
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
     wrapper.unmount()
   })
-  it('hides unsupported agents and copies directly without settings', async () => {
+  it('disables unsupported agents and copies directly without settings', async () => {
     const wrapper = render()
-    expect(wrapper.find('[data-testid="agent-gemini"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="agent-gemini"]').attributes('disabled')).toBeDefined()
     expect(wrapper.text()).toContain('ChatGPT/Codex')
     createTicket.mockResolvedValueOnce({ ticket: 'a'.repeat(64), agent: 'codex', expires_in: 300 })
     await wrapper.get('[data-testid="agent-codex"]').trigger('click')

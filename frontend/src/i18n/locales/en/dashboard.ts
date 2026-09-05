@@ -127,8 +127,9 @@ export default {
     lastUsedAt: 'Last Used',
     lastUsedIP: 'Last Used IP',
     quickImport: {
+      ccsUnavailable: 'CCS import is unavailable for this key and Agent',
       chooseAction: 'Choose an action',
-      supportedOnly: 'Only Agents supported by this key are shown',
+      supportedOnly: 'Agents unsupported by this key are disabled',
       recommended: 'Recommended',
       copyImport: 'Copy import command',
       copyClean: 'Copy cleanup command',

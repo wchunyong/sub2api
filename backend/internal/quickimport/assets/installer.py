@@ -369,6 +369,7 @@ def main():
     parser.add_argument('--stdin', action='store_true', help='Read configuration from stdin (isolated tests)')
     parser.add_argument('--home', type=Path, default=Path.home(), help='Explicit isolated home for testing')
     args = parser.parse_args()
+    stage = 'preflight'
     try:
         root = args.home.resolve()
         if args.action == 'clean':
@@ -385,19 +386,26 @@ def main():
                 if not args.server or not args.ticket: raise ValueError('Missing server or ticket')
                 parsed = urlparse(args.server)
                 if parsed.scheme != 'https' or parsed.username or parsed.password or parsed.query or parsed.fragment: raise ValueError('HTTPS server required')
-                request = urllib.request.Request(args.server.rstrip('/') + '/api/v1/quick-import/exchange', data=json.dumps({'ticket': args.ticket, 'agent': args.agent}).encode(), headers={'Content-Type': 'application/json'}, method='POST')
+                stage = 'configuration exchange'
+                request = urllib.request.Request(args.server.rstrip('/') + '/api/v1/quick-import/exchange', data=json.dumps({'ticket': args.ticket, 'agent': args.agent}).encode(), headers={'Content-Type': 'application/json', 'User-Agent': 'lianjieai-quick-import/1.0', 'Accept': 'application/json'}, method='POST')
                 with urllib.request.build_opener(NoRedirect).open(request, timeout=30) as response:
                     payload = json.load(response)['data']
             if payload['agent'] != args.agent: raise ValueError('Agent mismatch')
             configuration(payload)
             if not args.stdin:
+                stage = 'model catalog'
                 synchronize_models(payload)
+            stage = 'configuration write'
             install(root, payload)
             print(f'Configured {args.agent}. Restart the client. A project configuration may override user settings.')
             print(f'Offline recovery: python "{root / ".sub2api-quick-import" / args.agent / "restore.py"}" clean --agent {args.agent}')
     except Exception as error:
         # Network errors and parser exceptions may embed a credential-bearing body.
-        if isinstance(error, ValueError) and not isinstance(error, (json.JSONDecodeError, tomllib.TOMLDecodeError)):
+        if isinstance(error, urllib.error.HTTPError):
+            print(f'Failed during {stage}: HTTP {error.code}. Generate a new import command and retry; if it persists, report this stage and status.', file=sys.stderr)
+        elif isinstance(error, urllib.error.URLError):
+            print(f'Failed during {stage}: network or TLS connection error. Check connectivity and retry with a new command.', file=sys.stderr)
+        elif isinstance(error, ValueError) and not isinstance(error, (json.JSONDecodeError, tomllib.TOMLDecodeError)):
             print(str(error), file=sys.stderr)
         else: print('Operation failed. Original configuration was preserved or recovery information is available. Check network, permissions and configuration syntax.', file=sys.stderr)
         sys.exit(1)
