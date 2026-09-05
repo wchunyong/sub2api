@@ -377,17 +377,9 @@
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-900/20 dark:hover:text-green-400"
               >
                 <Icon name="terminal" size="sm" />
-                <span class="text-xs">{{ t('keys.useKey') }}</span>
+                <span class="text-xs">{{ t('keys.quickImport.title') }}</span>
               </button>
-              <!-- Import to CC Switch Button -->
-              <button
-                v-if="!publicSettings?.hide_ccs_import_button"
-                @click="importToCcswitch(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
-              >
-                <Icon name="upload" size="sm" />
-                <span class="text-xs">{{ t('keys.importToCcSwitch') }}</span>
-              </button>
+
               <!-- Toggle Status Button -->
               <button
                 @click="toggleKeyStatus(row)"
@@ -988,62 +980,27 @@
       @cancel="showResetRateLimitDialog = false"
     />
 
+    <BaseDialog :show="!!createdKeyForImport" :title="t('keys.keyCreatedSuccess')" @close="createdKeyForImport = null">
+      <div class="flex gap-3">
+        <button class="btn btn-primary" @click="openUseKeyModal(createdKeyForImport!); createdKeyForImport = null">{{ t('keys.quickImport.title') }}</button>
+        <button class="btn btn-secondary" @click="createdKeyForImport = null">{{ t('keys.quickImport.later') }}</button>
+      </div>
+    </BaseDialog>
+
     <!-- Use Key Modal -->
-    <UseKeyModal
+    <QuickImportModal
       :show="showUseKeyModal"
+      :key-id="selectedKey?.id || 0"
+      :key-name="selectedKey?.name"
+      :active="selectedKey?.status === 'active'"
+      :hide-ccs="publicSettings?.hide_ccs_import_button"
+      :claude-code-only="selectedKey?.group?.claude_code_only"
       :api-key="selectedKey?.key || ''"
       :base-url="publicSettings?.api_base_url || ''"
       :platform="selectedKey?.group?.platform || null"
       :allow-messages-dispatch="selectedKey?.group?.allow_messages_dispatch || false"
       @close="closeUseKeyModal"
     />
-
-    <!-- CCS Client Selection Dialog for Antigravity -->
-    <BaseDialog
-      :show="showCcsClientSelect"
-      :title="t('keys.ccsClientSelect.title')"
-      width="narrow"
-      @close="closeCcsClientSelect"
-    >
-      <div class="space-y-4">
-        <p class="text-sm text-gray-600 dark:text-gray-400">
-          {{ t('keys.ccsClientSelect.description') }}
-	        </p>
-	        <div class="grid grid-cols-2 gap-3">
-	          <button
-	            @click="handleCcsClientSelect('claude')"
-	            class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-gray-200 dark:border-dark-600 hover:border-primary-500 dark:hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all"
-	          >
-	            <Icon name="terminal" size="xl" class="text-gray-600 dark:text-gray-400" />
-	            <span class="font-medium text-gray-900 dark:text-white">{{
-	              t('keys.ccsClientSelect.claudeCode')
-	            }}</span>
-	            <span class="text-xs text-gray-500 dark:text-gray-400">{{
-	              t('keys.ccsClientSelect.claudeCodeDesc')
-	            }}</span>
-	          </button>
-	          <button
-	            @click="handleCcsClientSelect('gemini')"
-	            class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-gray-200 dark:border-dark-600 hover:border-primary-500 dark:hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all"
-	          >
-	            <Icon name="sparkles" size="xl" class="text-gray-600 dark:text-gray-400" />
-	            <span class="font-medium text-gray-900 dark:text-white">{{
-	              t('keys.ccsClientSelect.geminiCli')
-	            }}</span>
-	            <span class="text-xs text-gray-500 dark:text-gray-400">{{
-	              t('keys.ccsClientSelect.geminiCliDesc')
-	            }}</span>
-	          </button>
-	        </div>
-	      </div>
-      <template #footer>
-        <div class="flex justify-end">
-          <button @click="closeCcsClientSelect" class="btn btn-secondary">
-            {{ t('common.cancel') }}
-          </button>
-        </div>
-      </template>
-    </BaseDialog>
 
     <!-- Group Selector Dropdown (Teleported to body to avoid overflow clipping) -->
     <Teleport to="body">
@@ -1136,7 +1093,7 @@ import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 	import Select from '@/components/common/Select.vue'
 	import SearchInput from '@/components/common/SearchInput.vue'
 	import Icon from '@/components/icons/Icon.vue'
-	import UseKeyModal from '@/components/keys/UseKeyModal.vue'
+	import QuickImportModal from '@/components/keys/QuickImportModal.vue'
 	import EndpointPopover from '@/components/keys/EndpointPopover.vue'
 	import GroupBadge from '@/components/common/GroupBadge.vue'
 	import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
@@ -1145,10 +1102,7 @@ import type { Column } from '@/components/common/types'
 import type { BatchApiKeyUsageStats } from '@/api/usage'
 import { formatDateTime } from '@/utils/format'
 import { maskApiKey } from '@/utils/maskApiKey'
-import {
-  buildCcSwitchImportDeeplink,
-  type CcSwitchClientType
-} from '@/utils/ccswitchImport'
+
 
 // Helper to format date for datetime-local input
 const formatDateTimeLocal = (isoDate: string): string => {
@@ -1300,9 +1254,8 @@ const showDeleteDialog = ref(false)
 const showResetQuotaDialog = ref(false)
 const showResetRateLimitDialog = ref(false)
 const showUseKeyModal = ref(false)
-const showCcsClientSelect = ref(false)
+const createdKeyForImport = ref<ApiKey | null>(null)
 const showColumnDropdown = ref(false)
-const pendingCcsRow = ref<ApiKey | null>(null)
 const selectedKey = ref<ApiKey | null>(null)
 const copiedKeyId = ref<number | null>(null)
 const groupSelectorKeyId = ref<number | null>(null)
@@ -1736,7 +1689,7 @@ const handleSubmit = async () => {
       appStore.showSuccess(t('keys.keyUpdatedSuccess'))
     } else {
       const customKey = formData.value.use_custom_key ? formData.value.custom_key : undefined
-      await keysAPI.create(
+      const createdKey = await keysAPI.create(
         formData.value.name,
         formData.value.group_id,
         customKey,
@@ -1747,6 +1700,7 @@ const handleSubmit = async () => {
         rateLimitData
       )
       appStore.showSuccess(t('keys.keyCreatedSuccess'))
+      createdKeyForImport.value = createdKey
       // Only advance tour if active, on submit step, and creation succeeded
       if (onboardingStore.isCurrentStep('[data-tour="key-form-submit"]')) {
         onboardingStore.nextStep(500)
@@ -1867,78 +1821,6 @@ const resetRateLimitUsage = async () => {
     const errorMsg = error.response?.data?.detail || t('keys.failedToResetRateLimit')
     appStore.showError(errorMsg)
   }
-}
-
-const importToCcswitch = (row: ApiKey) => {
-  const platform = row.group?.platform || 'anthropic'
-
-  // For antigravity platform, show client selection dialog
-  if (platform === 'antigravity') {
-    pendingCcsRow.value = row
-    showCcsClientSelect.value = true
-    return
-  }
-
-  // For other platforms, execute directly
-  executeCcsImport(row, platform === 'gemini' ? 'gemini' : 'claude')
-}
-
-const executeCcsImport = (row: ApiKey, clientType: CcSwitchClientType) => {
-  const baseUrl = publicSettings.value?.api_base_url || window.location.origin
-  const platform = row.group?.platform || 'anthropic'
-
-  const usageScript = `({
-    request: {
-      url: "{{baseUrl}}/v1/usage",
-      method: "GET",
-      headers: { "Authorization": "Bearer {{apiKey}}" }
-    },
-    extractor: function(response) {
-      const remaining = response?.remaining ?? response?.quota?.remaining ?? response?.balance;
-      const unit = response?.unit ?? response?.quota?.unit ?? "USD";
-      return {
-        isValid: response?.is_active ?? response?.isValid ?? true,
-        remaining,
-        unit
-      };
-    }
-  })`
-  const providerName = (publicSettings.value?.site_name || 'sub2api').trim() || 'sub2api'
-  const deeplink = buildCcSwitchImportDeeplink({
-    baseUrl,
-    platform,
-    clientType,
-    providerName,
-    apiKey: row.key,
-    usageScript
-  })
-
-  try {
-    window.open(deeplink, '_self')
-
-    // Check if the protocol handler worked by detecting if we're still focused
-    setTimeout(() => {
-      if (document.hasFocus()) {
-        // Still focused means the protocol handler likely failed
-        appStore.showError(t('keys.ccSwitchNotInstalled'))
-      }
-    }, 100)
-  } catch (error) {
-    appStore.showError(t('keys.ccSwitchNotInstalled'))
-  }
-}
-
-const handleCcsClientSelect = (clientType: CcSwitchClientType) => {
-  if (pendingCcsRow.value) {
-    executeCcsImport(pendingCcsRow.value, clientType)
-  }
-  showCcsClientSelect.value = false
-  pendingCcsRow.value = null
-}
-
-const closeCcsClientSelect = () => {
-  showCcsClientSelect.value = false
-  pendingCcsRow.value = null
 }
 
 function formatResetTime(resetAt: string | null): string {
