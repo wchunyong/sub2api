@@ -133,7 +133,10 @@ def configuration(payload):
         protocol = payload.get('protocol', 'openai')
         npm = {'openai': '@ai-sdk/openai', 'anthropic': '@ai-sdk/anthropic', 'compatible': '@ai-sdk/openai-compatible', 'gemini': '@ai-sdk/google'}.get(protocol)
         if not npm: raise ValueError('Unsupported protocol')
-        provider = dict(npm=npm, name='Sub2API', options=dict(baseURL=base, apiKey=key), models={model: {'name': model}})
+        catalog = normalize_models(payload.get('models', [{'id': model}]))
+        models = {item['id']: {'name': item['name']} for item in catalog}
+        if model not in models: raise ValueError('Selected model is not in the gateway model list. Choose an available model and retry.')
+        provider = dict(npm=npm, name='lianjieai', options=dict(baseURL=base, apiKey=key), models=models)
         fields = [(['provider', PROVIDER], provider), (['model'], f'{PROVIDER}/{model}')]
     return [dict(path=path, value={'exists': True, 'value': value}) for path, value in fields]
 
@@ -253,16 +256,31 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, *args, **kwargs): raise ValueError('Redirect refused')
 
 
+def normalize_models(items):
+    if not isinstance(items, list): raise ValueError('Invalid model list')
+    result = []
+    seen = set()
+    for item in items:
+        if not isinstance(item, dict): continue
+        model_id = item.get('id')
+        if not isinstance(model_id, str) or not model_id.strip() or len(model_id) > 200 or any(ord(c) < 32 for c in model_id) or model_id in seen: continue
+        seen.add(model_id)
+        name = item.get('name') or item.get('display_name')
+        result.append({'id': model_id, 'name': name if isinstance(name, str) and name.strip() else model_id})
+    return result
+
+
 def verify_connection(payload):
     base = urlparse(payload['base_url'])
     probe = urlparse(payload['probe_url'])
     if probe.scheme != 'https' or (probe.scheme, probe.netloc) != (base.scheme, base.netloc) or probe.username or probe.password or probe.query or probe.fragment:
         raise ValueError('Invalid connectivity probe URL')
-    request = urllib.request.Request(payload['probe_url'], headers={'Authorization': 'Bearer ' + payload['api_key']})
+    request = urllib.request.Request(payload['probe_url'], headers={'Authorization': 'Bearer ' + payload['api_key'], 'User-Agent': 'lianjieai-quick-import/1.0', 'Accept': 'application/json'})
     with urllib.request.build_opener(NoRedirect).open(request, timeout=20) as response:
         result = json.loads(response.read(1024 * 1024))
     if not isinstance(result, dict) or not isinstance(result.get('data'), list):
         raise ValueError('Gateway did not return a model list. Check the API base URL.')
+    return normalize_models(result['data'])
 
 
 def main():
@@ -295,7 +313,9 @@ def main():
                     payload = json.load(response)['data']
             if payload['agent'] != args.agent: raise ValueError('Agent mismatch')
             configuration(payload)
-            if not args.stdin: verify_connection(payload)
+            if not args.stdin:
+                models = verify_connection(payload)
+                if payload['agent'] == 'opencode': payload['models'] = models
             install(root, payload)
             print(f'Configured {args.agent}. Restart the client. A project configuration may override user settings.')
             print(f'Offline recovery: python "{root / ".sub2api-quick-import" / args.agent / "restore.py"}" clean --agent {args.agent}')

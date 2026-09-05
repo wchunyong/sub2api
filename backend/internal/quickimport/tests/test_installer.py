@@ -101,5 +101,24 @@ class InstallerTests(unittest.TestCase):
         request = opener.open.call_args.args[0]
         self.assertEqual(request.full_url, 'https://example.com/v1/models')
         self.assertEqual(request.get_header('Authorization'), 'Bearer mock-test-key')
+    def test_opencode_imports_named_provider_with_all_gateway_models(self):
+        p = self.payload('opencode')
+        p['models'] = [{'id': 'test-model'}, {'id': 'another-model', 'name': 'Another model'}]
+        installer.install(self.root, p)
+        data = json.loads((self.root / '.config/opencode/opencode.json').read_text())
+        provider = data['provider']['sub2api_quick']
+        self.assertEqual(provider['name'], 'lianjieai')
+        self.assertEqual(set(provider['models']), {'test-model', 'another-model'})
+        self.assertEqual(data['model'], 'sub2api_quick/test-model')
+        installer.clean(self.root, 'opencode')
+        self.assertFalse((self.root / '.config/opencode/opencode.json').exists())
+    def test_probe_returns_catalog_and_ignores_malformed_entries(self):
+        opener = unittest.mock.MagicMock()
+        response = opener.open.return_value.__enter__.return_value
+        response.read.return_value = b'{"data":[{"id":"test-model"},{"id":"other","name":"Other"},{"id":"other"},{"bad":"entry"}]}'
+        p = self.payload('opencode'); p['probe_url'] = 'https://example.com/v1/models'
+        with patch.object(installer.urllib.request, 'build_opener', return_value=opener):
+            models = installer.verify_connection(p)
+        self.assertEqual(models, [{'id':'test-model','name':'test-model'}, {'id':'other','name':'Other'}])
 
 if __name__ == '__main__': unittest.main()

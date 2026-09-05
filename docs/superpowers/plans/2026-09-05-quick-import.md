@@ -74,3 +74,13 @@ Implemented on `feature/quick-import-agents`. Changes have been committed by fea
 - macOS/Linux real-machine validation remains outstanding. Only Docker Desktop WSL distribution is present locally. Shell launcher is provided but cross-platform acceptance is not claimed.
 - Complex existing OpenCode JSONC, custom config environment overrides and unusual TOML layouts intentionally direct users to manual setup rather than overwrite ambiguous settings.
 - ChatGPT product target remains separate from Codex; no unverified ChatGPT import card is shipped.
+
+
+## OpenCode provider/model refinement — 2026-09-05
+
+- User confirmed the initial local OpenCode setup works. Provider display name is now `lianjieai`; the stable internal provider ID remains unchanged for recovery compatibility.
+- Each automatic OpenCode import obtains the authenticated `/v1/models` list, deduplicates valid IDs, maps model names into OpenCode's provider catalog, and preserves the selected default. A missing selected model fails explicitly instead of writing an unavailable default.
+- Gateway probe now sends an explicit client User-Agent and JSON Accept header; the gateway rejected the default Python user agent during the earlier local setup.
+- Local user configuration synchronized with the gateway's 10 models; OpenCode CLI `models sub2api_quick` lists all 10. Default remains `gpt-5.5`. No generation request was made during this update.
+- Installer suite: 13 passing tests. Actual OpenCode mock invocation and cleanup pass.
+- This local update has a separate recovery record. Cleanup once undoes this refinement; a second cleanup undoes the initial import. No cleanup was executed on the user's configuration.
