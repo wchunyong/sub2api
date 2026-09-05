@@ -379,3 +379,53 @@ func TestCleanConflictAndStack(t *testing.T) {
 		t.Fatal("new config was not removed")
 	}
 }
+
+func TestCodexCleanupAfterModelSwitch(t *testing.T) {
+	for _, original := range []string{"", "model = \"original\"\nmodel_provider = \"original-provider\"\n"} {
+		t.Run(original, func(t *testing.T) {
+			root := t.TempDir()
+			path := filepath.Join(root, paths["codex"])
+			if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+				t.Fatal(err)
+			}
+			if original != "" {
+				if err := os.WriteFile(path, []byte(original), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			payload := Payload{Version: 1, Agent: "codex", APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "imported", CodexManifest: map[string]any{"models": []any{map[string]any{"slug": "imported"}}}}
+			if err := Install(root, payload); err != nil {
+				t.Fatal(err)
+			}
+			text, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			edited := "unrelated = true\n" + strings.Replace(string(text), `model = "imported"`, `model = "selected-later"`, 1)
+			if err := os.WriteFile(path, []byte(edited), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := Clean(root, "codex"); err != nil {
+				t.Fatal(err)
+			}
+			text, err = os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			data, err := load(string(text), "codex")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if data["unrelated"] != true || strings.Contains(string(text), "test-secret") || strings.Contains(string(text), "selected-later") {
+				t.Fatal("cleanup did not restore managed fields and preserve unrelated settings")
+			}
+			if original != "" && (data["model"] != "original" || data["model_provider"] != "original-provider") {
+				t.Fatal("original model/provider not restored")
+			}
+			catalogs, err := filepath.Glob(filepath.Join(root, ".sub2api-quick-import", "codex", "models-*.json"))
+			if err != nil || len(catalogs) != 0 {
+				t.Fatal("catalog was not removed")
+			}
+		})
+	}
+}

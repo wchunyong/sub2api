@@ -6,7 +6,39 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/Wei-Shaw/sub2api/internal/quickimport/native"
 )
+
+func TestCleanReportsConflictWithoutCredentials(t *testing.T) {
+	root := t.TempDir()
+	if err := native.Install(root, native.Payload{Version: 1, Agent: "codex", APIKey: "private-test-key", BaseURL: "https://example.test/v1", Model: "imported"}); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, ".codex", "config.toml")
+	text, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	edited := strings.ReplaceAll(string(text), "private-test-key", "changed-private-key")
+	if err := os.WriteFile(path, []byte(edited), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var out, stderr bytes.Buffer
+	if run([]string{"clean", "--agent", "codex", "--home", root, "--yes"}, strings.NewReader(""), &out, &stderr) == 0 {
+		t.Fatal("accepted changed credentials")
+	}
+	if !strings.Contains(stderr.String(), "model_providers.sub2api_quick") {
+		t.Fatal("missing conflict field")
+	}
+	if strings.Contains(stderr.String(), "private") {
+		t.Fatal("credential leaked")
+	}
+	after, err := os.ReadFile(path)
+	if err != nil || string(after) != edited {
+		t.Fatal("conflict changed configuration")
+	}
+}
 
 func TestStdinCatalogPreservesLargeNumberAndRejectsTrailingJSON(t *testing.T) {
 	t.Setenv("CODEX_HOME", "")

@@ -579,6 +579,15 @@ func Install(root string, p Payload) error {
 	}
 	return nil
 }
+
+type RecoveryConflict struct {
+	Field string
+}
+
+func (conflict *RecoveryConflict) Error() string {
+	return "configuration conflict at " + conflict.Field + "; later edits preserved. Review this field before retrying cleanup"
+}
+
 func Clean(root, agent string) error {
 	root, err := filepath.Abs(root)
 	if err != nil {
@@ -657,7 +666,19 @@ func Clean(root, agent string) error {
 	}
 	for _, c := range rec.Changes {
 		if !equal(get(data, c.Path), c.Value) {
-			return errors.New("configuration conflict: later edits preserved")
+			if agent == "codex" && reflect.DeepEqual(c.Path, []string{"model"}) && data["model_provider"] == provider {
+				if selected, ok := data["model"].(string); ok && strings.TrimSpace(selected) != "" {
+					continue
+				}
+			}
+			field := "managed configuration"
+			if agent == "codex" {
+				switch strings.Join(c.Path, ".") {
+				case "model", "model_provider", "model_catalog_json", "model_providers.sub2api_quick":
+					field = strings.Join(c.Path, ".")
+				}
+			}
+			return &RecoveryConflict{Field: field}
 		}
 	}
 	result := rec.Before

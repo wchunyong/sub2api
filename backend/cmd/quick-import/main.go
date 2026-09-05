@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -61,7 +62,11 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 				return 0
 			}
 		}
-		if native.Clean(root, *agent) != nil {
+		if err := native.Clean(root, *agent); err != nil {
+			var conflict *native.RecoveryConflict
+			if errors.As(err, &conflict) {
+				return fail(conflict.Error())
+			}
 			return fail("Recovery failed; check permissions and recovery information")
 		}
 		fmt.Fprintln(out, "Restored. Restart the client. Run again to undo an earlier import, if needed.")

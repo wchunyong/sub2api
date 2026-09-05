@@ -24,8 +24,7 @@ export function cleanupCommand(os: ImportOS, agent: ImportAgent, server?: string
   const url = new URL(server)
   if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw new Error('Invalid server')
   const root = server.replace(/\/+$/, '')
-  // Legacy Python-only installs download the native recovery helper once.
   return os === 'windows'
-    ? `if (Test-Path "$env:USERPROFILE/.sub2api-quick-import/${agent}/restore.ps1") { ${local} } else { irm -MaximumRedirection 0 ${ps(root + '/setup/' + agent + '-clean.ps1')} | iex }`
-    : `if [ -f "$HOME/.sub2api-quick-import/${agent}/restore.sh" ]; then ${local}; else curl -fsS --proto '=https' ${sh(root + '/setup/' + agent + '-clean.sh')} | sh; fi`
+    ? `& { if (Test-Path "$env:USERPROFILE/.sub2api-quick-import/${agent}/restore.ps1") { ${local}; if ($LASTEXITCODE -eq 0) { return } }; irm -MaximumRedirection 0 ${ps(root + '/setup/' + agent + '-clean.ps1')} | iex }`
+    : `if [ -f "$HOME/.sub2api-quick-import/${agent}/restore.sh" ] && ${local}; then :; else curl -fsS --proto '=https' ${sh(root + '/setup/' + agent + '-clean.sh')} | sh; fi`
 }
