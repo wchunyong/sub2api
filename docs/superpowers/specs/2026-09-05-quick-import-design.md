@@ -1,7 +1,7 @@
 # API 密钥快速导入方案
 
 日期：2026-09-05  
-状态：已整理确认方案，待实施。本文不代表功能已经上线。
+状态：首轮实现已提交到 `feature/quick-import-agents`，未合并或上线；真实网关及 macOS/Linux 实机验收尚未完成。验证记录见同目录上级 `plans/2026-09-05-quick-import.md`。
 
 ## 1. 目标与范围
 
@@ -91,7 +91,7 @@ CCS 在本文中特指 CC Switch。
 
 ### 3.2 脚本能力
 
-Windows 使用 PowerShell `.ps1`；macOS 和 Linux 使用 Shell `.sh` 入口。入口共用配置规则和变更记录格式，通过明确的 Agent 标识分派到各自适配器。Claude Code、Codex、OpenCode 分别管理配置路径、字段、依赖和验证方式；不能用一套文件路径或配置模板套用所有 Agent。
+Windows 使用 PowerShell `.ps1`；macOS 和 Linux 使用 Shell `.sh` 入口。首轮实现共用 Python 3.11+ 标准库执行器；缺少 Python 或目标客户端时先给出安装说明，安装后重新运行，不静默安装。入口共用配置规则和变更记录格式，通过明确的 Agent 标识分派到各自适配器。Claude Code、Codex、OpenCode 分别管理配置路径、字段、依赖和验证方式；不能用一套文件路径或配置模板套用所有 Agent。
 
 执行过程：
 
