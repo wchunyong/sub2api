@@ -17,6 +17,7 @@ type Config struct {
 	BaseURL  string `json:"base_url"`
 	Model    string `json:"model"`
 	Protocol string `json:"protocol"`
+	ProbeURL string `json:"probe_url"`
 }
 
 func BuildConfig(agent, platform string, messages bool, baseURL, apiKey, model string) (Config, error) {
@@ -66,5 +67,5 @@ func BuildConfig(agent, platform string, messages bool, baseURL, apiKey, model s
 			protocol = "compatible"
 		}
 	}
-	return Config{Version: 1, Agent: agent, APIKey: apiKey, BaseURL: endpoint, Model: model, Protocol: protocol}, nil
+	return Config{Version: 1, Agent: agent, APIKey: apiKey, BaseURL: endpoint, Model: model, Protocol: protocol, ProbeURL: root + "/v1/models"}, nil
 }

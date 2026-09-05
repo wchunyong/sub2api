@@ -97,7 +97,7 @@ function invalidate() {
   clearTimeout(expiry); command.value = ''; error.value = ''; loading.value = false; copied.value = false
 }
 const displayCommand = computed(() => step.value === 'clean' && agent.value && automaticAgent(agent.value) ? cleanupCommand(os.value, agent.value) : command.value)
-watch([agent, step, os, model, () => props.show, () => props.keyId, () => props.apiKey, () => props.platform, () => props.active, () => props.baseUrl], invalidate, { flush: 'sync' })
+watch([agent, step, os, model, () => props.show, () => props.keyId, () => props.apiKey, () => props.platform, () => props.active, () => props.baseUrl, () => props.claudeCodeOnly, () => props.allowMessagesDispatch], invalidate, { flush: 'sync' })
 onBeforeUnmount(invalidate)
 async function generate() {
   if (!agent.value || !compatible.value || !automaticAgent(agent.value)) return

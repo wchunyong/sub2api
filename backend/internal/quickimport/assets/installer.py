@@ -170,7 +170,14 @@ def check_pending(records):
 def install(root, payload):
     agent = payload['agent']; changes = configuration(payload); path = target(root, agent)
     if agent == 'opencode' and path.with_suffix('.jsonc').exists():
-        raise ValueError('Existing OpenCode JSONC configuration: use manual configuration to avoid precedence conflicts')
+        # Desktop may create a schema-only JSONC file. Leave it intact when it
+        # cannot override our provider/model; complex JSONC requires manual setup.
+        try:
+            overlay = json.loads(path.with_suffix('.jsonc').read_text(encoding='utf-8-sig'))
+            safe = isinstance(overlay, dict) and not set(overlay).difference({'$schema'})
+        except (ValueError, OSError): safe = False
+        if not safe:
+            raise ValueError('Existing OpenCode JSONC configuration: use manual configuration to avoid precedence conflicts')
     with locked(root, agent) as folder:
         records = read_journal(folder); check_pending(records)
         before = path.read_text(encoding='utf-8-sig') if path.exists() else ''
@@ -246,6 +253,18 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, *args, **kwargs): raise ValueError('Redirect refused')
 
 
+def verify_connection(payload):
+    base = urlparse(payload['base_url'])
+    probe = urlparse(payload['probe_url'])
+    if probe.scheme != 'https' or (probe.scheme, probe.netloc) != (base.scheme, base.netloc) or probe.username or probe.password or probe.query or probe.fragment:
+        raise ValueError('Invalid connectivity probe URL')
+    request = urllib.request.Request(payload['probe_url'], headers={'Authorization': 'Bearer ' + payload['api_key']})
+    with urllib.request.build_opener(NoRedirect).open(request, timeout=20) as response:
+        result = json.loads(response.read(1024 * 1024))
+    if not isinstance(result, dict) or not isinstance(result.get('data'), list):
+        raise ValueError('Gateway did not return a model list. Check the API base URL.')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['install', 'clean'])
@@ -275,6 +294,8 @@ def main():
                 with urllib.request.build_opener(NoRedirect).open(request, timeout=30) as response:
                     payload = json.load(response)['data']
             if payload['agent'] != args.agent: raise ValueError('Agent mismatch')
+            configuration(payload)
+            if not args.stdin: verify_connection(payload)
             install(root, payload)
             print(f'Configured {args.agent}. Restart the client. A project configuration may override user settings.')
             print(f'Offline recovery: python "{root / ".sub2api-quick-import" / args.agent / "restore.py"}" clean --agent {args.agent}')

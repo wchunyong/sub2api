@@ -80,5 +80,26 @@ class InstallerTests(unittest.TestCase):
         with patch.object(installer.shutil, 'which', return_value=None):
             with self.assertRaisesRegex(ValueError, 'Install Codex'):
                 installer.require_client('codex')
+    def test_empty_desktop_jsonc_does_not_block_import(self):
+        path = self.root / '.config/opencode/opencode.jsonc'; path.parent.mkdir(parents=True)
+        path.write_text('{"$schema":"https://opencode.ai/config.json"}')
+        installer.install(self.root, self.payload('opencode'))
+        installer.clean(self.root, 'opencode')
+        self.assertTrue(path.exists())
+    def test_conflicting_jsonc_is_not_overwritten(self):
+        path = self.root / '.config/opencode/opencode.jsonc'; path.parent.mkdir(parents=True)
+        path.write_text('{"model":"existing/model"}')
+        with self.assertRaisesRegex(ValueError, 'JSONC'):
+            installer.install(self.root, self.payload('opencode'))
+    def test_connectivity_probe_uses_gateway_models_and_bearer_auth(self):
+        opener = unittest.mock.MagicMock()
+        response = opener.open.return_value.__enter__.return_value
+        response.read.return_value = b'{"data":[]}'
+        p = self.payload('opencode'); p['probe_url'] = 'https://example.com/v1/models'
+        with patch.object(installer.urllib.request, 'build_opener', return_value=opener):
+            installer.verify_connection(p)
+        request = opener.open.call_args.args[0]
+        self.assertEqual(request.full_url, 'https://example.com/v1/models')
+        self.assertEqual(request.get_header('Authorization'), 'Bearer mock-test-key')
 
 if __name__ == '__main__': unittest.main()
