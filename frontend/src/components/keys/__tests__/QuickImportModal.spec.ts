@@ -3,7 +3,8 @@ import { flushPromises, mount } from '@vue/test-utils'
 import QuickImportModal from '../QuickImportModal.vue'
 
 vi.mock('vue-i18n', async (original) => ({ ...await original<typeof import('vue-i18n')>(), useI18n: () => ({ t: (key: string) => key }) }))
-vi.mock('@/composables/useClipboard', () => ({ useClipboard: () => ({ copyToClipboard: vi.fn().mockResolvedValue(true) }) }))
+const { copy } = vi.hoisted(() => ({ copy: vi.fn().mockResolvedValue(true) }))
+vi.mock('@/composables/useClipboard', () => ({ useClipboard: () => ({ copyToClipboard: copy }) }))
 const { createTicket } = vi.hoisted(() => ({ createTicket: vi.fn() }))
 vi.mock('@/api/quickImport', () => ({ createImportTicket: createTicket, importServer: () => 'https://example.com' }))
 const props = { show: true, apiKey: 'sk-test', keyId: 1, baseUrl: 'https://example.com', platform: 'openai' as const }
@@ -14,6 +15,33 @@ function render(extra = {}) {
   } } })
 }
 describe('QuickImportModal', () => {
+  it('clears the copy error on a successful retry', async () => {
+    createTicket.mockResolvedValueOnce({ ticket: 'b'.repeat(64), agent: 'codex', expires_in: 300 })
+    copy.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    const wrapper = render()
+    await wrapper.get('[data-testid="agent-codex"]').trigger('click')
+    await wrapper.get('[data-testid="auto"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[role="alert"]').exists()).toBe(true)
+    const retry = wrapper.findAll('button').find(button => button.text() === 'keys.quickImport.copyImport')!
+    await retry.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+  it('hides unsupported agents and copies directly without settings', async () => {
+    const wrapper = render()
+    expect(wrapper.find('[data-testid="agent-gemini"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('ChatGPT/Codex')
+    createTicket.mockResolvedValueOnce({ ticket: 'a'.repeat(64), agent: 'codex', expires_in: 300 })
+    await wrapper.get('[data-testid="agent-codex"]').trigger('click')
+    await wrapper.get('[data-testid="auto"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('select').exists()).toBe(false)
+    expect(wrapper.find('input').exists()).toBe(false)
+    expect(copy.mock.lastCall?.[0]).toContain('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+    wrapper.unmount()
+  })
   it('selects an Agent before showing actions and carries it into manual configuration', async () => {
     const wrapper = render()
     expect(wrapper.find('[data-testid="manual"]').exists()).toBe(false)
@@ -34,7 +62,6 @@ describe('QuickImportModal', () => {
     const wrapper = render()
     await wrapper.get('[data-testid="agent-opencode"]').trigger('click')
     await wrapper.get('[data-testid="auto"]').trigger('click')
-    await wrapper.get('[data-testid="generate"]').trigger('click')
     await wrapper.setProps({ keyId: 2 })
     resolve({ ticket: 'a'.repeat(64), agent: 'opencode', model: 'mock', expires_in: 300 })
     await flushPromises()
@@ -42,11 +69,11 @@ describe('QuickImportModal', () => {
     wrapper.unmount()
   })
   it('allows offline cleanup for an inactive key and only selects its Agent', async () => {
-    const wrapper = render({ active: false })
+    const wrapper = render({ active: false, platform: 'anthropic' })
     await wrapper.get('[data-testid="agent-claude"]').trigger('click')
     await wrapper.get('[data-testid="clean"]').trigger('click')
-    expect(wrapper.get('pre').text()).toContain('/claude/restore.py')
-    expect(wrapper.get('pre').text()).not.toContain('/opencode/')
+    await flushPromises()
+    expect(copy.mock.lastCall?.[0]).toContain('/claude/restore.py')
     wrapper.unmount()
   })
 })

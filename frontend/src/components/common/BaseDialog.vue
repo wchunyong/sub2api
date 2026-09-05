@@ -15,7 +15,7 @@
           <!-- Header -->
           <div class="modal-header">
             <h3 :id="dialogId" class="modal-title">
-              {{ title }}
+              <slot name="title">{{ title }}</slot>
             </h3>
             <button
               v-if="showCloseButton"
@@ -55,7 +55,7 @@ const dialogRef = ref<HTMLElement | null>(null)
 const modalBodyRef = ref<HTMLElement | null>(null)
 let previousActiveElement: HTMLElement | null = null
 
-type DialogWidth = 'narrow' | 'normal' | 'wide' | 'extra-wide' | 'full'
+type DialogWidth = 'quick-import' | 'narrow' | 'normal' | 'wide' | 'extra-wide' | 'full'
 
 interface Props {
   show: boolean
@@ -91,6 +91,7 @@ const widthClasses = computed(() => {
   // wide=multi-section forms or rich content, extra-wide=analytics/tables,
   // full=full-screen or very dense layouts.
   const widths: Record<DialogWidth, string> = {
+    'quick-import': 'w-full max-w-[700px]',
     narrow: 'max-w-md',
     normal: 'max-w-lg',
     wide: 'w-full sm:max-w-2xl md:max-w-3xl lg:max-w-4xl',

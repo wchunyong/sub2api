@@ -2,7 +2,7 @@ import type { GroupPlatform } from '@/types'
 
 export type ImportAgent = 'claude' | 'codex' | 'codex-ws' | 'opencode' | 'gemini' | 'grok'
 export const importAgents: { id: ImportAgent; name: string }[] = [
-  { id: 'claude', name: 'Claude Code' }, { id: 'codex', name: 'Codex' },
+  { id: 'claude', name: 'Claude Code' }, { id: 'codex', name: 'ChatGPT/Codex' },
   { id: 'opencode', name: 'OpenCode' }, { id: 'gemini', name: 'Gemini CLI' },
   { id: 'grok', name: 'Grok CLI' }, { id: 'codex-ws', name: 'Codex WebSocket' }
 ]
