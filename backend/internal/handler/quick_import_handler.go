@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/quickimport"
@@ -103,6 +104,16 @@ func (h *QuickImportHandler) Exchange(c *gin.Context) {
 }
 func (h *QuickImportHandler) Asset(c *gin.Context) {
 	name := c.Param("name")
+	if body, ok := quickimport.NativeAsset(name); ok {
+		c.Header("Cache-Control", "no-cache")
+		c.Header("X-Content-Type-Options", "nosniff")
+		contentType := "application/octet-stream"
+		if strings.HasSuffix(name, ".sha256") {
+			contentType = "text/plain; charset=utf-8"
+		}
+		c.Data(http.StatusOK, contentType, body)
+		return
+	}
 	if name != "installer.py" && name != "install.ps1" && name != "install.sh" {
 		c.Status(http.StatusNotFound)
 		return

@@ -10,13 +10,22 @@ export function importCommand(os: ImportOS, agent: ImportAgent, server: string, 
   if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || !/^[a-f0-9]{64}$/.test(ticket)) throw new Error('Invalid command parameters')
   const root = server.replace(/\/+$/, '')
   if (os === 'windows') {
-    return `& { $p = Join-Path $env:TEMP ([IO.Path]::GetRandomFileName() + '.ps1'); try { Invoke-WebRequest -UseBasicParsing -MaximumRedirection 0 -Uri ${ps(root + '/api/v1/quick-import/assets/install.ps1')} -OutFile $p; powershell -NoProfile -ExecutionPolicy Bypass -File $p -Action install -Agent ${ps(agent)} -Server ${ps(root)} -Ticket ${ps(ticket)} } finally { Remove-Item -LiteralPath $p -ErrorAction SilentlyContinue } }`
+    return `& ([scriptblock]::Create((irm -MaximumRedirection 0 ${ps(root + '/setup/' + agent + '.ps1')}))) ${ps(ticket)}`
   }
-  return `(p=$(mktemp) && trap 'rm -f "$p"' EXIT HUP INT TERM && curl --fail --silent --show-error --proto '=https' --max-time 30 ${sh(root + '/api/v1/quick-import/assets/install.sh')} -o "$p" && sh "$p" install ${sh(agent)} ${sh(root)} ${sh(ticket)})`
+  return `curl -fsS --proto '=https' ${sh(root + '/setup/' + agent + '.sh')} | sh -s -- ${sh(ticket)}`
 }
-export function cleanupCommand(os: ImportOS, agent: ImportAgent): string {
+
+export function cleanupCommand(os: ImportOS, agent: ImportAgent, server?: string): string {
   checkedAgent(agent)
+  const local = os === 'windows'
+    ? `powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE/.sub2api-quick-import/${agent}/restore.ps1"`
+    : `sh "$HOME/.sub2api-quick-import/${agent}/restore.sh"`
+  if (!server) return local
+  const url = new URL(server)
+  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw new Error('Invalid server')
+  const root = server.replace(/\/+$/, '')
+  // Legacy Python-only installs download the native recovery helper once.
   return os === 'windows'
-    ? `python "$env:USERPROFILE/.sub2api-quick-import/${agent}/restore.py" clean --agent ${agent}`
-    : `python3 "$HOME/.sub2api-quick-import/${agent}/restore.py" clean --agent ${agent}`
+    ? `if (Test-Path "$env:USERPROFILE/.sub2api-quick-import/${agent}/restore.ps1") { ${local} } else { irm -MaximumRedirection 0 ${ps(root + '/setup/' + agent + '-clean.ps1')} | iex }`
+    : `if [ -f "$HOME/.sub2api-quick-import/${agent}/restore.sh" ]; then ${local}; else curl -fsS --proto '=https' ${sh(root + '/setup/' + agent + '-clean.sh')} | sh; fi`
 }

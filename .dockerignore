@@ -83,3 +83,6 @@ deploy/redis_data/
 .claude/
 issues/
 CLAUDE.md
+
+# Native import helpers are regenerated inside the builder.
+backend/internal/quickimport/native-assets/quick-import-*

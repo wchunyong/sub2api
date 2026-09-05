@@ -97,3 +97,16 @@ Implemented on `feature/quick-import-agents`. Changes have been committed by fea
 - Gemini、Grok、Codex WebSocket 保持已有手动配置能力，本轮不增加未经验证的自动安装适配。macOS/Linux 实机验收仍待完成。
 - 参考 Claude 官方 model-config、settings-reference 与 Codex 官方 config-reference；模型列表在每次导入时更新，不启动后台常驻同步任务。
 - 最终验证：19 项 Python 安装器测试、quickimport Go 单元测试、实际 OpenCode mock 回归通过；独立代码审查无待修复问题。
+
+
+## Native helper and short commands — 2026-09-05
+
+- Removed the end-user Python dependency. The bootstrap downloads a SHA256-checked Go executable for Windows, macOS or Linux (amd64/arm64); no Node.js or Go installation is required either.
+- `/setup/<agent>.ps1` and `.sh` serve short launchers. The one-time ticket stays in the command argument, never the script URL; API keys remain in POST exchange only.
+- Native binaries and checksums are generated before server builds in Docker, Make and GoReleaser (`go run ./cmd/build-quick-import` from backend). Direct development builds must run this generator to enable downloads.
+- Verified helpers are cached by content hash; per-Agent recovery scripts use the cached helper offline. New cleanup commands bootstrap once when only legacy Python recovery exists; the native engine reads legacy journal records without Python.
+- Maintained per-field restore, locks, pending intent, catalog ownership, same-origin HTTPS, redirect refusal, model sync and version compatibility. JSON decoders retain large integers; complex TOML including unsupported NaN/Inf comparison fails closed.
+- Tests: native engine/network/CLI, handler and route suites; actual Windows PowerShell with Python removed from PATH; all three Agent configuration round trips; downloader/checksum and offline recovery; Linux WSL native round trips and launcher recovery. Actual OpenCode binary made two requests to a mock gateway with native-generated configuration and cleanup passed.
+- Six binaries cross-compiled; macOS real-machine execution remains unverified. Actual production-key exchange was not performed during these tests.
+
+- Broader embedded-web static-file test still expects `/logo.png`, while the tracked frontend supplies only `/logo.svg`; that pre-existing fixture mismatch fails independently. Targeted API/setup bypass tests pass and the production server builds successfully with embedded helpers.
