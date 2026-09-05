@@ -16,15 +16,17 @@
         <div class="qi-selected"><span class="qi-logo" :class="{ 'qi-chatgpt': agent === 'codex' }"><img v-if="agentIcons[agent]" :src="agentIcons[agent]" alt="" /><Icon v-else name="terminal" /></span><strong>{{ agentName }}</strong><button class="qi-back" @click="back">← {{ t('keys.quickImport.back') }}</button></div>
         <template v-if="step === 'actions'">
           <div class="qi-actions">
-            <div class="qi-choice qi-choice-main">
-              <button data-testid="auto" class="qi-action" :disabled="loading || !compatible || !automaticAgent(agent)" @click="generate"><span class="qi-badge">{{ t('keys.quickImport.recommended') }}</span><Icon name="terminal" size="lg" /><strong>{{ t(loading ? 'keys.quickImport.generating' : copied === 'import' ? 'keys.useKeyModal.copied' : 'keys.quickImport.copyImport') }}</strong><small>{{ t('keys.quickImport.autoHint') }}</small></button>
+            <div class="qi-choice qi-choice-main"><span class="qi-corner"><span>{{ t('keys.quickImport.recommended') }}</span></span><button class="qi-help" :aria-expanded="help === 'import'" @click="help = help === 'import' ? '' : 'import'">{{ t('keys.quickImport.operationHelp') }} ⓘ</button>
+              <button data-testid="auto" class="qi-action" :disabled="loading || !compatible || !automaticAgent(agent)" @click="generate"><Icon name="terminal" size="lg" /><strong>{{ t(loading ? 'keys.quickImport.generating' : copied === 'import' ? 'keys.useKeyModal.copied' : 'keys.quickImport.copyImport') }}</strong><small>{{ t('keys.quickImport.autoHint') }}</small></button>
               <button data-testid="clean" class="qi-clean" :disabled="!automaticAgent(agent)" @click="clean"><Icon name="refresh" size="xs" />{{ t(copied === 'clean' ? 'keys.useKeyModal.copied' : 'keys.quickImport.copyClean') }}</button>
             </div>
-            <div v-if="!hideCcs" class="qi-choice">
-              <button data-testid="ccs" class="qi-action" :disabled="!compatible || !supportsCcs(agent, platform)" @click="openCcs"><span class="qi-badge">{{ t('keys.quickImport.recommended') }}</span><Icon name="externalLink" size="lg" /><strong>{{ t('keys.importToCcSwitch') }}</strong><small>{{ t(supportsCcs(agent, platform) ? 'keys.quickImport.ccsHint' : 'keys.quickImport.ccsUnavailable') }}</small></button>
+            <div v-if="!hideCcs" class="qi-choice"><span class="qi-corner"><span>{{ t('keys.quickImport.recommended') }}</span></span><button class="qi-help" :aria-expanded="help === 'ccs'" @click="help = help === 'ccs' ? '' : 'ccs'">{{ t('keys.quickImport.operationHelp') }} ⓘ</button>
+              <button data-testid="ccs" class="qi-action" :disabled="!compatible || !supportsCcs(agent, platform)" @click="openCcs"><Icon name="externalLink" size="lg" /><strong>{{ t('keys.importToCcSwitch') }}</strong><small>{{ t(supportsCcs(agent, platform) ? 'keys.quickImport.ccsHint' : 'keys.quickImport.ccsUnavailable') }}</small></button>
             </div>
-            <div class="qi-choice"><button data-testid="manual" class="qi-action" :disabled="!compatible" @click="step = 'manual'"><span class="qi-badge qi-placeholder" aria-hidden="true">—</span><Icon name="cog" size="lg" /><strong>{{ t('keys.quickImport.manual') }}</strong><small>{{ t('keys.quickImport.manualHint') }}</small></button></div>
+            <div class="qi-choice"><button class="qi-help" :aria-expanded="help === 'manual'" @click="help = help === 'manual' ? '' : 'manual'">{{ t('keys.quickImport.operationHelp') }} ⓘ</button><button data-testid="manual" class="qi-action" :disabled="!compatible" @click="step = 'manual'"><Icon name="cog" size="lg" /><strong>{{ t('keys.quickImport.manual') }}</strong><small>{{ t('keys.quickImport.manualHint') }}</small></button></div>
           </div>
+          <div v-if="help" class="qi-help-panel" role="note">{{ t(help === 'import' ? (os === 'windows' ? 'keys.quickImport.powershellHelp' : 'keys.quickImport.shellHelp') : help === 'ccs' ? 'keys.quickImport.ccsHelp' : 'keys.quickImport.manualHelp') }}</div>
+          <p v-if="os === 'windows'" class="qi-status qi-shell-name">{{ t('keys.quickImport.powershellOnly') }}</p>
           <p class="qi-status" role="status" aria-live="polite">{{ t(copied === 'import' ? 'keys.quickImport.importCopied' : copied === 'clean' ? 'keys.quickImport.cleanCopied' : ccsOpened ? 'keys.quickImport.ccsOpened' : 'keys.quickImport.directHint') }}</p>
           <a v-if="ccsOpened" href="https://github.com/farion1231/cc-switch/releases" target="_blank" rel="noopener noreferrer" class="qi-status">{{ t('keys.quickImport.installCcs') }}</a>
           <p v-if="error" role="alert" class="text-sm text-red-600">{{ error }}</p>
@@ -57,6 +59,8 @@ const { t } = useI18n()
 const { copyToClipboard } = useClipboard()
 const agent = ref<ImportAgent | null>(null)
 const step = ref('actions')
+const help = ref('')
+watch([agent, step, () => props.show], () => { help.value = '' })
 const ccsOpened = ref(false)
 const os = ref<ImportOS>(/Windows/i.test(navigator.userAgent) ? 'windows' : 'unix')
 const command = ref('')
@@ -130,4 +134,6 @@ function openCcs() {
 .qi-actions:has(>.qi-choice:nth-child(2):last-child){grid-template-columns:repeat(2,minmax(0,1fr))}.qi-actions:has(>.qi-choice:only-child){grid-template-columns:1fr}.qi-choice-main .qi-action>svg{color:#0dafa2}.qi-action:disabled{opacity:.5;cursor:not-allowed}.qi-action{min-height:190px}.qi-body .qi-clean{flex-shrink:0}.qi-chatgpt{background:#fff}.qi-chatgpt img{width:30px;height:30px}.qi-badge{font-size:11px;border-radius:5px;padding:2px 7px;color:var(--qi-sub);background:var(--qi-hover)}.qi-placeholder{visibility:hidden}.qi-step{display:block;font-size:12px;font-weight:400;color:#8190a4;margin-top:4px}.qi-body{padding:0;display:block}
 :global(.dark) .qi-body{--qi-bg:#1d293b;--qi-text:#f1f5fa;--qi-sub:#a2b0c3;--qi-line:#354357;--qi-hover:#25344a;--qi-soft:#173c40}
 .qi-agent:disabled,.qi-body .qi-clean:disabled{opacity:.4;cursor:not-allowed}.qi-agent:disabled:hover{background:transparent;border-color:var(--qi-line)}.qi-action{height:auto;min-height:190px;flex:1 0 auto;justify-content:flex-start}.qi-choice{min-height:236px}.qi-body .qi-clean{margin-top:auto}.qi-status{min-height:21px}
+
+.qi-choice{position:relative}.qi-action{padding-top:54px}.qi-corner{position:absolute;top:0;left:0;width:66px;height:66px;background:#facc15;clip-path:polygon(0 0,100% 0,0 100%);pointer-events:none;z-index:1}.qi-corner span{position:absolute;top:14px;left:3px;width:48px;text-align:center;transform:rotate(-45deg);color:#422006;font-size:11px;font-weight:600}.qi-body .qi-help{position:absolute;right:9px;top:10px;z-index:1;padding:7px 3px;font-size:12px;color:var(--qi-sub)}.qi-help:hover{text-decoration:underline}.qi-help-panel{margin-top:16px;padding:14px 16px;border:1px solid var(--qi-line);border-radius:10px;background:var(--qi-hover);font-size:13px;line-height:1.8;white-space:pre-line}.qi-shell-name{font-weight:600;color:var(--qi-text)}@media(max-width:420px){.qi-body .qi-help{font-size:11px;right:4px}.qi-corner{width:48px;height:48px}.qi-corner span{top:9px;left:0;width:36px;font-size:9px}}
 </style>

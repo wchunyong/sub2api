@@ -127,6 +127,13 @@ export default {
     lastUsedAt: 'Last Used',
     lastUsedIP: 'Last Used IP',
     quickImport: {
+      operationHelp: 'How to use',
+      powershellOnly: 'Windows: run in PowerShell, not CMD.',
+      powershellHelp: '1. Open Windows PowerShell from Start (not CMD / Command Prompt).\n2. Copy the import command, paste into PowerShell and press Enter within 5 minutes.\n3. Restart the Agent when finished. Run cleanup in the original Windows user account using PowerShell.\nRequires the Agent and Python 3.11+. Administrator rights are not required.',
+      shellHelp: 'Open your macOS / Linux terminal. Copy and paste the import command and press Enter within 5 minutes. Restart the Agent afterwards. Run cleanup in the original environment. Requires the Agent and Python 3.11+.',
+      ccsHelp: 'Install and open CC Switch. Click Import to CCS, allow the browser to open the application, then review and save the configuration. A disabled button means this key or Agent is unsupported.',
+      manualHelp: 'Open manual configuration and follow its instructions to copy and save the key and settings in your Agent, then restart it. Prefer command import or CCS.',
+
       ccsUnavailable: 'CCS import is unavailable for this key and Agent',
       chooseAction: 'Choose an action',
       supportedOnly: 'Agents unsupported by this key are disabled',
