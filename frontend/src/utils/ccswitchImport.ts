@@ -1,4 +1,5 @@
 import type { GroupPlatform } from '@/types'
+import type { ImportAgent } from './quickImport'
 
 export const OPENAI_CC_SWITCH_CODEX_MODEL = 'gpt-5.5'
 export const GROK_CC_SWITCH_MODEL = 'grok-4.5'
@@ -18,6 +19,7 @@ export interface CcSwitchImportDeeplinkInput {
   providerName: string
   apiKey: string
   usageScript: string
+  agent?: ImportAgent
 }
 
 function withV1Endpoint(baseUrl: string): string {
@@ -62,7 +64,7 @@ export function resolveCcSwitchImportConfig(
 }
 
 export function buildCcSwitchImportDeeplink(input: CcSwitchImportDeeplinkInput): string {
-  const config = resolveCcSwitchImportConfig(input.platform, input.clientType, input.baseUrl)
+  const config = resolveSelectedAgentConfig(input) ?? resolveCcSwitchImportConfig(input.platform, input.clientType, input.baseUrl)
   const entries: [string, string][] = [
     ['resource', 'provider'],
     ['app', config.app],
@@ -81,4 +83,20 @@ export function buildCcSwitchImportDeeplink(input: CcSwitchImportDeeplinkInput):
   }
 
   return `ccswitch://v1/import?${new URLSearchParams(entries).toString()}`
+}
+
+function resolveSelectedAgentConfig(input: CcSwitchImportDeeplinkInput): CcSwitchImportConfig | undefined {
+  if (input.agent === 'codex' || input.agent === 'opencode') {
+    return {
+      app: input.agent,
+      endpoint: withV1Endpoint(input.baseUrl),
+      ...(input.agent === 'codex' && input.platform === 'openai' ? { model: OPENAI_CC_SWITCH_CODEX_MODEL } : {})
+    }
+  }
+  if (input.agent === 'claude') {
+    return {
+      app: 'claude',
+      endpoint: input.platform === 'antigravity' ? `${input.baseUrl.replace(/\/+$/, '')}/antigravity` : input.baseUrl
+    }
+  }
 }

@@ -117,7 +117,7 @@ function back() { if (step.value === 'actions') agent.value = null; else step.va
 function openCcs() {
   if (!agent.value || !compatible.value || !supportsCcs(agent.value, props.platform)) return
   const usageScript = `({request:{url:"{{baseUrl}}/v1/usage",method:"GET",headers:{Authorization:"Bearer {{apiKey}}"}},extractor:function(r){return {isValid:r.is_active??true,remaining:r.remaining??r.quota?.remaining??r.balance,unit:r.unit??"USD"}}})`
-  const link = buildCcSwitchImportDeeplink({ baseUrl: props.baseUrl || window.location.origin, platform: props.platform, clientType: agent.value === 'gemini' ? 'gemini' : 'claude', providerName: props.keyName || 'Sub2API', apiKey: props.apiKey, usageScript })
+  const link = buildCcSwitchImportDeeplink({ baseUrl: props.baseUrl || window.location.origin, platform: props.platform, agent: agent.value, clientType: agent.value === 'gemini' ? 'gemini' : 'claude', providerName: props.keyName || 'Sub2API', apiKey: props.apiKey, usageScript })
   window.location.assign(link)
   ccsOpened.value = true
 }

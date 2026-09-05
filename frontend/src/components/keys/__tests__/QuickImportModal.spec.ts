@@ -15,11 +15,28 @@ function render(extra = {}) {
   } } })
 }
 describe('QuickImportModal', () => {
-  it('keeps unavailable CCS visible and disabled without collapsing actions', async () => {
+  it.each(['claude', 'codex', 'opencode'])('enables CCS for %s in the same DeepSeek group', async (agent) => {
     const wrapper = render({ platform: 'deepseek' })
+    await wrapper.get(`[data-testid="agent-${agent}"]`).trigger('click')
+    expect(wrapper.get('[data-testid="ccs"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.findAll('.qi-choice')).toHaveLength(3)
+    const assign = vi.fn()
+    vi.stubGlobal('window', Object.create(window, { location: { value: { assign } } }))
+    try {
+      await wrapper.get('[data-testid="ccs"]').trigger('click')
+      expect(assign).toHaveBeenCalledOnce()
+      const params = new URL(assign.mock.calls[0][0]).searchParams
+      expect(params.get('app')).toBe(agent)
+      expect(params.get('endpoint')).toBe(agent === 'claude' ? props.baseUrl : `${props.baseUrl}/v1`)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+    wrapper.unmount()
+  })
+  it('keeps CCS disabled for an inactive key', async () => {
+    const wrapper = render({ active: false, platform: 'deepseek' })
     await wrapper.get('[data-testid="agent-codex"]').trigger('click')
     expect(wrapper.get('[data-testid="ccs"]').attributes('disabled')).toBeDefined()
-    expect(wrapper.findAll('.qi-choice')).toHaveLength(3)
     wrapper.unmount()
   })
   it('clears the copy error on a successful retry', async () => {

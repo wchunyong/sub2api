@@ -27,6 +27,26 @@ describe('ccswitchImport utils', () => {
     usageScript: 'return true'
   }
 
+  it.each(['claude', 'codex', 'opencode'] as const)('uses selected %s instead of the group to choose the CCS app', (agent) => {
+    for (const platform of ['deepseek', 'anthropic', 'openai'] as const) {
+      const params = paramsFromDeeplink(buildCcSwitchImportDeeplink({
+        ...baseInput, platform, clientType: 'claude', agent
+      }))
+      expect(params.get('app')).toBe(agent)
+      expect(params.get('endpoint')).toBe(agent === 'claude' ? baseInput.baseUrl : `${baseInput.baseUrl}/v1`)
+      expect(params.get('apiKey')).toBe(baseInput.apiKey)
+    }
+  })
+
+  it.each(['codex', 'opencode'] as const)('normalizes the selected %s endpoint without duplicating /v1', (agent) => {
+    for (const baseUrl of ['https://api.example.com/', 'https://api.example.com/v1', 'https://api.example.com/v1/']) {
+      const params = paramsFromDeeplink(buildCcSwitchImportDeeplink({
+        ...baseInput, baseUrl, platform: 'deepseek', clientType: 'claude', agent
+      }))
+      expect(params.get('endpoint')).toBe('https://api.example.com/v1')
+    }
+  })
+
   it('adds the Codex model parameter for OpenAI imports', () => {
     const params = paramsFromDeeplink(
       buildCcSwitchImportDeeplink({
