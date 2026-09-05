@@ -1,5 +1,6 @@
 <template>
-  <BaseDialog
+  <component
+    :is="embedded ? 'div' : BaseDialog"
     :show="show"
     :title="t('keys.useKeyModal.title')"
     width="wide"
@@ -29,7 +30,7 @@
         </p>
 
         <!-- Client Tabs -->
-        <div v-if="clientTabs.length" class="overflow-x-auto border-b border-gray-200 dark:border-dark-700">
+        <div v-if="!client && clientTabs.length" class="overflow-x-auto border-b border-gray-200 dark:border-dark-700">
           <nav class="-mb-px flex min-w-max gap-4 sm:gap-6" aria-label="Client">
             <button
               v-for="tab in clientTabs"
@@ -241,7 +242,7 @@
       </template>
     </div>
 
-    <template #footer>
+    <template v-if="!embedded" #footer>
       <div class="flex justify-end">
         <button
           @click="emit('close')"
@@ -251,7 +252,7 @@
         </button>
       </div>
     </template>
-  </BaseDialog>
+  </component>
 </template>
 
 <script setup lang="ts">
@@ -276,6 +277,8 @@ interface Props {
   baseUrl: string
   platform: GroupPlatform | null
   allowMessagesDispatch?: boolean
+  embedded?: boolean
+  client?: string
 }
 
 interface Emits {
@@ -348,9 +351,11 @@ const defaultClientTab = computed(() => {
 
 watch(() => props.platform, () => {
   activeTab.value = 'unix'
-  activeClientTab.value = defaultClientTab.value
+  activeClientTab.value = props.client || defaultClientTab.value
   codexAuthMode.value = 'legacy'
 }, { immediate: true })
+
+watch(() => props.client, (client) => { activeClientTab.value = client || defaultClientTab.value })
 
 watch(() => props.show, (show) => {
   if (show) {
