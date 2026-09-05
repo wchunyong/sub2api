@@ -127,8 +127,9 @@ export default {
     lastUsedAt: '上次使用时间',
     lastUsedIP: '最近使用 IP',
     quickImport: {
+      ccsUnavailable: '当前密钥与此 Agent 暂不支持 CCS 导入',
       chooseAction: '选择操作',
-      supportedOnly: '仅显示当前密钥支持的 Agent',
+      supportedOnly: '不支持当前密钥的 Agent 已置灰',
       recommended: '推荐',
       copyImport: '复制导入命令',
       copyClean: '复制清理命令',

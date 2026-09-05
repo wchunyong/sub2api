@@ -189,4 +189,18 @@ class InstallerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'conflict'): installer.clean(self.root,'codex')
         self.assertEqual(config.read_text(encoding='utf-8'),original)
 
+class ExchangeTests(unittest.TestCase):
+    def test_exchange_identifies_client_and_reports_safe_http_status(self):
+        import io
+        import urllib.error
+        opener=unittest.mock.MagicMock()
+        opener.open.side_effect=urllib.error.HTTPError('https://example.com',403,'secret-body',{},None)
+        output=io.StringIO()
+        with patch.object(installer.sys,'argv',['installer.py','install','--agent','opencode','--server','https://example.com','--ticket','a'*64]), patch.object(installer,'require_client'), patch.dict(installer.os.environ,{'USERPROFILE':str(Path.home()),'HOME':str(Path.home())},clear=True), patch.object(installer.urllib.request,'build_opener',return_value=opener), patch.object(installer.sys,'stderr',output):
+            with self.assertRaises(SystemExit): installer.main()
+        request=opener.open.call_args.args[0]
+        self.assertEqual(request.get_header('User-agent'),'lianjieai-quick-import/1.0')
+        self.assertIn('configuration exchange: HTTP 403',output.getvalue())
+        self.assertNotIn('secret-body',output.getvalue())
+
 if __name__ == '__main__': unittest.main()
