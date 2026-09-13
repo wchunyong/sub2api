@@ -1,43 +1,41 @@
 <template>
-  <Teleport to="body">
-    <Transition name="announcement-banner-slide">
-      <div
-        v-if="banner"
-        class="fixed inset-x-0 top-0 z-[115] bg-gradient-to-r from-violet-600 via-rose-500 to-amber-400 px-4 py-3 text-white shadow-lg"
-        data-testid="announcement-banner"
-        :class="{ 'cursor-pointer': canClickWholeBanner }"
-        role="region"
-        :aria-label="banner.title"
-        @click="handleBannerClick"
-      >
-        <div class="mx-auto flex max-w-7xl items-center justify-center gap-3 pr-9 text-center">
-          <div
-            class="announcement-banner-content min-w-0 text-sm font-medium leading-6 sm:text-base"
-            v-html="renderedContent"
-          ></div>
-
-          <button
-            v-if="showButton"
-            type="button"
-            class="shrink-0 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-blue-700 shadow-sm transition hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-white/70"
-            @click.stop="handleButtonClick"
-          >
-            {{ buttonText }}
-          </button>
-        </div>
+  <Transition name="announcement-banner-slide">
+    <div
+      v-if="banner"
+      class="relative z-[30] bg-gradient-to-r from-violet-600 via-rose-500 to-amber-400 px-4 py-3 text-white shadow-lg"
+      data-testid="announcement-banner"
+      :class="{ 'cursor-pointer': canClickWholeBanner }"
+      role="region"
+      :aria-label="banner.title"
+      @click="handleBannerClick"
+    >
+      <div class="mx-auto flex max-w-7xl items-center justify-center gap-3 pr-9 text-center">
+        <div
+          class="announcement-banner-content min-w-0 text-sm font-medium leading-6 sm:text-base"
+          v-html="renderedContent"
+        ></div>
 
         <button
+          v-if="showButton"
           type="button"
-          data-testid="announcement-banner-dismiss"
-          class="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-white/90 transition hover:bg-white/15 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/70"
-          :aria-label="t('common.close')"
-          @click.stop="dismiss"
+          class="shrink-0 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-blue-700 shadow-sm transition hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-white/70"
+          @click.stop="handleButtonClick"
         >
-          <Icon name="x" size="sm" />
+          {{ buttonText }}
         </button>
       </div>
-    </Transition>
-  </Teleport>
+
+      <button
+        type="button"
+        data-testid="announcement-banner-dismiss"
+        class="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-white/90 transition hover:bg-white/15 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/70"
+        :aria-label="t('common.close')"
+        @click.stop="dismiss"
+      >
+        <Icon name="x" size="sm" />
+      </button>
+    </div>
+  </Transition>
 </template>
 
 <script setup lang="ts">

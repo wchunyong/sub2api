@@ -45,10 +45,31 @@ describe('AnnouncementBanner', () => {
       },
     ]
 
-    mount(AnnouncementBanner)
+    const wrapper = mount(AnnouncementBanner)
 
-    expect(document.body.textContent).toContain('2024 年度')
-    expect(document.body.textContent).toContain('了解详情')
+    expect(wrapper.text()).toContain('2024 年度')
+    expect(wrapper.text()).toContain('了解详情')
+  })
+
+  it('participates in normal page layout instead of covering the top bar', () => {
+    const store = useAnnouncementStore()
+    store.announcements = [
+      {
+        id: 12,
+        title: 'Inline banner',
+        content: '插入式横幅',
+        notify_mode: 'banner',
+        banner_config: {},
+        created_at: '2026-07-24T07:30:00Z',
+        updated_at: '2026-07-24T07:30:00Z',
+      },
+    ]
+
+    const wrapper = mount(AnnouncementBanner)
+    const banner = wrapper.get('[data-testid="announcement-banner"]')
+
+    expect(banner.classes()).not.toContain('fixed')
+    expect(banner.classes()).not.toContain('top-0')
   })
 
   it('marks the banner read when dismissed', async () => {
@@ -66,9 +87,8 @@ describe('AnnouncementBanner', () => {
     ]
     const markAsRead = vi.spyOn(store, 'markAsRead').mockResolvedValue()
 
-    mount(AnnouncementBanner)
-    document.body.querySelector<HTMLButtonElement>('[data-testid="announcement-banner-dismiss"]')?.click()
-    await Promise.resolve()
+    const wrapper = mount(AnnouncementBanner)
+    await wrapper.get('[data-testid="announcement-banner-dismiss"]').trigger('click')
 
     expect(markAsRead).toHaveBeenCalledWith(11)
   })
