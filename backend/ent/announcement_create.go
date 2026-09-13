@@ -64,6 +64,20 @@ func (_c *AnnouncementCreate) SetNillableNotifyMode(v *string) *AnnouncementCrea
 	return _c
 }
 
+// SetBannerConfig sets the "banner_config" field.
+func (_c *AnnouncementCreate) SetBannerConfig(v domain.AnnouncementBannerConfig) *AnnouncementCreate {
+	_c.mutation.SetBannerConfig(v)
+	return _c
+}
+
+// SetNillableBannerConfig sets the "banner_config" field if the given value is not nil.
+func (_c *AnnouncementCreate) SetNillableBannerConfig(v *domain.AnnouncementBannerConfig) *AnnouncementCreate {
+	if v != nil {
+		_c.SetBannerConfig(*v)
+	}
+	return _c
+}
+
 // SetTargeting sets the "targeting" field.
 func (_c *AnnouncementCreate) SetTargeting(v domain.AnnouncementTargeting) *AnnouncementCreate {
 	_c.mutation.SetTargeting(v)
@@ -313,6 +327,10 @@ func (_c *AnnouncementCreate) createSpec() (*Announcement, *sqlgraph.CreateSpec)
 		_spec.SetField(announcement.FieldNotifyMode, field.TypeString, value)
 		_node.NotifyMode = value
 	}
+	if value, ok := _c.mutation.BannerConfig(); ok {
+		_spec.SetField(announcement.FieldBannerConfig, field.TypeJSON, value)
+		_node.BannerConfig = value
+	}
 	if value, ok := _c.mutation.Targeting(); ok {
 		_spec.SetField(announcement.FieldTargeting, field.TypeJSON, value)
 		_node.Targeting = value
@@ -454,6 +472,24 @@ func (u *AnnouncementUpsert) SetNotifyMode(v string) *AnnouncementUpsert {
 // UpdateNotifyMode sets the "notify_mode" field to the value that was provided on create.
 func (u *AnnouncementUpsert) UpdateNotifyMode() *AnnouncementUpsert {
 	u.SetExcluded(announcement.FieldNotifyMode)
+	return u
+}
+
+// SetBannerConfig sets the "banner_config" field.
+func (u *AnnouncementUpsert) SetBannerConfig(v domain.AnnouncementBannerConfig) *AnnouncementUpsert {
+	u.Set(announcement.FieldBannerConfig, v)
+	return u
+}
+
+// UpdateBannerConfig sets the "banner_config" field to the value that was provided on create.
+func (u *AnnouncementUpsert) UpdateBannerConfig() *AnnouncementUpsert {
+	u.SetExcluded(announcement.FieldBannerConfig)
+	return u
+}
+
+// ClearBannerConfig clears the value of the "banner_config" field.
+func (u *AnnouncementUpsert) ClearBannerConfig() *AnnouncementUpsert {
+	u.SetNull(announcement.FieldBannerConfig)
 	return u
 }
 
@@ -669,6 +705,27 @@ func (u *AnnouncementUpsertOne) SetNotifyMode(v string) *AnnouncementUpsertOne {
 func (u *AnnouncementUpsertOne) UpdateNotifyMode() *AnnouncementUpsertOne {
 	return u.Update(func(s *AnnouncementUpsert) {
 		s.UpdateNotifyMode()
+	})
+}
+
+// SetBannerConfig sets the "banner_config" field.
+func (u *AnnouncementUpsertOne) SetBannerConfig(v domain.AnnouncementBannerConfig) *AnnouncementUpsertOne {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.SetBannerConfig(v)
+	})
+}
+
+// UpdateBannerConfig sets the "banner_config" field to the value that was provided on create.
+func (u *AnnouncementUpsertOne) UpdateBannerConfig() *AnnouncementUpsertOne {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.UpdateBannerConfig()
+	})
+}
+
+// ClearBannerConfig clears the value of the "banner_config" field.
+func (u *AnnouncementUpsertOne) ClearBannerConfig() *AnnouncementUpsertOne {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.ClearBannerConfig()
 	})
 }
 
@@ -1069,6 +1126,27 @@ func (u *AnnouncementUpsertBulk) SetNotifyMode(v string) *AnnouncementUpsertBulk
 func (u *AnnouncementUpsertBulk) UpdateNotifyMode() *AnnouncementUpsertBulk {
 	return u.Update(func(s *AnnouncementUpsert) {
 		s.UpdateNotifyMode()
+	})
+}
+
+// SetBannerConfig sets the "banner_config" field.
+func (u *AnnouncementUpsertBulk) SetBannerConfig(v domain.AnnouncementBannerConfig) *AnnouncementUpsertBulk {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.SetBannerConfig(v)
+	})
+}
+
+// UpdateBannerConfig sets the "banner_config" field to the value that was provided on create.
+func (u *AnnouncementUpsertBulk) UpdateBannerConfig() *AnnouncementUpsertBulk {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.UpdateBannerConfig()
+	})
+}
+
+// ClearBannerConfig clears the value of the "banner_config" field.
+func (u *AnnouncementUpsertBulk) ClearBannerConfig() *AnnouncementUpsertBulk {
+	return u.Update(func(s *AnnouncementUpsert) {
+		s.ClearBannerConfig()
 	})
 }
 

@@ -33,25 +33,27 @@ func NewAnnouncementService(
 }
 
 type CreateAnnouncementInput struct {
-	Title      string
-	Content    string
-	Status     string
-	NotifyMode string
-	Targeting  AnnouncementTargeting
-	StartsAt   *time.Time
-	EndsAt     *time.Time
-	ActorID    *int64 // 管理员用户ID
+	Title        string
+	Content      string
+	Status       string
+	NotifyMode   string
+	BannerConfig AnnouncementBannerConfig
+	Targeting    AnnouncementTargeting
+	StartsAt     *time.Time
+	EndsAt       *time.Time
+	ActorID      *int64 // 管理员用户ID
 }
 
 type UpdateAnnouncementInput struct {
-	Title      *string
-	Content    *string
-	Status     *string
-	NotifyMode *string
-	Targeting  *AnnouncementTargeting
-	StartsAt   **time.Time
-	EndsAt     **time.Time
-	ActorID    *int64 // 管理员用户ID
+	Title        *string
+	Content      *string
+	Status       *string
+	NotifyMode   *string
+	BannerConfig *AnnouncementBannerConfig
+	Targeting    *AnnouncementTargeting
+	StartsAt     **time.Time
+	EndsAt       **time.Time
+	ActorID      *int64 // 管理员用户ID
 }
 
 type UserAnnouncement struct {
@@ -106,6 +108,10 @@ func (s *AnnouncementService) Create(ctx context.Context, input *CreateAnnouncem
 	if !isValidAnnouncementNotifyMode(notifyMode) {
 		return nil, ErrAnnouncementInvalidNotifyMode
 	}
+	bannerConfig, err := normalizeAnnouncementBannerConfig(notifyMode, input.BannerConfig)
+	if err != nil {
+		return nil, err
+	}
 
 	if input.StartsAt != nil && input.EndsAt != nil {
 		if !input.StartsAt.Before(*input.EndsAt) {
@@ -114,13 +120,14 @@ func (s *AnnouncementService) Create(ctx context.Context, input *CreateAnnouncem
 	}
 
 	a := &Announcement{
-		Title:      title,
-		Content:    content,
-		Status:     status,
-		NotifyMode: notifyMode,
-		Targeting:  targeting,
-		StartsAt:   input.StartsAt,
-		EndsAt:     input.EndsAt,
+		Title:        title,
+		Content:      content,
+		Status:       status,
+		NotifyMode:   notifyMode,
+		BannerConfig: bannerConfig,
+		Targeting:    targeting,
+		StartsAt:     input.StartsAt,
+		EndsAt:       input.EndsAt,
 	}
 	if input.ActorID != nil && *input.ActorID > 0 {
 		a.CreatedBy = input.ActorID
@@ -177,6 +184,14 @@ func (s *AnnouncementService) Update(ctx context.Context, id int64, input *Updat
 		}
 		a.NotifyMode = notifyMode
 	}
+	if input.BannerConfig != nil {
+		a.BannerConfig = *input.BannerConfig
+	}
+	bannerConfig, err := normalizeAnnouncementBannerConfig(a.NotifyMode, a.BannerConfig)
+	if err != nil {
+		return nil, err
+	}
+	a.BannerConfig = bannerConfig
 
 	if input.Targeting != nil {
 		targeting, err := domain.AnnouncementTargeting(*input.Targeting).NormalizeAndValidate()
@@ -407,9 +422,20 @@ func isValidAnnouncementStatus(status string) bool {
 
 func isValidAnnouncementNotifyMode(mode string) bool {
 	switch mode {
-	case AnnouncementNotifyModeSilent, AnnouncementNotifyModePopup:
+	case AnnouncementNotifyModeSilent, AnnouncementNotifyModePopup, AnnouncementNotifyModeBanner:
 		return true
 	default:
 		return false
 	}
+}
+
+func normalizeAnnouncementBannerConfig(mode string, config AnnouncementBannerConfig) (AnnouncementBannerConfig, error) {
+	if mode != AnnouncementNotifyModeBanner {
+		return AnnouncementBannerConfig{}, nil
+	}
+	normalized, ok := config.NormalizeAndValidate()
+	if !ok {
+		return AnnouncementBannerConfig{}, ErrAnnouncementInvalidBannerConfig
+	}
+	return normalized, nil
 }

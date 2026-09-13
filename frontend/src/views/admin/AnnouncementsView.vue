@@ -82,10 +82,12 @@
                 'badge',
                 row.notify_mode === 'popup'
                   ? 'badge-warning'
+                  : row.notify_mode === 'banner'
+                    ? 'badge-info'
                   : 'badge-gray'
               ]"
             >
-              {{ row.notify_mode === 'popup' ? t('admin.announcements.notifyModeLabels.popup') : t('admin.announcements.notifyModeLabels.silent') }}
+              {{ notifyModeLabel(row.notify_mode) }}
             </span>
           </template>
 
@@ -198,6 +200,49 @@
           </div>
         </div>
 
+        <div v-if="form.notify_mode === 'banner'" class="space-y-3 rounded-lg border border-gray-200 p-4 dark:border-dark-700">
+          <div>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
+              {{ t('admin.announcements.form.bannerSettings') }}
+            </h3>
+          </div>
+
+          <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <input v-model="form.banner_config.whole_banner_click_enabled" type="checkbox" class="checkbox" />
+            {{ t('admin.announcements.form.wholeBannerClick') }}
+          </label>
+          <input
+            v-if="form.banner_config.whole_banner_click_enabled"
+            v-model="form.banner_config.click_url"
+            type="url"
+            class="input"
+            placeholder="https://hovxm.com"
+            required
+          />
+
+          <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <input v-model="form.banner_config.button_enabled" type="checkbox" class="checkbox" />
+            {{ t('admin.announcements.form.bannerButtonClick') }}
+          </label>
+          <div v-if="form.banner_config.button_enabled" class="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <input
+              v-model="form.banner_config.button_text"
+              type="text"
+              class="input"
+              maxlength="50"
+              :placeholder="t('admin.announcements.form.bannerButtonText')"
+              required
+            />
+            <input
+              v-model="form.banner_config.button_url"
+              type="url"
+              class="input"
+              placeholder="https://hovxm.com"
+              required
+            />
+          </div>
+        </div>
+
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label class="input-label">{{ t('admin.announcements.form.startsAt') }}</label>
@@ -264,6 +309,7 @@ import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { adminAPI } from '@/api/admin'
 import { formatDateTime, formatDateTimeLocalInput, parseDateTimeLocalInput } from '@/utils/format'
 import type { AdminGroup, Announcement, AnnouncementTargeting } from '@/types'
+import type { AnnouncementBannerConfig, AnnouncementNotifyMode } from '@/types'
 import type { Column } from '@/components/common/types'
 
 import AppLayout from '@/components/layout/AppLayout.vue'
@@ -318,7 +364,8 @@ const statusOptions = computed(() => [
 
 const notifyModeOptions = computed(() => [
   { value: 'silent', label: t('admin.announcements.notifyModeLabels.silent') },
-  { value: 'popup', label: t('admin.announcements.notifyModeLabels.popup') }
+  { value: 'popup', label: t('admin.announcements.notifyModeLabels.popup') },
+  { value: 'banner', label: t('admin.announcements.notifyModeLabels.banner') }
 ])
 
 const columns = computed<Column[]>(() => [
@@ -336,6 +383,12 @@ const statusLabel = (status: string) => {
   if (status === 'active') return t('admin.announcements.statusLabels.active')
   if (status === 'archived') return t('admin.announcements.statusLabels.archived')
   return status
+}
+
+const notifyModeLabel = (mode: AnnouncementNotifyMode) => {
+  if (mode === 'popup') return t('admin.announcements.notifyModeLabels.popup')
+  if (mode === 'banner') return t('admin.announcements.notifyModeLabels.banner')
+  return t('admin.announcements.notifyModeLabels.silent')
 }
 
 const targetingSummary = (targeting: AnnouncementTargeting) => {
@@ -431,7 +484,14 @@ const form = reactive({
   title: '',
   content: '',
   status: 'draft',
-  notify_mode: 'silent',
+  notify_mode: 'silent' as AnnouncementNotifyMode,
+  banner_config: {
+    whole_banner_click_enabled: false,
+    click_url: '',
+    button_enabled: false,
+    button_text: '',
+    button_url: ''
+  } as AnnouncementBannerConfig,
   starts_at_str: '',
   ends_at_str: '',
   targeting: { any_of: [] } as AnnouncementTargeting
@@ -454,6 +514,7 @@ function resetForm() {
   form.content = ''
   form.status = 'draft'
   form.notify_mode = 'silent'
+  form.banner_config = emptyBannerConfig()
   form.starts_at_str = ''
   form.ends_at_str = ''
   form.targeting = { any_of: [] }
@@ -464,6 +525,7 @@ function fillFormFromAnnouncement(a: Announcement) {
   form.content = a.content
   form.status = a.status
   form.notify_mode = a.notify_mode || 'silent'
+  form.banner_config = normalizeBannerConfig(a.banner_config)
 
   // Backend returns RFC3339 strings
   form.starts_at_str = a.starts_at ? formatDateTimeLocalInput(Math.floor(new Date(a.starts_at).getTime() / 1000)) : ''
@@ -498,6 +560,7 @@ function buildCreatePayload() {
     content: form.content,
     status: form.status as any,
     notify_mode: form.notify_mode as any,
+    banner_config: normalizeBannerConfig(form.banner_config),
     targeting: form.targeting,
     starts_at: startsAt ?? undefined,
     ends_at: endsAt ?? undefined
@@ -511,6 +574,9 @@ function buildUpdatePayload(original: Announcement) {
   if (form.content !== original.content) payload.content = form.content
   if (form.status !== original.status) payload.status = form.status
   if (form.notify_mode !== (original.notify_mode || 'silent')) payload.notify_mode = form.notify_mode
+  if (JSON.stringify(normalizeBannerConfig(form.banner_config)) !== JSON.stringify(normalizeBannerConfig(original.banner_config))) {
+    payload.banner_config = normalizeBannerConfig(form.banner_config)
+  }
 
   // starts_at / ends_at: distinguish unchanged vs clear(0) vs set
   const originalStarts = original.starts_at ? Math.floor(new Date(original.starts_at).getTime() / 1000) : null
@@ -611,6 +677,26 @@ function openPreview(row: Announcement) {
 function openReadStatus(row: Announcement) {
   readStatusAnnouncementId.value = row.id
   showReadStatusDialog.value = true
+}
+
+function emptyBannerConfig(): AnnouncementBannerConfig {
+  return {
+    whole_banner_click_enabled: false,
+    click_url: '',
+    button_enabled: false,
+    button_text: '',
+    button_url: ''
+  }
+}
+
+function normalizeBannerConfig(config?: AnnouncementBannerConfig): AnnouncementBannerConfig {
+  return {
+    whole_banner_click_enabled: Boolean(config?.whole_banner_click_enabled),
+    click_url: (config?.click_url ?? '').trim(),
+    button_enabled: Boolean(config?.button_enabled),
+    button_text: (config?.button_text ?? '').trim(),
+    button_url: (config?.button_url ?? '').trim()
+  }
 }
 
 onMounted(async () => {

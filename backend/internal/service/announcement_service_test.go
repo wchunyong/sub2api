@@ -58,6 +58,51 @@ func TestAnnouncementServiceCreateRejectsEqualStartEndTimes(t *testing.T) {
 	require.ErrorIs(t, err, ErrAnnouncementInvalidSchedule)
 }
 
+func TestAnnouncementServiceCreateAcceptsBannerAnnouncements(t *testing.T) {
+	repo := &announcementRepoStub{}
+	svc := NewAnnouncementService(repo, nil, nil, nil)
+
+	created, err := svc.Create(context.Background(), &CreateAnnouncementInput{
+		Title:      " 顶部横幅 ",
+		Content:    " 💪 2024 年度白皮书发布 ",
+		Status:     AnnouncementStatusActive,
+		NotifyMode: AnnouncementNotifyModeBanner,
+		BannerConfig: AnnouncementBannerConfig{
+			WholeBannerClickEnabled: true,
+			ClickURL:                " https://hovxm.com ",
+			ButtonEnabled:           true,
+			ButtonText:              " 了解详情 ",
+			ButtonURL:               " https://hovxm.com/docs ",
+		},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, AnnouncementNotifyModeBanner, created.NotifyMode)
+	require.True(t, created.BannerConfig.WholeBannerClickEnabled)
+	require.Equal(t, "https://hovxm.com", created.BannerConfig.ClickURL)
+	require.True(t, created.BannerConfig.ButtonEnabled)
+	require.Equal(t, "了解详情", created.BannerConfig.ButtonText)
+	require.Equal(t, "https://hovxm.com/docs", created.BannerConfig.ButtonURL)
+}
+
+func TestAnnouncementServiceCreateRejectsBannerInvalidURL(t *testing.T) {
+	repo := &announcementRepoStub{}
+	svc := NewAnnouncementService(repo, nil, nil, nil)
+
+	_, err := svc.Create(context.Background(), &CreateAnnouncementInput{
+		Title:      "顶部横幅",
+		Content:    "白皮书发布",
+		Status:     AnnouncementStatusActive,
+		NotifyMode: AnnouncementNotifyModeBanner,
+		BannerConfig: AnnouncementBannerConfig{
+			WholeBannerClickEnabled: true,
+			ClickURL:                "javascript:alert(1)",
+		},
+	})
+
+	require.ErrorIs(t, err, ErrAnnouncementInvalidBannerConfig)
+}
+
 func TestAnnouncementServiceUpdateRejectsEqualStartEndTimes(t *testing.T) {
 	repo := &announcementRepoStub{
 		item: &Announcement{

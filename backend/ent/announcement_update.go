@@ -86,6 +86,26 @@ func (_u *AnnouncementUpdate) SetNillableNotifyMode(v *string) *AnnouncementUpda
 	return _u
 }
 
+// SetBannerConfig sets the "banner_config" field.
+func (_u *AnnouncementUpdate) SetBannerConfig(v domain.AnnouncementBannerConfig) *AnnouncementUpdate {
+	_u.mutation.SetBannerConfig(v)
+	return _u
+}
+
+// SetNillableBannerConfig sets the "banner_config" field if the given value is not nil.
+func (_u *AnnouncementUpdate) SetNillableBannerConfig(v *domain.AnnouncementBannerConfig) *AnnouncementUpdate {
+	if v != nil {
+		_u.SetBannerConfig(*v)
+	}
+	return _u
+}
+
+// ClearBannerConfig clears the value of the "banner_config" field.
+func (_u *AnnouncementUpdate) ClearBannerConfig() *AnnouncementUpdate {
+	_u.mutation.ClearBannerConfig()
+	return _u
+}
+
 // SetTargeting sets the "targeting" field.
 func (_u *AnnouncementUpdate) SetTargeting(v domain.AnnouncementTargeting) *AnnouncementUpdate {
 	_u.mutation.SetTargeting(v)
@@ -332,6 +352,12 @@ func (_u *AnnouncementUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if value, ok := _u.mutation.NotifyMode(); ok {
 		_spec.SetField(announcement.FieldNotifyMode, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.BannerConfig(); ok {
+		_spec.SetField(announcement.FieldBannerConfig, field.TypeJSON, value)
+	}
+	if _u.mutation.BannerConfigCleared() {
+		_spec.ClearField(announcement.FieldBannerConfig, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.Targeting(); ok {
 		_spec.SetField(announcement.FieldTargeting, field.TypeJSON, value)
 	}
@@ -489,6 +515,26 @@ func (_u *AnnouncementUpdateOne) SetNillableNotifyMode(v *string) *AnnouncementU
 	if v != nil {
 		_u.SetNotifyMode(*v)
 	}
+	return _u
+}
+
+// SetBannerConfig sets the "banner_config" field.
+func (_u *AnnouncementUpdateOne) SetBannerConfig(v domain.AnnouncementBannerConfig) *AnnouncementUpdateOne {
+	_u.mutation.SetBannerConfig(v)
+	return _u
+}
+
+// SetNillableBannerConfig sets the "banner_config" field if the given value is not nil.
+func (_u *AnnouncementUpdateOne) SetNillableBannerConfig(v *domain.AnnouncementBannerConfig) *AnnouncementUpdateOne {
+	if v != nil {
+		_u.SetBannerConfig(*v)
+	}
+	return _u
+}
+
+// ClearBannerConfig clears the value of the "banner_config" field.
+func (_u *AnnouncementUpdateOne) ClearBannerConfig() *AnnouncementUpdateOne {
+	_u.mutation.ClearBannerConfig()
 	return _u
 }
 
@@ -767,6 +813,12 @@ func (_u *AnnouncementUpdateOne) sqlSave(ctx context.Context) (_node *Announceme
 	}
 	if value, ok := _u.mutation.NotifyMode(); ok {
 		_spec.SetField(announcement.FieldNotifyMode, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.BannerConfig(); ok {
+		_spec.SetField(announcement.FieldBannerConfig, field.TypeJSON, value)
+	}
+	if _u.mutation.BannerConfigCleared() {
+		_spec.ClearField(announcement.FieldBannerConfig, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.Targeting(); ok {
 		_spec.SetField(announcement.FieldTargeting, field.TypeJSON, value)

@@ -18,6 +18,7 @@ const (
 const (
 	AnnouncementNotifyModeSilent = domain.AnnouncementNotifyModeSilent
 	AnnouncementNotifyModePopup  = domain.AnnouncementNotifyModePopup
+	AnnouncementNotifyModeBanner = domain.AnnouncementNotifyModeBanner
 )
 
 const (
@@ -48,6 +49,10 @@ var (
 		"ANNOUNCEMENT_NOTIFY_MODE_INVALID",
 		"announcement notify_mode is invalid",
 	)
+	ErrAnnouncementInvalidBannerConfig = infraerrors.BadRequest(
+		"ANNOUNCEMENT_BANNER_CONFIG_INVALID",
+		"announcement banner_config is invalid",
+	)
 	ErrAnnouncementInvalidSchedule = infraerrors.BadRequest(
 		"ANNOUNCEMENT_TIME_RANGE_INVALID",
 		"starts_at must be before ends_at",
@@ -55,6 +60,8 @@ var (
 )
 
 type AnnouncementTargeting = domain.AnnouncementTargeting
+
+type AnnouncementBannerConfig = domain.AnnouncementBannerConfig
 
 type AnnouncementConditionGroup = domain.AnnouncementConditionGroup
 

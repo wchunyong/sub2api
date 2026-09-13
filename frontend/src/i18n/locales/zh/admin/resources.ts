@@ -397,14 +397,19 @@ export default {
       },
       notifyModeLabels: {
         silent: '静默',
-        popup: '弹窗'
+        popup: '弹窗',
+        banner: '横幅'
       },
       form: {
         title: '标题',
         content: '内容（支持 Markdown）',
         status: '状态',
         notifyMode: '通知方式',
-        notifyModeHint: '弹窗模式会自动弹出通知给用户',
+        notifyModeHint: '弹窗模式会自动弹出通知；横幅模式会展示在网站顶部',
+        bannerSettings: '横幅设置',
+        wholeBannerClick: '横幅整行点击跳转 URL',
+        bannerButtonClick: '按钮点击跳转',
+        bannerButtonText: '按钮文案',
         startsAt: '开始时间',
         endsAt: '结束时间',
         startsAtHint: '留空表示立即生效',

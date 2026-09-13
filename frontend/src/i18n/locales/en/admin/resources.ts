@@ -400,14 +400,19 @@ export default {
       },
       notifyModeLabels: {
         silent: 'Silent',
-        popup: 'Popup'
+        popup: 'Popup',
+        banner: 'Banner'
       },
       form: {
         title: 'Title',
         content: 'Content (Markdown supported)',
         status: 'Status',
         notifyMode: 'Notify Mode',
-        notifyModeHint: 'Popup mode will show a popup notification to users',
+        notifyModeHint: 'Popup mode shows a popup; banner mode displays at the top of the site',
+        bannerSettings: 'Banner Settings',
+        wholeBannerClick: 'Whole banner click URL',
+        bannerButtonClick: 'Button click link',
+        bannerButtonText: 'Button text',
         startsAt: 'Starts At',
         endsAt: 'Ends At',
         startsAtHint: 'Leave empty to start immediately',

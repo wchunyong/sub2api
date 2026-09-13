@@ -22,6 +22,8 @@ const (
 	FieldStatus = "status"
 	// FieldNotifyMode holds the string denoting the notify_mode field in the database.
 	FieldNotifyMode = "notify_mode"
+	// FieldBannerConfig holds the string denoting the banner_config field in the database.
+	FieldBannerConfig = "banner_config"
 	// FieldTargeting holds the string denoting the targeting field in the database.
 	FieldTargeting = "targeting"
 	// FieldStartsAt holds the string denoting the starts_at field in the database.
@@ -56,6 +58,7 @@ var Columns = []string{
 	FieldContent,
 	FieldStatus,
 	FieldNotifyMode,
+	FieldBannerConfig,
 	FieldTargeting,
 	FieldStartsAt,
 	FieldEndsAt,
@@ -122,6 +125,11 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByNotifyMode orders the results by the notify_mode field.
 func ByNotifyMode(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldNotifyMode, opts...).ToFunc()
+}
+
+// ByBannerConfig orders the results by the banner_config field.
+func ByBannerConfig(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBannerConfig, opts...).ToFunc()
 }
 
 // ByStartsAt orders the results by the starts_at field.

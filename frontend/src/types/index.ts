@@ -330,7 +330,7 @@ export interface UpdateSubscriptionRequest {
 // ==================== Announcement Types ====================
 
 export type AnnouncementStatus = 'draft' | 'active' | 'archived'
-export type AnnouncementNotifyMode = 'silent' | 'popup'
+export type AnnouncementNotifyMode = 'silent' | 'popup' | 'banner'
 
 export type AnnouncementConditionType = 'subscription' | 'balance'
 
@@ -351,12 +351,21 @@ export interface AnnouncementTargeting {
   any_of?: AnnouncementConditionGroup[]
 }
 
+export interface AnnouncementBannerConfig {
+  whole_banner_click_enabled?: boolean
+  click_url?: string
+  button_enabled?: boolean
+  button_text?: string
+  button_url?: string
+}
+
 export interface Announcement {
   id: number
   title: string
   content: string
   status: AnnouncementStatus
   notify_mode: AnnouncementNotifyMode
+  banner_config?: AnnouncementBannerConfig
   targeting: AnnouncementTargeting
   starts_at?: string
   ends_at?: string
@@ -371,6 +380,7 @@ export interface UserAnnouncement {
   title: string
   content: string
   notify_mode: AnnouncementNotifyMode
+  banner_config?: AnnouncementBannerConfig
   starts_at?: string
   ends_at?: string
   read_at?: string
@@ -383,6 +393,7 @@ export interface CreateAnnouncementRequest {
   content: string
   status?: AnnouncementStatus
   notify_mode?: AnnouncementNotifyMode
+  banner_config?: AnnouncementBannerConfig
   targeting: AnnouncementTargeting
   starts_at?: number
   ends_at?: number
@@ -393,6 +404,7 @@ export interface UpdateAnnouncementRequest {
   content?: string
   status?: AnnouncementStatus
   notify_mode?: AnnouncementNotifyMode
+  banner_config?: AnnouncementBannerConfig
   targeting?: AnnouncementTargeting
   starts_at?: number
   ends_at?: number

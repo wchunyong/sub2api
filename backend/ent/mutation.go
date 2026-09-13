@@ -5580,6 +5580,7 @@ type AnnouncementMutation struct {
 	content       *string
 	status        *string
 	notify_mode   *string
+	banner_config *domain.AnnouncementBannerConfig
 	targeting     *domain.AnnouncementTargeting
 	starts_at     *time.Time
 	ends_at       *time.Time
@@ -5838,6 +5839,55 @@ func (m *AnnouncementMutation) OldNotifyMode(ctx context.Context) (v string, err
 // ResetNotifyMode resets all changes to the "notify_mode" field.
 func (m *AnnouncementMutation) ResetNotifyMode() {
 	m.notify_mode = nil
+}
+
+// SetBannerConfig sets the "banner_config" field.
+func (m *AnnouncementMutation) SetBannerConfig(dt domain.AnnouncementBannerConfig) {
+	m.banner_config = &dt
+}
+
+// BannerConfig returns the value of the "banner_config" field in the mutation.
+func (m *AnnouncementMutation) BannerConfig() (r domain.AnnouncementBannerConfig, exists bool) {
+	v := m.banner_config
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBannerConfig returns the old "banner_config" field's value of the Announcement entity.
+// If the Announcement object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AnnouncementMutation) OldBannerConfig(ctx context.Context) (v domain.AnnouncementBannerConfig, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBannerConfig is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBannerConfig requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBannerConfig: %w", err)
+	}
+	return oldValue.BannerConfig, nil
+}
+
+// ClearBannerConfig clears the value of the "banner_config" field.
+func (m *AnnouncementMutation) ClearBannerConfig() {
+	m.banner_config = nil
+	m.clearedFields[announcement.FieldBannerConfig] = struct{}{}
+}
+
+// BannerConfigCleared returns if the "banner_config" field was cleared in this mutation.
+func (m *AnnouncementMutation) BannerConfigCleared() bool {
+	_, ok := m.clearedFields[announcement.FieldBannerConfig]
+	return ok
+}
+
+// ResetBannerConfig resets all changes to the "banner_config" field.
+func (m *AnnouncementMutation) ResetBannerConfig() {
+	m.banner_config = nil
+	delete(m.clearedFields, announcement.FieldBannerConfig)
 }
 
 // SetTargeting sets the "targeting" field.
@@ -6287,7 +6337,7 @@ func (m *AnnouncementMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AnnouncementMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 12)
 	if m.title != nil {
 		fields = append(fields, announcement.FieldTitle)
 	}
@@ -6299,6 +6349,9 @@ func (m *AnnouncementMutation) Fields() []string {
 	}
 	if m.notify_mode != nil {
 		fields = append(fields, announcement.FieldNotifyMode)
+	}
+	if m.banner_config != nil {
+		fields = append(fields, announcement.FieldBannerConfig)
 	}
 	if m.targeting != nil {
 		fields = append(fields, announcement.FieldTargeting)
@@ -6337,6 +6390,8 @@ func (m *AnnouncementMutation) Field(name string) (ent.Value, bool) {
 		return m.Status()
 	case announcement.FieldNotifyMode:
 		return m.NotifyMode()
+	case announcement.FieldBannerConfig:
+		return m.BannerConfig()
 	case announcement.FieldTargeting:
 		return m.Targeting()
 	case announcement.FieldStartsAt:
@@ -6368,6 +6423,8 @@ func (m *AnnouncementMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldStatus(ctx)
 	case announcement.FieldNotifyMode:
 		return m.OldNotifyMode(ctx)
+	case announcement.FieldBannerConfig:
+		return m.OldBannerConfig(ctx)
 	case announcement.FieldTargeting:
 		return m.OldTargeting(ctx)
 	case announcement.FieldStartsAt:
@@ -6418,6 +6475,13 @@ func (m *AnnouncementMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetNotifyMode(v)
+		return nil
+	case announcement.FieldBannerConfig:
+		v, ok := value.(domain.AnnouncementBannerConfig)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBannerConfig(v)
 		return nil
 	case announcement.FieldTargeting:
 		v, ok := value.(domain.AnnouncementTargeting)
@@ -6528,6 +6592,9 @@ func (m *AnnouncementMutation) ClearedFields() []string {
 	if m.FieldCleared(announcement.FieldTargeting) {
 		fields = append(fields, announcement.FieldTargeting)
 	}
+	if m.FieldCleared(announcement.FieldBannerConfig) {
+		fields = append(fields, announcement.FieldBannerConfig)
+	}
 	if m.FieldCleared(announcement.FieldStartsAt) {
 		fields = append(fields, announcement.FieldStartsAt)
 	}
@@ -6554,6 +6621,9 @@ func (m *AnnouncementMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *AnnouncementMutation) ClearField(name string) error {
 	switch name {
+	case announcement.FieldBannerConfig:
+		m.ClearBannerConfig()
+		return nil
 	case announcement.FieldTargeting:
 		m.ClearTargeting()
 		return nil
@@ -6588,6 +6658,9 @@ func (m *AnnouncementMutation) ResetField(name string) error {
 		return nil
 	case announcement.FieldNotifyMode:
 		m.ResetNotifyMode()
+		return nil
+	case announcement.FieldBannerConfig:
+		m.ResetBannerConfig()
 		return nil
 	case announcement.FieldTargeting:
 		m.ResetTargeting()

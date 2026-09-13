@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"net/url"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ const (
 const (
 	AnnouncementNotifyModeSilent = "silent"
 	AnnouncementNotifyModePopup  = "popup"
+	AnnouncementNotifyModeBanner = "banner"
 )
 
 const (
@@ -36,6 +38,56 @@ var (
 	ErrAnnouncementNotFound      = infraerrors.NotFound("ANNOUNCEMENT_NOT_FOUND", "announcement not found")
 	ErrAnnouncementInvalidTarget = infraerrors.BadRequest("ANNOUNCEMENT_INVALID_TARGET", "invalid announcement targeting rules")
 )
+
+type AnnouncementBannerConfig struct {
+	WholeBannerClickEnabled bool   `json:"whole_banner_click_enabled,omitempty"`
+	ClickURL                string `json:"click_url,omitempty"`
+	ButtonEnabled           bool   `json:"button_enabled,omitempty"`
+	ButtonText              string `json:"button_text,omitempty"`
+	ButtonURL               string `json:"button_url,omitempty"`
+}
+
+func (c AnnouncementBannerConfig) NormalizeAndValidate() (AnnouncementBannerConfig, bool) {
+	normalized := AnnouncementBannerConfig{
+		WholeBannerClickEnabled: c.WholeBannerClickEnabled,
+		ClickURL:                strings.TrimSpace(c.ClickURL),
+		ButtonEnabled:           c.ButtonEnabled,
+		ButtonText:              strings.TrimSpace(c.ButtonText),
+		ButtonURL:               strings.TrimSpace(c.ButtonURL),
+	}
+
+	if !normalized.WholeBannerClickEnabled {
+		normalized.ClickURL = ""
+	} else if !isHTTPURL(normalized.ClickURL) {
+		return AnnouncementBannerConfig{}, false
+	}
+
+	if !normalized.ButtonEnabled {
+		normalized.ButtonText = ""
+		normalized.ButtonURL = ""
+		return normalized, true
+	}
+
+	if normalized.ButtonText == "" || len([]rune(normalized.ButtonText)) > 50 {
+		return AnnouncementBannerConfig{}, false
+	}
+	if !isHTTPURL(normalized.ButtonURL) {
+		return AnnouncementBannerConfig{}, false
+	}
+
+	return normalized, true
+}
+
+func isHTTPURL(raw string) bool {
+	if raw == "" || len(raw) > 2048 {
+		return false
+	}
+	parsed, err := url.ParseRequestURI(raw)
+	if err != nil || parsed == nil {
+		return false
+	}
+	return parsed.Scheme == "http" || parsed.Scheme == "https"
+}
 
 type AnnouncementTargeting struct {
 	// AnyOf 表示 OR：任意一个条件组满足即可展示。
@@ -200,18 +252,19 @@ func (c AnnouncementCondition) validate() error {
 }
 
 type Announcement struct {
-	ID         int64
-	Title      string
-	Content    string
-	Status     string
-	NotifyMode string
-	Targeting  AnnouncementTargeting
-	StartsAt   *time.Time
-	EndsAt     *time.Time
-	CreatedBy  *int64
-	UpdatedBy  *int64
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID           int64
+	Title        string
+	Content      string
+	Status       string
+	NotifyMode   string
+	BannerConfig AnnouncementBannerConfig
+	Targeting    AnnouncementTargeting
+	StartsAt     *time.Time
+	EndsAt       *time.Time
+	CreatedBy    *int64
+	UpdatedBy    *int64
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 func (a *Announcement) IsActiveAt(now time.Time) bool {
