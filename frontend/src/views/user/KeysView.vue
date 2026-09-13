@@ -92,14 +92,19 @@
         >
           <template #header-group="{ column }">
             <span>{{ column.label }}</span>
-            <span class="group relative inline-flex" :title="t('keys.groupLockedHint')">
+            <button
+              type="button"
+              class="group relative inline-flex cursor-help items-center rounded-sm outline-none focus-visible:ring-1 focus-visible:ring-gray-400"
+              :aria-label="t('keys.groupLockedHint')"
+            >
               <Icon name="exclamationCircle" size="xs" class="text-gray-400 dark:text-gray-500" />
               <span
-                class="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-72 -translate-x-1/2 rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-dark-700"
+                data-test="group-lock-tooltip"
+                class="pointer-events-none absolute left-1/2 top-full z-50 mt-2 w-72 -translate-x-1/2 rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 dark:bg-dark-700"
               >
                 {{ t('keys.groupLockedHint') }}
               </span>
-            </span>
+            </button>
           </template>
 
           <template #cell-id="{ value }">

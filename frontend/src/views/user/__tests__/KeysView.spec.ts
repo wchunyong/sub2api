@@ -454,7 +454,14 @@ describe('user KeysView column settings', () => {
     expect(groupHeader.text()).toContain(
       'Once an API key is created, its group cannot be changed. Create a new API key to use a different group.'
     )
-    expect(groupHeader.get('[data-test="icon"]').classes()).toContain('text-gray-400')
+    const hintTrigger = groupHeader.get('button[aria-label="Once an API key is created, its group cannot be changed. Create a new API key to use a different group."]')
+    expect(hintTrigger.attributes('title')).toBeUndefined()
+    expect(hintTrigger.get('[data-test="icon"]').classes()).toContain('text-gray-400')
+    const tooltip = hintTrigger.get('[data-test="group-lock-tooltip"]')
+    expect(tooltip.classes()).toContain('top-full')
+    expect(tooltip.classes()).toContain('mt-2')
+    expect(tooltip.classes()).toContain('group-hover:opacity-100')
+    expect(tooltip.classes()).toContain('group-focus-within:opacity-100')
     expect(wrapper.get('[data-test="group-cell"]').text()).not.toContain(
       'Once an API key is created, its group cannot be changed. Create a new API key to use a different group.'
     )
