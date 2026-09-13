@@ -6,6 +6,7 @@ LDFLAGS ?= -s -w -X main.Version=$(VERSION)
 build:
 	go run ./cmd/build-quick-import
 	CGO_ENABLED=0 go build -ldflags="$(LDFLAGS)" -trimpath -o bin/server ./cmd/server
+	CGO_ENABLED=0 go build -trimpath -o bin/crazy-monday ./cmd/crazy-monday
 
 generate:
 	go generate ./ent

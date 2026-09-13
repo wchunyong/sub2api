@@ -78,6 +78,12 @@ RUN VERSION_VALUE="${VERSION}" && \
     -o /app/sub2api \
     ./cmd/server
 
+# Build scheduled-task helpers used by Dokploy Schedule.
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -trimpath \
+    -o /app/crazy-monday \
+    ./cmd/crazy-monday
+
 # -----------------------------------------------------------------------------
 # Stage 3: Final Runtime Image
 # -----------------------------------------------------------------------------
@@ -105,6 +111,7 @@ WORKDIR /app
 
 # Copy binary and runtime fallback resources from builder
 COPY --from=backend-builder /app/sub2api /app/sub2api
+COPY --from=backend-builder /app/crazy-monday /app/crazy-monday
 COPY --from=backend-builder --chown=sub2api:sub2api /app/backend/resources /app/resources
 
 # Create data directory

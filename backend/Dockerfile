@@ -18,6 +18,9 @@ COPY . .
 RUN VERSION_VALUE="$(./scripts/resolve-version.sh)" && \
     go build -ldflags="-s -w -X main.Version=${VERSION_VALUE}" -o main ./cmd/server/
 
+# 构建 Dokploy Schedule 使用的活动脚本
+RUN CGO_ENABLED=0 go build -trimpath -o crazy-monday ./cmd/crazy-monday
+
 # 暴露端口
 EXPOSE 8080
 
