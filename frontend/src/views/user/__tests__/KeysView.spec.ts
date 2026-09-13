@@ -11,6 +11,7 @@ const {
   getDashboardApiKeysUsage,
   getAvailableGroups,
   getUserGroupRates,
+  updateKey,
   showError,
   showSuccess,
   copyToClipboard,
@@ -22,6 +23,7 @@ const {
   getDashboardApiKeysUsage: vi.fn(),
   getAvailableGroups: vi.fn(),
   getUserGroupRates: vi.fn(),
+  updateKey: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
   copyToClipboard: vi.fn(),
@@ -31,6 +33,8 @@ const {
 
 const messages: Record<string, string> = {
   'common.actions': 'Actions',
+  'common.delete': 'Delete',
+  'common.edit': 'Edit',
   'common.name': 'Name',
   'common.refresh': 'Refresh',
   'common.status': 'Status',
@@ -42,6 +46,7 @@ const messages: Record<string, string> = {
   'keys.created': 'Created',
   'keys.expiresAt': 'Expires',
   'keys.group': 'Group',
+  'keys.groupLockedHint': 'Create a new API key to switch groups.',
   'keys.id': 'ID',
   'keys.currentConcurrency': 'Current Concurrency',
   'keys.lastUsedAt': 'Last Used',
@@ -53,13 +58,15 @@ const messages: Record<string, string> = {
   'keys.status.inactive': 'Inactive',
   'keys.status.quota_exhausted': 'Quota exhausted',
   'keys.usage': 'Usage',
+  'keys.noExpiration': 'Never',
+  'keys.quickImport.title': 'Quick Import',
 }
 
 vi.mock('@/api', () => ({
   keysAPI: {
     list: listKeys,
     create: vi.fn(),
-    update: vi.fn(),
+    update: updateKey,
     delete: vi.fn(),
     toggleStatus: vi.fn(),
   },
@@ -151,6 +158,12 @@ const TablePageLayoutStub = {
   `,
 }
 
+const BaseDialogStub = {
+  props: ['show', 'title'],
+  emits: ['close'],
+  template: '<div v-if="show"><slot /><slot name="footer" /></div>',
+}
+
 const DataTableStub = {
   name: 'DataTable',
   props: ['columns', 'data'],
@@ -170,8 +183,14 @@ const DataTableStub = {
           <slot name="cell-id" :value="row.id" :row="row" />
         </div>
         <slot name="cell-name" :value="row.name" :row="row" />
+        <div data-test="group-cell">
+          <slot name="cell-group" :value="row.group" :row="row" />
+        </div>
         <div data-test="current-concurrency">
           <slot name="cell-current_concurrency" :value="row.current_concurrency" :row="row" />
+        </div>
+        <div data-test="actions-cell">
+          <slot name="cell-actions" :row="row" />
         </div>
         <div
           v-if="columns.some((col) => col.key === 'last_used_ip')"
@@ -223,7 +242,7 @@ const mountView = async () => {
         TablePageLayout: TablePageLayoutStub,
         DataTable: DataTableStub,
         Pagination: PaginationStub,
-        BaseDialog: true,
+        BaseDialog: BaseDialogStub,
         ConfirmDialog: true,
         EmptyState: true,
         Select: SelectStub,
@@ -265,6 +284,7 @@ describe('user KeysView column settings', () => {
     getDashboardApiKeysUsage.mockReset()
     getAvailableGroups.mockReset()
     getUserGroupRates.mockReset()
+    updateKey.mockReset()
     showError.mockReset()
     showSuccess.mockReset()
     copyToClipboard.mockReset()
@@ -282,6 +302,7 @@ describe('user KeysView column settings', () => {
     getDashboardApiKeysUsage.mockResolvedValue({ stats: {} })
     getAvailableGroups.mockResolvedValue([])
     getUserGroupRates.mockResolvedValue({})
+    updateKey.mockResolvedValue({})
     isCurrentStep.mockReturnValue(false)
   })
 
@@ -392,6 +413,61 @@ describe('user KeysView column settings', () => {
     const wrapper = await mountView()
 
     expect(wrapper.get('[data-test="current-concurrency"]').text()).toBe('3')
+  })
+
+  it('shows API key groups as locked and explains that switching requires a new key', async () => {
+    listKeys.mockResolvedValueOnce({
+      items: [
+        {
+          ...createApiKey(),
+          group_id: 42,
+          group: {
+            id: 42,
+            name: 'OpenAI',
+            platform: 'openai',
+            subscription_type: 'standard',
+            rate_multiplier: 1,
+            peak_rate_enabled: false,
+            peak_start: '',
+            peak_end: '',
+            peak_rate_multiplier: 1,
+          },
+        },
+      ],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      pages: 1,
+    })
+    const wrapper = await mountView()
+
+    expect(wrapper.get('[data-test="group-cell"]').text()).toContain(
+      'Create a new API key to switch groups.'
+    )
+    expect(wrapper.find('[data-test="group-cell"] button').exists()).toBe(false)
+  })
+
+  it('does not submit group_id when editing an existing API key', async () => {
+    listKeys.mockResolvedValueOnce({
+      items: [{ ...createApiKey(), group_id: 42 }],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      pages: 1,
+    })
+    const wrapper = await mountView()
+
+    await getButtonByText(wrapper, 'Edit').trigger('click')
+    await flushPromises()
+    await wrapper.get('form#key-form').trigger('submit')
+    await flushPromises()
+
+    expect(updateKey).toHaveBeenCalledWith(
+      1,
+      expect.not.objectContaining({
+        group_id: expect.anything(),
+      })
+    )
   })
 
   it('marks current concurrency as sortable', async () => {

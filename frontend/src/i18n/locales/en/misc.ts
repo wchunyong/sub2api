@@ -2,8 +2,8 @@ export default {
 
   // Subscription Progress (Header component)
   subscriptionProgress: {
-    title: 'My Subscriptions',
-    viewDetails: 'View subscription details',
+    title: 'Free Quota',
+    viewDetails: 'Free Quota',
     activeCount: '{count} active subscription(s)',
     daily: 'Daily',
     weekly: 'Weekly',

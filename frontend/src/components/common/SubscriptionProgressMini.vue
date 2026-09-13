@@ -33,9 +33,6 @@
           <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
             {{ t('subscriptionProgress.title') }}
           </h3>
-          <p class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">
-            {{ t('subscriptionProgress.activeCount', { count: activeSubscriptions.length }) }}
-          </p>
         </div>
 
         <div class="max-h-64 overflow-y-auto">
@@ -163,15 +160,6 @@
           </div>
         </div>
 
-        <div class="border-t border-gray-100 p-2 dark:border-dark-700">
-          <router-link
-            to="/subscriptions"
-            @click="closeTooltip"
-            class="block w-full py-1 text-center text-xs text-primary-600 hover:underline dark:text-primary-400"
-          >
-            {{ t('subscriptionProgress.viewAll') }}
-          </router-link>
-        </div>
       </div>
     </transition>
   </div>
