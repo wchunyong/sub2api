@@ -101,7 +101,7 @@ export default {
     nameLabel: '名称',
     namePlaceholder: '我的 API 密钥',
     groupLabel: '分组',
-    groupLockedHint: '要想切换分组，就要新建API密钥。',
+    groupLockedHint: 'API密钥一旦创建，不支持分组切换，使用不同分组请重新创建API密钥',
     selectGroup: '选择分组',
     statusLabel: '状态',
     selectStatus: '选择状态',

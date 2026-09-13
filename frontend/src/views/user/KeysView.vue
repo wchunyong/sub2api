@@ -90,6 +90,18 @@
           default-sort-order="desc"
           @sort="handleSort"
         >
+          <template #header-group="{ column }">
+            <span>{{ column.label }}</span>
+            <span class="group relative inline-flex" :title="t('keys.groupLockedHint')">
+              <Icon name="exclamationCircle" size="xs" class="text-gray-400 dark:text-gray-500" />
+              <span
+                class="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-72 -translate-x-1/2 rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-dark-700"
+              >
+                {{ t('keys.groupLockedHint') }}
+              </span>
+            </span>
+          </template>
+
           <template #cell-id="{ value }">
             <span class="font-mono text-xs text-gray-500 dark:text-gray-400">#{{ value }}</span>
           </template>
@@ -135,14 +147,6 @@
 
           <template #cell-group="{ row }">
             <div class="flex flex-col items-start gap-1">
-              <span class="group relative inline-flex" :title="t('keys.groupLockedHint')">
-                <Icon name="exclamationCircle" size="xs" class="text-amber-500" />
-                <span
-                  class="pointer-events-none absolute bottom-full left-0 z-10 mb-2 w-56 rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-dark-700"
-                >
-                  {{ t('keys.groupLockedHint') }}
-                </span>
-              </span>
               <div class="flex items-center gap-2">
                 <GroupBadge
                   v-if="row.group"

@@ -101,7 +101,7 @@ export default {
     nameLabel: 'Name',
     namePlaceholder: 'My API Key',
     groupLabel: 'Group',
-    groupLockedHint: 'Create a new API key to switch groups.',
+    groupLockedHint: 'Once an API key is created, its group cannot be changed. Create a new API key to use a different group.',
     selectGroup: 'Select a group',
     statusLabel: 'Status',
     selectStatus: 'Select status',

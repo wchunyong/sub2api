@@ -46,7 +46,7 @@ const messages: Record<string, string> = {
   'keys.created': 'Created',
   'keys.expiresAt': 'Expires',
   'keys.group': 'Group',
-  'keys.groupLockedHint': 'Create a new API key to switch groups.',
+  'keys.groupLockedHint': 'Once an API key is created, its group cannot be changed. Create a new API key to use a different group.',
   'keys.id': 'ID',
   'keys.currentConcurrency': 'Current Concurrency',
   'keys.lastUsedAt': 'Last Used',
@@ -172,6 +172,11 @@ const DataTableStub = {
     <div>
       <div data-test="columns">{{ columns.map((col) => col.key).join(',') }}</div>
       <div data-test="columns-meta">{{ JSON.stringify(columns.map((col) => ({ key: col.key, sortable: !!col.sortable }))) }}</div>
+      <div v-for="column in columns" :key="'header-' + column.key" :data-test="'header-' + column.key">
+        <slot :name="'header-' + column.key" :column="column">
+          <span>{{ column.label }}</span>
+        </slot>
+      </div>
       <button data-test="sort-current-concurrency" @click="$emit('sort', 'current_concurrency', 'asc')">
         Sort Current Concurrency
       </button>
@@ -399,14 +404,17 @@ describe('user KeysView column settings', () => {
     await wrapper.get('button[title="Column Settings"]').trigger('click')
     await nextTick()
 
-    const columnMenuText = wrapper.text()
-    expect(columnMenuText).toContain('API Key')
-    expect(columnMenuText).toContain('ID')
-    expect(columnMenuText).toContain('Current Concurrency')
-    expect(columnMenuText).toContain('Rate Limit')
-    expect(columnMenuText).toContain('Last Used IP')
-    expect(columnMenuText).not.toContain('Name')
-    expect(columnMenuText).not.toContain('Actions')
+    const columnMenuItems = wrapper
+      .findAll('button')
+      .map((button) => button.text().trim())
+      .filter(Boolean)
+    expect(columnMenuItems.some((item) => item.includes('API Key'))).toBe(true)
+    expect(columnMenuItems.some((item) => item.includes('ID'))).toBe(true)
+    expect(columnMenuItems.some((item) => item.includes('Current Concurrency'))).toBe(true)
+    expect(columnMenuItems.some((item) => item.includes('Rate Limit'))).toBe(true)
+    expect(columnMenuItems.some((item) => item.includes('Last Used IP'))).toBe(true)
+    expect(columnMenuItems.some((item) => item.includes('Name'))).toBe(false)
+    expect(columnMenuItems.some((item) => item.includes('Actions'))).toBe(false)
   })
 
   it('renders the current concurrency value', async () => {
@@ -415,7 +423,7 @@ describe('user KeysView column settings', () => {
     expect(wrapper.get('[data-test="current-concurrency"]').text()).toBe('3')
   })
 
-  it('shows API key groups as locked and explains that switching requires a new key', async () => {
+  it('shows the API key group lock hint in the group column header', async () => {
     listKeys.mockResolvedValueOnce({
       items: [
         {
@@ -441,8 +449,14 @@ describe('user KeysView column settings', () => {
     })
     const wrapper = await mountView()
 
-    expect(wrapper.get('[data-test="group-cell"]').text()).toContain(
-      'Create a new API key to switch groups.'
+    const groupHeader = wrapper.get('[data-test="header-group"]')
+    expect(groupHeader.text()).toContain('Group')
+    expect(groupHeader.text()).toContain(
+      'Once an API key is created, its group cannot be changed. Create a new API key to use a different group.'
+    )
+    expect(groupHeader.get('[data-test="icon"]').classes()).toContain('text-gray-400')
+    expect(wrapper.get('[data-test="group-cell"]').text()).not.toContain(
+      'Once an API key is created, its group cannot be changed. Create a new API key to use a different group.'
     )
     expect(wrapper.find('[data-test="group-cell"] button').exists()).toBe(false)
   })
