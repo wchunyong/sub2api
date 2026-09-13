@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { nextTick } from 'vue'
 
 import AnnouncementBanner from '../AnnouncementBanner.vue'
 import { useAnnouncementStore } from '@/stores/announcements'
@@ -23,6 +24,8 @@ describe('AnnouncementBanner', () => {
 
   afterEach(() => {
     document.body.innerHTML = ''
+    document.documentElement.classList.remove('has-announcement-banner')
+    document.documentElement.style.removeProperty('--announcement-banner-height')
     vi.restoreAllMocks()
   })
 
@@ -72,7 +75,35 @@ describe('AnnouncementBanner', () => {
     expect(banner.classes()).not.toContain('fixed')
     expect(banner.classes()).not.toContain('top-0')
     expect(banner.classes()).toContain('z-[50]')
-    expect(banner.classes().join(' ')).toContain('from-slate')
+    expect(banner.classes()).toEqual(
+      expect.arrayContaining(['from-violet-600', 'via-rose-500', 'to-amber-400'])
+    )
+  })
+
+  it('sets a global banner offset while visible so fixed chrome can move down', async () => {
+    const store = useAnnouncementStore()
+    store.announcements = [
+      {
+        id: 14,
+        title: 'Offset banner',
+        content: '全站下移',
+        notify_mode: 'banner',
+        banner_config: {},
+        created_at: '2026-07-24T07:30:00Z',
+        updated_at: '2026-07-24T07:30:00Z',
+      },
+    ]
+
+    const wrapper = mount(AnnouncementBanner)
+    await nextTick()
+    await nextTick()
+
+    expect(document.documentElement.classList.contains('has-announcement-banner')).toBe(true)
+    expect(document.documentElement.style.getPropertyValue('--announcement-banner-height')).not.toBe('')
+
+    wrapper.unmount()
+
+    expect(document.documentElement.classList.contains('has-announcement-banner')).toBe(false)
   })
 
   it('marks the banner read when dismissed', async () => {

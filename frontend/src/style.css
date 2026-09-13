@@ -546,6 +546,11 @@
     transition-property: width, transform;
   }
 
+  :root.has-announcement-banner .sidebar {
+    top: var(--announcement-banner-height);
+    height: calc(100vh - var(--announcement-banner-height));
+  }
+
   .sidebar-header {
     @apply h-16 px-6;
     @apply flex items-center gap-3;

@@ -1,8 +1,9 @@
 <template>
   <Transition name="announcement-banner-slide">
     <div
+      ref="bannerEl"
       v-if="banner"
-      class="relative z-[50] bg-gradient-to-r from-slate-700 via-slate-600 to-slate-500 px-4 py-3 text-white shadow-lg"
+      class="relative z-[50] bg-gradient-to-r from-violet-600 via-rose-500 to-amber-400 px-4 py-3 text-white shadow-lg"
       data-testid="announcement-banner"
       :class="{ 'cursor-pointer': canClickWholeBanner }"
       role="region"
@@ -39,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
@@ -53,6 +54,8 @@ const announcementStore = useAnnouncementStore()
 const authStore = useAuthStore()
 const { announcements } = storeToRefs(announcementStore)
 const locallyDismissedIds = ref(new Set<number>())
+const bannerEl = ref<HTMLElement | null>(null)
+let resizeObserver: ResizeObserver | null = null
 
 const banner = computed(() =>
   announcements.value.find((item) =>
@@ -109,6 +112,40 @@ async function dismiss() {
   }
   await announcementStore.markAsRead(banner.value.id)
 }
+
+function clearBannerOffset() {
+  resizeObserver?.disconnect()
+  resizeObserver = null
+  document.documentElement.classList.remove('has-announcement-banner')
+  document.documentElement.style.removeProperty('--announcement-banner-height')
+}
+
+function syncBannerOffset() {
+  const height = bannerEl.value?.getBoundingClientRect().height || bannerEl.value?.offsetHeight || 48
+  document.documentElement.classList.add('has-announcement-banner')
+  document.documentElement.style.setProperty('--announcement-banner-height', `${height}px`)
+}
+
+async function bindBannerOffset() {
+  await nextTick()
+  if (!banner.value || !bannerEl.value) {
+    clearBannerOffset()
+    return
+  }
+
+  syncBannerOffset()
+  resizeObserver?.disconnect()
+  if (typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(syncBannerOffset)
+    resizeObserver.observe(bannerEl.value)
+  }
+}
+
+watch(banner, () => {
+  void bindBannerOffset()
+}, { immediate: true })
+
+onBeforeUnmount(clearBannerOffset)
 
 async function handleBannerClick() {
   if (!banner.value || !canClickWholeBanner.value) return
