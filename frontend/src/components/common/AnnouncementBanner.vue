@@ -2,7 +2,7 @@
   <Transition name="announcement-banner-slide">
     <div
       v-if="banner"
-      class="relative z-[30] bg-gradient-to-r from-violet-600 via-rose-500 to-amber-400 px-4 py-3 text-white shadow-lg"
+      class="relative z-[50] bg-gradient-to-r from-slate-700 via-slate-600 to-slate-500 px-4 py-3 text-white shadow-lg"
       data-testid="announcement-banner"
       :class="{ 'cursor-pointer': canClickWholeBanner }"
       role="region"
@@ -39,20 +39,27 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { useAnnouncementStore } from '@/stores/announcements'
+import { useAuthStore } from '@/stores/auth'
 import Icon from '@/components/icons/Icon.vue'
 
 const { t } = useI18n()
 const announcementStore = useAnnouncementStore()
+const authStore = useAuthStore()
 const { announcements } = storeToRefs(announcementStore)
+const locallyDismissedIds = ref(new Set<number>())
 
 const banner = computed(() =>
-  announcements.value.find((item) => item.notify_mode === 'banner' && !item.read_at) ?? null
+  announcements.value.find((item) =>
+    item.notify_mode === 'banner' &&
+    !item.read_at &&
+    !locallyDismissedIds.value.has(item.id)
+  ) ?? null
 )
 
 const config = computed(() => banner.value?.banner_config ?? {})
@@ -96,6 +103,10 @@ function openURL(raw?: string) {
 
 async function dismiss() {
   if (!banner.value) return
+  if (!authStore.isAuthenticated) {
+    locallyDismissedIds.value = new Set(locallyDismissedIds.value).add(banner.value.id)
+    return
+  }
   await announcementStore.markAsRead(banner.value.id)
 }
 

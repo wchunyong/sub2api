@@ -29,7 +29,16 @@ func NewAnnouncementHandler(announcementService *service.AnnouncementService) *A
 func (h *AnnouncementHandler) List(c *gin.Context) {
 	subject, ok := middleware2.GetAuthSubjectFromContext(c)
 	if !ok {
-		response.Unauthorized(c, "User not found in context")
+		items, err := h.announcementService.ListForAnonymous(c.Request.Context())
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+		out := make([]dto.UserAnnouncement, 0, len(items))
+		for i := range items {
+			out = append(out, *dto.UserAnnouncementFromService(&items[i]))
+		}
+		response.Success(c, out)
 		return
 	}
 

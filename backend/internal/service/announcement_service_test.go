@@ -10,7 +10,8 @@ import (
 )
 
 type announcementRepoStub struct {
-	item *Announcement
+	item        *Announcement
+	activeItems []Announcement
 }
 
 func (s *announcementRepoStub) Create(_ context.Context, a *Announcement) error {
@@ -38,8 +39,8 @@ func (*announcementRepoStub) List(context.Context, pagination.PaginationParams, 
 	return nil, nil, nil
 }
 
-func (*announcementRepoStub) ListActive(context.Context, time.Time) ([]Announcement, error) {
-	return nil, nil
+func (s *announcementRepoStub) ListActive(context.Context, time.Time) ([]Announcement, error) {
+	return s.activeItems, nil
 }
 
 func TestAnnouncementServiceCreateRejectsEqualStartEndTimes(t *testing.T) {
@@ -83,6 +84,66 @@ func TestAnnouncementServiceCreateAcceptsBannerAnnouncements(t *testing.T) {
 	require.True(t, created.BannerConfig.ButtonEnabled)
 	require.Equal(t, "了解详情", created.BannerConfig.ButtonText)
 	require.Equal(t, "https://hovxm.com/docs", created.BannerConfig.ButtonURL)
+}
+
+func TestAnnouncementServiceCreateBannerUsesDefaultTitleWhenBlank(t *testing.T) {
+	repo := &announcementRepoStub{}
+	svc := NewAnnouncementService(repo, nil, nil, nil)
+
+	created, err := svc.Create(context.Background(), &CreateAnnouncementInput{
+		Title:      "",
+		Content:    "横幅内容",
+		Status:     AnnouncementStatusActive,
+		NotifyMode: AnnouncementNotifyModeBanner,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, DefaultBannerAnnouncementTitle, created.Title)
+}
+
+func TestAnnouncementServiceListForAnonymousShowsOnlyUntargetedBanners(t *testing.T) {
+	repo := &announcementRepoStub{
+		activeItems: []Announcement{
+			{
+				ID:         1,
+				Title:      "全员横幅",
+				Content:    "访客可见",
+				Status:     AnnouncementStatusActive,
+				NotifyMode: AnnouncementNotifyModeBanner,
+			},
+			{
+				ID:         2,
+				Title:      "弹窗",
+				Content:    "访客不需要",
+				Status:     AnnouncementStatusActive,
+				NotifyMode: AnnouncementNotifyModePopup,
+			},
+			{
+				ID:         3,
+				Title:      "条件横幅",
+				Content:    "需要余额条件",
+				Status:     AnnouncementStatusActive,
+				NotifyMode: AnnouncementNotifyModeBanner,
+				Targeting: AnnouncementTargeting{
+					AnyOf: []AnnouncementConditionGroup{{
+						AllOf: []AnnouncementCondition{{
+							Type:     AnnouncementConditionTypeBalance,
+							Operator: AnnouncementOperatorGT,
+							Value:    0,
+						}},
+					}},
+				},
+			},
+		},
+	}
+	svc := NewAnnouncementService(repo, nil, nil, nil)
+
+	items, err := svc.ListForAnonymous(context.Background())
+
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Equal(t, int64(1), items[0].Announcement.ID)
+	require.Nil(t, items[0].ReadAt)
 }
 
 func TestAnnouncementServiceCreateRejectsBannerInvalidURL(t *testing.T) {

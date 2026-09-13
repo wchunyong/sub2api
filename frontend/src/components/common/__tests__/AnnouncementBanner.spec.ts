@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 
 import AnnouncementBanner from '../AnnouncementBanner.vue'
 import { useAnnouncementStore } from '@/stores/announcements'
+import { useAuthStore } from '@/stores/auth'
 
 vi.mock('vue-i18n', async () => {
   const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
@@ -70,9 +71,28 @@ describe('AnnouncementBanner', () => {
 
     expect(banner.classes()).not.toContain('fixed')
     expect(banner.classes()).not.toContain('top-0')
+    expect(banner.classes()).toContain('z-[50]')
+    expect(banner.classes().join(' ')).toContain('from-slate')
   })
 
   it('marks the banner read when dismissed', async () => {
+    const authStore = useAuthStore()
+    authStore.user = {
+      id: 1,
+      username: 'user',
+      email: 'user@example.com',
+      role: 'user',
+      balance: 0,
+      concurrency: 1,
+      status: 'active',
+      allowed_groups: null,
+      balance_notify_enabled: false,
+      balance_notify_threshold: null,
+      balance_notify_extra_emails: [],
+      created_at: '2026-07-24T07:30:00Z',
+      updated_at: '2026-07-24T07:30:00Z',
+    }
+    authStore.token = 'token'
     const store = useAnnouncementStore()
     store.announcements = [
       {
@@ -91,5 +111,32 @@ describe('AnnouncementBanner', () => {
     await wrapper.get('[data-testid="announcement-banner-dismiss"]').trigger('click')
 
     expect(markAsRead).toHaveBeenCalledWith(11)
+  })
+
+  it('lets anonymous visitors close the banner only for the current page session', async () => {
+    const store = useAnnouncementStore()
+    store.announcements = [
+      {
+        id: 13,
+        title: 'Guest banner',
+        content: '访客横幅',
+        notify_mode: 'banner',
+        banner_config: {},
+        created_at: '2026-07-24T07:30:00Z',
+        updated_at: '2026-07-24T07:30:00Z',
+      },
+    ]
+    const markAsRead = vi.spyOn(store, 'markAsRead').mockResolvedValue()
+
+    const wrapper = mount(AnnouncementBanner)
+    await wrapper.get('[data-testid="announcement-banner-dismiss"]').trigger('click')
+
+    expect(markAsRead).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="announcement-banner"]').exists()).toBe(false)
+
+    wrapper.unmount()
+    const remounted = mount(AnnouncementBanner)
+
+    expect(remounted.find('[data-testid="announcement-banner"]').exists()).toBe(true)
   })
 })

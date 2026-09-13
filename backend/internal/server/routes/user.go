@@ -13,10 +13,18 @@ func RegisterUserRoutes(
 	v1 *gin.RouterGroup,
 	h *handler.Handlers,
 	jwtAuth middleware.JWTAuthMiddleware,
+	optionalJWTAuth middleware.OptionalJWTAuthMiddleware,
 	auditLog middleware.AuditLogMiddleware,
 	settingService *service.SettingService,
 	panelRateLimiter *middleware.PanelRateLimiter,
 ) {
+	// 公告列表：匿名用户可读取全员横幅，登录用户可读取完整可见公告。
+	announcementsPublic := v1.Group("/announcements")
+	announcementsPublic.Use(gin.HandlerFunc(optionalJWTAuth))
+	{
+		announcementsPublic.GET("", h.Announcement.List)
+	}
+
 	authenticated := v1.Group("")
 	authenticated.Use(gin.HandlerFunc(jwtAuth))
 	authenticated.Use(middleware.BackendModeUserGuard(settingService))
@@ -112,10 +120,9 @@ func RegisterUserRoutes(
 			usage.POST("/dashboard/api-keys-usage", h.Usage.DashboardAPIKeysUsage)
 		}
 
-		// 公告（用户可见）
+		// 公告已读状态仅登录用户可写入。
 		announcements := authenticated.Group("/announcements")
 		{
-			announcements.GET("", h.Announcement.List)
 			announcements.POST("/:id/read", h.Announcement.MarkRead)
 		}
 

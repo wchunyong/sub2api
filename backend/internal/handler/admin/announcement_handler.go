@@ -27,7 +27,7 @@ func NewAnnouncementHandler(announcementService *service.AnnouncementService) *A
 }
 
 type CreateAnnouncementRequest struct {
-	Title        string                           `json:"title" binding:"required"`
+	Title        string                           `json:"title"`
 	Content      string                           `json:"content" binding:"required"`
 	Status       string                           `json:"status" binding:"omitempty,oneof=draft active archived"`
 	NotifyMode   string                           `json:"notify_mode" binding:"omitempty,oneof=silent popup banner"`

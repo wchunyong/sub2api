@@ -55,7 +55,7 @@ watch(
 
 // Watch for authentication state and manage subscription data + announcements
 function onVisibilityChange() {
-  if (document.visibilityState === 'visible' && authStore.isAuthenticated) {
+  if (document.visibilityState === 'visible') {
     announcementStore.fetchAnnouncements()
   }
 }
@@ -90,14 +90,12 @@ watch(
         announcementStore.fetchAnnouncements()
       }
 
-      // Register visibility change listener
-      document.addEventListener('visibilitychange', onVisibilityChange)
     } else {
       // User logged out: clear data and stop polling
       subscriptionStore.clear()
       announcementStore.reset()
+      announcementStore.fetchAnnouncements(true)
       adminComplianceStore.reset()
-      document.removeEventListener('visibilitychange', onVisibilityChange)
     }
   },
   { immediate: true }
@@ -105,9 +103,7 @@ watch(
 
 // Route change trigger (throttled by store)
 router.afterEach(() => {
-  if (authStore.isAuthenticated) {
-    announcementStore.fetchAnnouncements()
-  }
+  announcementStore.fetchAnnouncements()
 })
 
 onBeforeUnmount(() => {
@@ -117,6 +113,7 @@ onBeforeUnmount(() => {
 
 onMounted(async () => {
   window.addEventListener('admin-compliance-required', onAdminComplianceRequired)
+  document.addEventListener('visibilitychange', onVisibilityChange)
 
   // Check if setup is needed
   try {
@@ -131,6 +128,7 @@ onMounted(async () => {
 
   // Load public settings into appStore (will be cached for other components)
   await appStore.fetchPublicSettings()
+  await announcementStore.fetchAnnouncements()
 
   // Re-resolve document title now that site settings are available
   updateDocumentTitle()

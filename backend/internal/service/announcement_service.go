@@ -79,15 +79,6 @@ func (s *AnnouncementService) Create(ctx context.Context, input *CreateAnnouncem
 		return nil, ErrAnnouncementInvalidSchedule
 	}
 
-	title := strings.TrimSpace(input.Title)
-	content := strings.TrimSpace(input.Content)
-	if title == "" || len(title) > 200 {
-		return nil, ErrAnnouncementInvalidTitle
-	}
-	if content == "" {
-		return nil, ErrAnnouncementContentRequired
-	}
-
 	status := strings.TrimSpace(input.Status)
 	if status == "" {
 		status = AnnouncementStatusDraft
@@ -108,6 +99,16 @@ func (s *AnnouncementService) Create(ctx context.Context, input *CreateAnnouncem
 	if !isValidAnnouncementNotifyMode(notifyMode) {
 		return nil, ErrAnnouncementInvalidNotifyMode
 	}
+
+	title, err := normalizeAnnouncementTitle(input.Title, notifyMode)
+	if err != nil {
+		return nil, err
+	}
+	content := strings.TrimSpace(input.Content)
+	if content == "" {
+		return nil, ErrAnnouncementContentRequired
+	}
+
 	bannerConfig, err := normalizeAnnouncementBannerConfig(notifyMode, input.BannerConfig)
 	if err != nil {
 		return nil, err
@@ -155,10 +156,14 @@ func (s *AnnouncementService) Update(ctx context.Context, id int64, input *Updat
 		return nil, err
 	}
 
+	nextNotifyMode := a.NotifyMode
+	if input.NotifyMode != nil {
+		nextNotifyMode = strings.TrimSpace(*input.NotifyMode)
+	}
 	if input.Title != nil {
-		title := strings.TrimSpace(*input.Title)
-		if title == "" || len(title) > 200 {
-			return nil, ErrAnnouncementInvalidTitle
+		title, err := normalizeAnnouncementTitle(*input.Title, nextNotifyMode)
+		if err != nil {
+			return nil, err
 		}
 		a.Title = title
 	}
@@ -313,6 +318,35 @@ func (s *AnnouncementService) ListForUser(ctx context.Context, userID int64, unr
 	return out, nil
 }
 
+func (s *AnnouncementService) ListForAnonymous(ctx context.Context) ([]UserAnnouncement, error) {
+	now := time.Now()
+	anns, err := s.announcementRepo.ListActive(ctx, now)
+	if err != nil {
+		return nil, fmt.Errorf("list active announcements: %w", err)
+	}
+
+	out := make([]UserAnnouncement, 0, len(anns))
+	for i := range anns {
+		a := anns[i]
+		if !a.IsActiveAt(now) {
+			continue
+		}
+		if a.NotifyMode != AnnouncementNotifyModeBanner {
+			continue
+		}
+		if !a.Targeting.Matches(0, nil) {
+			continue
+		}
+		out = append(out, UserAnnouncement{Announcement: a})
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Announcement.ID > out[j].Announcement.ID
+	})
+
+	return out, nil
+}
+
 func (s *AnnouncementService) MarkRead(ctx context.Context, userID, announcementID int64) error {
 	// 安全：仅允许标记当前用户“可见”的公告
 	user, err := s.userRepo.GetByID(ctx, userID)
@@ -438,4 +472,15 @@ func normalizeAnnouncementBannerConfig(mode string, config AnnouncementBannerCon
 		return AnnouncementBannerConfig{}, ErrAnnouncementInvalidBannerConfig
 	}
 	return normalized, nil
+}
+
+func normalizeAnnouncementTitle(raw string, notifyMode string) (string, error) {
+	title := strings.TrimSpace(raw)
+	if title == "" && notifyMode == AnnouncementNotifyModeBanner {
+		title = DefaultBannerAnnouncementTitle
+	}
+	if title == "" || len(title) > 200 {
+		return "", ErrAnnouncementInvalidTitle
+	}
+	return title, nil
 }

@@ -21,6 +21,8 @@ const (
 	AnnouncementNotifyModeBanner = domain.AnnouncementNotifyModeBanner
 )
 
+const DefaultBannerAnnouncementTitle = "横幅公告"
+
 const (
 	AnnouncementConditionTypeSubscription = domain.AnnouncementConditionTypeSubscription
 	AnnouncementConditionTypeBalance      = domain.AnnouncementConditionTypeBalance

@@ -178,7 +178,7 @@
       @close="closeEdit"
     >
       <form id="announcement-form" @submit.prevent="handleSave" class="space-y-4">
-        <div>
+        <div v-if="form.notify_mode !== 'banner'">
           <label class="input-label">{{ t('admin.announcements.form.title') }}</label>
           <input v-model="form.title" type="text" class="input" required />
         </div>
@@ -328,6 +328,7 @@ import AnnouncementPopup from '@/components/common/AnnouncementPopup.vue'
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const DEFAULT_BANNER_TITLE = '横幅公告'
 
 const announcements = ref<Announcement[]>([])
 const loading = ref(false)
@@ -556,7 +557,7 @@ function buildCreatePayload() {
   const endsAt = parseDateTimeLocalInput(form.ends_at_str)
 
   return {
-    title: form.title,
+    title: form.notify_mode === 'banner' ? (form.title.trim() || DEFAULT_BANNER_TITLE) : form.title,
     content: form.content,
     status: form.status as any,
     notify_mode: form.notify_mode as any,
@@ -569,8 +570,9 @@ function buildCreatePayload() {
 
 function buildUpdatePayload(original: Announcement) {
   const payload: any = {}
+  const normalizedTitle = form.notify_mode === 'banner' ? (form.title.trim() || DEFAULT_BANNER_TITLE) : form.title
 
-  if (form.title !== original.title) payload.title = form.title
+  if (normalizedTitle !== original.title) payload.title = normalizedTitle
   if (form.content !== original.content) payload.content = form.content
   if (form.status !== original.status) payload.status = form.status
   if (form.notify_mode !== (original.notify_mode || 'silent')) payload.notify_mode = form.notify_mode
