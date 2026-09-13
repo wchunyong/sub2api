@@ -56,6 +56,7 @@ const { announcements } = storeToRefs(announcementStore)
 const locallyDismissedIds = ref(new Set<number>())
 const bannerEl = ref<HTMLElement | null>(null)
 let resizeObserver: ResizeObserver | null = null
+let listeningForViewportChanges = false
 
 const banner = computed(() =>
   announcements.value.find((item) =>
@@ -116,14 +117,22 @@ async function dismiss() {
 function clearBannerOffset() {
   resizeObserver?.disconnect()
   resizeObserver = null
+  if (listeningForViewportChanges) {
+    window.removeEventListener('scroll', syncBannerOffset)
+    window.removeEventListener('resize', syncBannerOffset)
+    listeningForViewportChanges = false
+  }
   document.documentElement.classList.remove('has-announcement-banner')
   document.documentElement.style.removeProperty('--announcement-banner-height')
+  document.documentElement.style.removeProperty('--announcement-banner-offset')
 }
 
 function syncBannerOffset() {
   const height = bannerEl.value?.getBoundingClientRect().height || bannerEl.value?.offsetHeight || 48
+  const offset = Math.max(height - window.scrollY, 0)
   document.documentElement.classList.add('has-announcement-banner')
   document.documentElement.style.setProperty('--announcement-banner-height', `${height}px`)
+  document.documentElement.style.setProperty('--announcement-banner-offset', `${offset}px`)
 }
 
 async function bindBannerOffset() {
@@ -134,6 +143,11 @@ async function bindBannerOffset() {
   }
 
   syncBannerOffset()
+  if (!listeningForViewportChanges) {
+    window.addEventListener('scroll', syncBannerOffset, { passive: true })
+    window.addEventListener('resize', syncBannerOffset)
+    listeningForViewportChanges = true
+  }
   resizeObserver?.disconnect()
   if (typeof ResizeObserver !== 'undefined') {
     resizeObserver = new ResizeObserver(syncBannerOffset)

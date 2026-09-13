@@ -547,8 +547,8 @@
   }
 
   :root.has-announcement-banner .sidebar {
-    top: var(--announcement-banner-height);
-    height: calc(100vh - var(--announcement-banner-height));
+    top: var(--announcement-banner-offset);
+    height: calc(100vh - var(--announcement-banner-offset));
   }
 
   .sidebar-header {

@@ -26,6 +26,7 @@ describe('AnnouncementBanner', () => {
     document.body.innerHTML = ''
     document.documentElement.classList.remove('has-announcement-banner')
     document.documentElement.style.removeProperty('--announcement-banner-height')
+    document.documentElement.style.removeProperty('--announcement-banner-offset')
     vi.restoreAllMocks()
   })
 
@@ -100,10 +101,37 @@ describe('AnnouncementBanner', () => {
 
     expect(document.documentElement.classList.contains('has-announcement-banner')).toBe(true)
     expect(document.documentElement.style.getPropertyValue('--announcement-banner-height')).not.toBe('')
+    expect(document.documentElement.style.getPropertyValue('--announcement-banner-offset')).not.toBe('')
 
     wrapper.unmount()
 
     expect(document.documentElement.classList.contains('has-announcement-banner')).toBe(false)
+  })
+
+  it('reduces the fixed chrome offset as the banner scrolls out of view', async () => {
+    const store = useAnnouncementStore()
+    store.announcements = [
+      {
+        id: 15,
+        title: 'Scrolling banner',
+        content: '滚动时整体上移',
+        notify_mode: 'banner',
+        banner_config: {},
+        created_at: '2026-07-24T07:30:00Z',
+        updated_at: '2026-07-24T07:30:00Z',
+      },
+    ]
+
+    mount(AnnouncementBanner)
+    await nextTick()
+    await nextTick()
+
+    expect(document.documentElement.style.getPropertyValue('--announcement-banner-offset')).toBe('48px')
+
+    vi.spyOn(window, 'scrollY', 'get').mockReturnValue(60)
+    window.dispatchEvent(new Event('scroll'))
+
+    expect(document.documentElement.style.getPropertyValue('--announcement-banner-offset')).toBe('0px')
   })
 
   it('marks the banner read when dismissed', async () => {
