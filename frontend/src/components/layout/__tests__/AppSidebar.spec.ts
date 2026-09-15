@@ -76,3 +76,16 @@ describe('AppSidebar header styles', () => {
     expect(sidebarBrandBlockMatch?.[0]).not.toContain('overflow: hidden;')
   })
 })
+
+describe('AppSidebar subscription feature flag', () => {
+  it('keeps subscription visibility restricted to the admin navigation', () => {
+    expect(componentSource).toContain('const flagSubscription = makeSidebarFlag(FeatureFlags.subscription)')
+    expect(componentSource).not.toMatch(/path: '\/subscriptions'[^\n]*featureFlag: flagSubscription/)
+    expect(componentSource).toMatch(/path: '\/purchase'[^\n]*label: t\('nav\.buySubscription'\)/)
+  })
+
+  it('also hides the admin Subscription Management entry on recharge-only sites', () => {
+    expect(componentSource).toMatch(/path: '\/admin\/subscriptions'[^\n]*featureFlag: flagSubscription/)
+  })
+
+})
