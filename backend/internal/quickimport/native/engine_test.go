@@ -347,6 +347,70 @@ func TestInstallCleanPreservesUnrelated(t *testing.T) {
 	}
 }
 
+func TestInstallRegistersImageMCPByDefault(t *testing.T) {
+	for _, agent := range []string{"claude", "codex", "opencode"} {
+		t.Run(agent, func(t *testing.T) {
+			root := t.TempDir()
+			p := Payload{Version: 1, Agent: agent, APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "test-model"}
+			if err := Install(root, p); err != nil {
+				t.Fatal(err)
+			}
+			text, err := os.ReadFile(filepath.Join(root, paths[agent]))
+			if err != nil {
+				t.Fatal(err)
+			}
+			data, err := load(string(text), agent)
+			if err != nil {
+				t.Fatal(err)
+			}
+			switch agent {
+			case "codex":
+				server := get(data, []string{"mcp_servers", "sub2api_image"}).Value.(map[string]any)
+				if server["url"] != "https://example.test/mcp" {
+					t.Fatalf("bad Codex MCP server: %#v", server)
+				}
+				headers := server["http_headers"].(map[string]any)
+				if headers["Authorization"] != "Bearer test-secret" {
+					t.Fatalf("bad Codex MCP auth header: %#v", headers)
+				}
+			case "opencode":
+				server := get(data, []string{"mcp", "servers", "sub2api_image"}).Value.(map[string]any)
+				if server["url"] != "https://example.test/mcp" || server["oauth"] != false {
+					t.Fatalf("bad OpenCode MCP server: %#v", server)
+				}
+			case "claude":
+				server := get(data, []string{"mcpServers", "sub2api-image"}).Value.(map[string]any)
+				if server["url"] != "https://example.test/mcp" {
+					t.Fatalf("bad Claude MCP server: %#v", server)
+				}
+			}
+			if err := Clean(root, agent); err != nil {
+				t.Fatal(err)
+			}
+			after, _ := os.ReadFile(filepath.Join(root, paths[agent]))
+			if strings.Contains(string(after), "sub2api_image") || strings.Contains(string(after), "test-secret") {
+				t.Fatalf("cleanup left MCP data: %s", after)
+			}
+		})
+	}
+}
+
+func TestInstallCanDisableImageMCP(t *testing.T) {
+	disabled := false
+	root := t.TempDir()
+	p := Payload{Version: 1, Agent: "opencode", APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "test-model", MCPImageToolsEnabled: &disabled}
+	if err := Install(root, p); err != nil {
+		t.Fatal(err)
+	}
+	text, err := os.ReadFile(filepath.Join(root, paths["opencode"]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(text), "sub2api_image") || strings.Contains(string(text), "/mcp") {
+		t.Fatalf("disabled MCP was written: %s", text)
+	}
+}
+
 func TestCleanConflictAndStack(t *testing.T) {
 	root := t.TempDir()
 	p := Payload{Version: 1, Agent: "claude", APIKey: "test-secret", BaseURL: "https://example.test", Model: "first"}

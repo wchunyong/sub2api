@@ -1,0 +1,202 @@
+package mcp
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
+
+type fakeImageGateway struct {
+	generateInput GenerateImageInput
+	editInput     EditImageInput
+}
+
+func (f *fakeImageGateway) GenerateImage(ctx context.Context, input GenerateImageInput) (ImageResult, error) {
+	f.generateInput = input
+	return ImageResult{
+		URL:        "https://gateway.example.test/images/result.png",
+		MIMEType:   "image/png",
+		Width:      1024,
+		Height:     1024,
+		Model:      input.Model,
+		ImageCount: 1,
+	}, nil
+}
+
+func (f *fakeImageGateway) EditImage(ctx context.Context, input EditImageInput) (ImageResult, error) {
+	f.editInput = input
+	return ImageResult{
+		URL:        "https://gateway.example.test/images/result.png",
+		MIMEType:   "image/png",
+		Width:      1024,
+		Height:     1024,
+		Model:      input.Model,
+		ImageCount: 1,
+	}, nil
+}
+
+func TestServerListsImageTools(t *testing.T) {
+	server := NewServer(&fakeImageGateway{})
+	request := jsonRPCRequest(t, "tools/list", nil)
+	response := serveMCP(t, server, request)
+
+	var body map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	result := body["result"].(map[string]any)
+	tools := result["tools"].([]any)
+	if len(tools) != 2 {
+		t.Fatalf("expected 2 tools, got %d: %s", len(tools), response.Body.String())
+	}
+	names := map[string]bool{}
+	for _, item := range tools {
+		tool := item.(map[string]any)
+		names[tool["name"].(string)] = true
+		if tool["inputSchema"] == nil {
+			t.Fatalf("tool %s is missing inputSchema", tool["name"])
+		}
+	}
+	if !names["generate_image"] || !names["edit_image"] {
+		t.Fatalf("missing image tools: %#v", names)
+	}
+}
+
+func TestServerCallsGenerateImage(t *testing.T) {
+	gateway := &fakeImageGateway{}
+	server := NewServer(gateway)
+	request := jsonRPCRequest(t, "tools/call", map[string]any{
+		"name": "generate_image",
+		"arguments": map[string]any{
+			"prompt":        "draw a small red house",
+			"model":         "gpt-image-2",
+			"size":          "1024x1024",
+			"quality":       "high",
+			"output_format": "png",
+			"n":             1,
+		},
+	})
+	response := serveMCP(t, server, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("unexpected status %d: %s", response.Code, response.Body.String())
+	}
+	if gateway.generateInput.Prompt != "draw a small red house" || gateway.generateInput.Model != "gpt-image-2" || gateway.generateInput.N != 1 {
+		t.Fatalf("bad gateway input: %#v", gateway.generateInput)
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	result := body["result"].(map[string]any)
+	content := result["content"].([]any)
+	text := content[0].(map[string]any)["text"].(string)
+	if !bytes.Contains([]byte(text), []byte("https://gateway.example.test/images/result.png")) {
+		t.Fatalf("tool result did not include image URL: %s", text)
+	}
+	if !bytes.Contains([]byte(text), []byte(`"mime_type":"image/png"`)) {
+		t.Fatalf("tool result did not include MIME metadata: %s", text)
+	}
+}
+
+func TestServerDefaultsGenerateImageModel(t *testing.T) {
+	gateway := &fakeImageGateway{}
+	server := NewServer(gateway)
+	request := jsonRPCRequest(t, "tools/call", map[string]any{
+		"name":      "generate_image",
+		"arguments": map[string]any{"prompt": "draw a small red house"},
+	})
+	serveMCP(t, server, request)
+
+	if gateway.generateInput.Model != DefaultImageModel {
+		t.Fatalf("expected default model %q, got %q", DefaultImageModel, gateway.generateInput.Model)
+	}
+}
+
+func TestServerCallsEditImage(t *testing.T) {
+	gateway := &fakeImageGateway{}
+	server := NewServer(gateway)
+	request := jsonRPCRequest(t, "tools/call", map[string]any{
+		"name": "edit_image",
+		"arguments": map[string]any{
+			"image":         "data:image/png;base64,QUJD",
+			"prompt":        "replace the background",
+			"model":         "gpt-image-2",
+			"size":          "1024x1024",
+			"quality":       "high",
+			"output_format": "png",
+		},
+	})
+	response := serveMCP(t, server, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("unexpected status %d: %s", response.Code, response.Body.String())
+	}
+	if gateway.editInput.Image != "data:image/png;base64,QUJD" ||
+		gateway.editInput.Prompt != "replace the background" ||
+		gateway.editInput.Model != "gpt-image-2" {
+		t.Fatalf("bad edit input: %#v", gateway.editInput)
+	}
+}
+
+func TestServerAcceptsInitializedNotification(t *testing.T) {
+	server := NewServer(&fakeImageGateway{})
+	request := jsonRPCRequest(t, "notifications/initialized", map[string]any{})
+	response := serveMCP(t, server, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("unexpected status %d: %s", response.Code, response.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body["error"] != nil {
+		t.Fatalf("initialized notification returned error: %s", response.Body.String())
+	}
+}
+
+func TestServerRejectsUnknownTool(t *testing.T) {
+	server := NewServer(&fakeImageGateway{})
+	request := jsonRPCRequest(t, "tools/call", map[string]any{
+		"name":      "delete_everything",
+		"arguments": map[string]any{},
+	})
+	response := serveMCP(t, server, request)
+
+	var body map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	errObj := body["error"].(map[string]any)
+	if errObj["code"].(float64) != float64(ErrUnknownTool.Code) {
+		t.Fatalf("unexpected error: %#v", errObj)
+	}
+}
+
+func jsonRPCRequest(t *testing.T, method string, params any) []byte {
+	t.Helper()
+	body, err := json.Marshal(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  method,
+		"params":  params,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return body
+}
+
+func serveMCP(t *testing.T, server *Server, body []byte) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	return rec
+}

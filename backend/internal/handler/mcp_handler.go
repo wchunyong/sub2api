@@ -1,0 +1,145 @@
+package handler
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+
+	"github.com/Wei-Shaw/sub2api/internal/mcp"
+	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
+	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/gin-gonic/gin"
+)
+
+type MCPHandler struct {
+	openAI *OpenAIGatewayHandler
+}
+
+func NewMCPHandler(openAI *OpenAIGatewayHandler) *MCPHandler {
+	return &MCPHandler{openAI: openAI}
+}
+
+func (h *MCPHandler) Serve(c *gin.Context) {
+	server := mcp.NewServer(&mcpImageGateway{source: c, openAI: h.openAI})
+	server.ServeHTTP(c.Writer, c.Request)
+}
+
+type mcpImageGateway struct {
+	source *gin.Context
+	openAI *OpenAIGatewayHandler
+}
+
+func (g *mcpImageGateway) GenerateImage(ctx context.Context, input mcp.GenerateImageInput) (mcp.ImageResult, error) {
+	if g == nil || g.source == nil || g.openAI == nil {
+		return mcp.ImageResult{}, fmt.Errorf("image gateway unavailable")
+	}
+	if err := g.validateImageModel(input.Model); err != nil {
+		return mcp.ImageResult{}, err
+	}
+	body, err := json.Marshal(map[string]any{
+		"model":         input.Model,
+		"prompt":        input.Prompt,
+		"size":          input.Size,
+		"quality":       input.Quality,
+		"output_format": input.OutputFormat,
+		"n":             input.N,
+	})
+	if err != nil {
+		return mcp.ImageResult{}, err
+	}
+	return g.callImages(ctx, "/v1/images/generations", body, input.Model, input.N)
+}
+
+func (g *mcpImageGateway) EditImage(ctx context.Context, input mcp.EditImageInput) (mcp.ImageResult, error) {
+	if g == nil || g.source == nil || g.openAI == nil {
+		return mcp.ImageResult{}, fmt.Errorf("image gateway unavailable")
+	}
+	if err := g.validateImageModel(input.Model); err != nil {
+		return mcp.ImageResult{}, err
+	}
+	body, err := json.Marshal(map[string]any{
+		"model":         input.Model,
+		"prompt":        input.Prompt,
+		"images":        []map[string]string{{"image_url": input.Image}},
+		"size":          input.Size,
+		"quality":       input.Quality,
+		"output_format": input.OutputFormat,
+		"n":             1,
+	})
+	if err != nil {
+		return mcp.ImageResult{}, err
+	}
+	return g.callImages(ctx, "/v1/images/edits", body, input.Model, 1)
+}
+
+func (g *mcpImageGateway) validateImageModel(model string) error {
+	apiKey, ok := middleware2.GetAPIKeyFromContext(g.source)
+	if !ok || apiKey == nil || apiKey.Group == nil {
+		return fmt.Errorf("authenticated API key context missing")
+	}
+	if apiKey.Group.Platform != service.PlatformOpenAI {
+		return fmt.Errorf("image MCP currently supports OpenAI platform groups")
+	}
+	if apiKey.Group.ModelAllowlistEnabled() && !apiKey.Group.ModelAllowlist.Allows(model) {
+		return fmt.Errorf("model is not allowed by this API key group")
+	}
+	return nil
+}
+
+func (g *mcpImageGateway) callImages(ctx context.Context, path string, body []byte, model string, imageCount int) (mcp.ImageResult, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, path, bytes.NewReader(body))
+	if err != nil {
+		return mcp.ImageResult{}, err
+	}
+	req.Header = g.source.Request.Header.Clone()
+	req.Header.Set("Content-Type", "application/json")
+	req.ContentLength = int64(len(body))
+
+	rec := httptest.NewRecorder()
+	imageContext, _ := gin.CreateTestContext(rec)
+	imageContext.Request = req
+	for key, value := range g.source.Keys {
+		imageContext.Set(key, value)
+	}
+
+	g.openAI.Images(imageContext)
+	if rec.Code < 200 || rec.Code >= 300 {
+		return mcp.ImageResult{}, fmt.Errorf("image request failed with status %d: %s", rec.Code, strings.TrimSpace(rec.Body.String()))
+	}
+	return parseOpenAIImageResult(rec.Body.Bytes(), model, imageCount)
+}
+
+func parseOpenAIImageResult(body []byte, model string, count int) (mcp.ImageResult, error) {
+	var response struct {
+		Data []struct {
+			URL           string `json:"url"`
+			B64JSON       string `json:"b64_json"`
+			RevisedPrompt string `json:"revised_prompt"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return mcp.ImageResult{}, err
+	}
+	if len(response.Data) == 0 {
+		return mcp.ImageResult{}, fmt.Errorf("image response did not include data")
+	}
+	item := response.Data[0]
+	result := mcp.ImageResult{
+		URL:           strings.TrimSpace(item.URL),
+		MIMEType:      "image/png",
+		Model:         model,
+		ImageCount:    count,
+		RevisedPrompt: item.RevisedPrompt,
+	}
+	if result.URL == "" && item.B64JSON != "" {
+		result.URL = "data:image/png;base64," + item.B64JSON
+	}
+	if result.URL == "" {
+		return mcp.ImageResult{}, fmt.Errorf("image response did not include a URL")
+	}
+	return result, nil
+}

@@ -17,7 +17,7 @@ import tempfile
 import tomllib
 import urllib.request
 import uuid
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 from contextlib import contextmanager
 
 PROVIDER = 'sub2api_quick'
@@ -107,15 +107,26 @@ def render(text, agent, changes):
             if value['exists']: head = f'{parts[0]} = {json.dumps(value["value"])}\n' + head
             result = head + tail
         else:
-            if parts != ['model_providers', PROVIDER]: raise ValueError('Unsupported TOML change')
-            pattern = rf'(?ms)^\[model_providers\.{PROVIDER}\][ \t]*\r?\n.*?(?=^\[|\Z)'
+            if parts == ['model_providers', PROVIDER]:
+                table = f'model_providers.{PROVIDER}'
+            elif parts == ['mcp_servers', 'sub2api_image']:
+                table = 'mcp_servers.sub2api_image'
+            else:
+                raise ValueError('Unsupported TOML change')
+            pattern = rf'(?ms)^\[{re.escape(table)}\][ \t]*\r?\n.*?(?=^\[|\Z)'
             result = re.sub(pattern, '', result)
             if value['exists']:
-                result = result.rstrip() + f'\n\n[model_providers.{PROVIDER}]\n'
+                result = result.rstrip() + f'\n\n[{table}]\n'
                 for key, item in value['value'].items():
-                    result += f'{key} = {json.dumps(item)}\n'
+                    result += f'{key} = {toml_scalar(item)}\n'
     if load(result, agent) != desired: raise ValueError('Complex TOML layout requires manual configuration')
     return result
+
+
+def toml_scalar(value):
+    if isinstance(value, dict):
+        return '{ ' + ', '.join(f'{key} = {toml_scalar(value[key])}' for key in sorted(value)) + ' }'
+    return json.dumps(value)
 
 
 def configuration(payload):
@@ -126,6 +137,7 @@ def configuration(payload):
     if parsed.scheme != 'https' and not (parsed.scheme == 'http' and parsed.hostname in ('127.0.0.1', 'localhost')):
         raise ValueError('HTTPS gateway required')
     if parsed.username or parsed.password or parsed.query or parsed.fragment: raise ValueError('Invalid gateway URL')
+    mcp_endpoint = resolve_mcp_endpoint(payload, base)
     catalog = normalize_models(payload.get('models', [{'id': model}]))
     if model not in {item['id'] for item in catalog}: raise ValueError('Selected model is not in the gateway model list. Choose an available model and retry.')
     if agent == 'claude':
@@ -133,9 +145,13 @@ def configuration(payload):
         fields += [(['env', 'ANTHROPIC_CUSTOM_MODEL_OPTION'], model), (['env', 'ANTHROPIC_CUSTOM_MODEL_OPTION_NAME'], 'lianjieai · ' + model), (['env', 'ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION'], 'lianjieai gateway')]
         if payload.get('claude_model_picker_supported', True):
             fields.append((['modelPicker'], {'options': [{'model': item['id'], 'label': 'lianjieai · ' + item['name']} for item in catalog], 'replaceBuiltInOptions': True}))
+        if mcp_image_tools_enabled(payload):
+            fields.append((['mcpServers', 'sub2api-image'], {'type': 'http', 'url': mcp_endpoint, 'headers': {'Authorization': 'Bearer ' + key}}))
     elif agent == 'codex':
         fields = [(['model'], model), (['model_provider'], PROVIDER), (['model_providers', PROVIDER], dict(name='lianjieai', base_url=base, wire_api='responses', experimental_bearer_token=key, requires_openai_auth=False))]
         if payload.get('catalog_path'): fields.append((['model_catalog_json'], payload['catalog_path']))
+        if mcp_image_tools_enabled(payload):
+            fields.append((['mcp_servers', 'sub2api_image'], {'url': mcp_endpoint, 'http_headers': {'Authorization': 'Bearer ' + key}, 'startup_timeout_sec': 20, 'tool_timeout_sec': 300}))
     else:
         protocol = payload.get('protocol', 'openai')
         npm = {'openai': '@ai-sdk/openai', 'anthropic': '@ai-sdk/anthropic', 'compatible': '@ai-sdk/openai-compatible', 'gemini': '@ai-sdk/google'}.get(protocol)
@@ -144,7 +160,37 @@ def configuration(payload):
         if model not in models: raise ValueError('Selected model is not in the gateway model list. Choose an available model and retry.')
         provider = dict(npm=npm, name='lianjieai', options=dict(baseURL=base, apiKey=key), models=models)
         fields = [(['provider', PROVIDER], provider), (['model'], f'{PROVIDER}/{model}')]
+        if mcp_image_tools_enabled(payload):
+            fields.append((['mcp', 'servers', 'sub2api_image'], {'type': 'remote', 'url': mcp_endpoint, 'oauth': False, 'headers': {'Authorization': 'Bearer ' + key}}))
     return [dict(path=path, value={'exists': True, 'value': value}) for path, value in fields]
+
+
+def mcp_image_tools_enabled(payload):
+    return payload.get('mcp_image_tools_enabled', True) is not False
+
+
+def derive_mcp_endpoint(base):
+    parsed = urlparse(base.rstrip('/'))
+    path = parsed.path.rstrip('/')
+    if path == '/v1':
+        path = ''
+    elif path.endswith('/v1'):
+        path = path[:-3]
+    return urlunparse((parsed.scheme, parsed.netloc, path.rstrip('/') + '/mcp', '', '', ''))
+
+
+def resolve_mcp_endpoint(payload, base):
+    endpoint = str(payload.get('mcp_endpoint') or '').strip()
+    if not endpoint and mcp_image_tools_enabled(payload):
+        endpoint = derive_mcp_endpoint(base)
+    if not endpoint:
+        return ''
+    parsed = urlparse(endpoint)
+    if parsed.scheme != 'https' and not (parsed.scheme == 'http' and parsed.hostname in ('127.0.0.1', 'localhost')):
+        raise ValueError('Invalid MCP endpoint')
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise ValueError('Invalid MCP endpoint')
+    return endpoint.rstrip('/')
 
 
 @contextmanager

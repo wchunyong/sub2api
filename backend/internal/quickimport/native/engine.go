@@ -35,6 +35,8 @@ type Payload struct {
 	Model                      string         `json:"model"`
 	Protocol                   string         `json:"protocol"`
 	ProbeURL                   string         `json:"probe_url"`
+	MCPEndpoint                string         `json:"mcp_endpoint"`
+	MCPImageToolsEnabled       *bool          `json:"mcp_image_tools_enabled"`
 	Models                     []Model        `json:"models"`
 	ClaudeModelPickerSupported bool           `json:"claude_model_picker_supported"`
 	CodexManifest              map[string]any `json:"codex_manifest"`
@@ -320,7 +322,13 @@ func render(text, agent string, changes []change) (string, error) {
 			}
 			result = head + tail
 		} else {
-			if !reflect.DeepEqual(c.Path, []string{"model_providers", provider}) {
+			tableName := ""
+			switch {
+			case reflect.DeepEqual(c.Path, []string{"model_providers", provider}):
+				tableName = "model_providers." + provider
+			case reflect.DeepEqual(c.Path, []string{"mcp_servers", "sub2api_image"}):
+				tableName = "mcp_servers.sub2api_image"
+			default:
 				return "", errors.New("unsupported TOML change")
 			}
 			lines := strings.SplitAfter(result, "\n")
@@ -328,7 +336,7 @@ func render(text, agent string, changes []change) (string, error) {
 			skip := false
 			for _, line := range lines {
 				if strings.HasPrefix(line, "[") {
-					skip = strings.TrimSpace(line) == "[model_providers."+provider+"]"
+					skip = strings.TrimSpace(line) == "["+tableName+"]"
 				}
 				if !skip {
 					out.WriteString(line)
@@ -338,20 +346,20 @@ func render(text, agent string, changes []change) (string, error) {
 			if c.Value.Exists {
 				m, ok := c.Value.Value.(map[string]any)
 				if !ok {
-					return "", errors.New("invalid provider table")
+					return "", errors.New("invalid TOML table")
 				}
-				result = strings.TrimRight(result, "\r\n ") + "\n\n[model_providers." + provider + "]\n"
+				result = strings.TrimRight(result, "\r\n ") + "\n\n[" + tableName + "]\n"
 				keys := make([]string, 0, len(m))
 				for k := range m {
 					keys = append(keys, k)
 				}
 				sort.Strings(keys)
 				for _, k := range keys {
-					b, e := json.Marshal(m[k])
+					b, e := tomlScalar(m[k])
 					if e != nil {
 						return "", e
 					}
-					result += k + " = " + string(b) + "\n"
+					result += k + " = " + b + "\n"
 				}
 			}
 		}
@@ -362,6 +370,29 @@ func render(text, agent string, changes []change) (string, error) {
 	}
 	return result, nil
 }
+
+func tomlScalar(v any) (string, error) {
+	switch m := v.(type) {
+	case map[string]any:
+		keys := make([]string, 0, len(m))
+		for k := range m {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		parts := make([]string, 0, len(keys))
+		for _, k := range keys {
+			b, err := tomlScalar(m[k])
+			if err != nil {
+				return "", err
+			}
+			parts = append(parts, k+" = "+b)
+		}
+		return "{ " + strings.Join(parts, ", ") + " }", nil
+	default:
+		b, err := json.Marshal(v)
+		return string(b), err
+	}
+}
 func configuration(p Payload, catalogPath string) ([]change, error) {
 	base := strings.TrimRight(p.BaseURL, "/")
 	u, err := url.Parse(base)
@@ -370,6 +401,10 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 	}
 	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.ForceQuery || !(u.Scheme == "https" || (u.Scheme == "http" && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1"))) {
 		return nil, errors.New("HTTPS gateway required")
+	}
+	mcpEndpoint, err := resolveMCPEndpoint(p, base)
+	if err != nil {
+		return nil, err
 	}
 	models := p.Models
 	if models == nil {
@@ -414,12 +449,27 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 			}
 			add([]string{"modelPicker"}, map[string]any{"options": options, "replaceBuiltInOptions": true})
 		}
+		if mcpImageToolsEnabled(p) {
+			add([]string{"mcpServers", "sub2api-image"}, map[string]any{
+				"type":    "http",
+				"url":     mcpEndpoint,
+				"headers": map[string]any{"Authorization": "Bearer " + p.APIKey},
+			})
+		}
 	case "codex":
 		add([]string{"model"}, p.Model)
 		add([]string{"model_provider"}, provider)
 		add([]string{"model_providers", provider}, map[string]any{"name": "lianjieai", "base_url": base, "wire_api": "responses", "experimental_bearer_token": p.APIKey, "requires_openai_auth": false})
 		if catalogPath != "" {
 			add([]string{"model_catalog_json"}, catalogPath)
+		}
+		if mcpImageToolsEnabled(p) {
+			add([]string{"mcp_servers", "sub2api_image"}, map[string]any{
+				"url":                 mcpEndpoint,
+				"http_headers":        map[string]any{"Authorization": "Bearer " + p.APIKey},
+				"startup_timeout_sec": 20,
+				"tool_timeout_sec":    300,
+			})
 		}
 	case "opencode":
 		protocol := p.Protocol
@@ -436,8 +486,53 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 		}
 		add([]string{"provider", provider}, map[string]any{"npm": npm, "name": "lianjieai", "options": map[string]any{"baseURL": base, "apiKey": p.APIKey}, "models": models})
 		add([]string{"model"}, provider+"/"+p.Model)
+		if mcpImageToolsEnabled(p) {
+			add([]string{"mcp", "servers", "sub2api_image"}, map[string]any{
+				"type":    "remote",
+				"url":     mcpEndpoint,
+				"oauth":   false,
+				"headers": map[string]any{"Authorization": "Bearer " + p.APIKey},
+			})
+		}
 	}
 	return changes, nil
+}
+
+func mcpImageToolsEnabled(p Payload) bool {
+	return p.MCPImageToolsEnabled == nil || *p.MCPImageToolsEnabled
+}
+
+func resolveMCPEndpoint(p Payload, base string) (string, error) {
+	endpoint := strings.TrimSpace(p.MCPEndpoint)
+	if endpoint == "" && mcpImageToolsEnabled(p) {
+		endpoint = deriveMCPEndpoint(base)
+	}
+	if endpoint == "" {
+		return "", nil
+	}
+	u, err := url.Parse(endpoint)
+	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.ForceQuery ||
+		!(u.Scheme == "https" || (u.Scheme == "http" && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1"))) {
+		return "", errors.New("invalid MCP endpoint")
+	}
+	return strings.TrimRight(endpoint, "/"), nil
+}
+
+func deriveMCPEndpoint(base string) string {
+	u, err := url.Parse(strings.TrimRight(base, "/"))
+	if err != nil {
+		return ""
+	}
+	path := strings.TrimRight(u.Path, "/")
+	if path == "/v1" {
+		path = ""
+	} else if strings.HasSuffix(path, "/v1") {
+		path = strings.TrimSuffix(path, "/v1")
+	}
+	u.Path = strings.TrimRight(path, "/") + "/mcp"
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String()
 }
 func ownedPath(root, folder string, item ownedFile) (string, error) {
 	path := filepath.Join(root, filepath.FromSlash(strings.ReplaceAll(item.Path, `\`, "/")))
@@ -674,7 +769,7 @@ func Clean(root, agent string) error {
 			field := "managed configuration"
 			if agent == "codex" {
 				switch strings.Join(c.Path, ".") {
-				case "model", "model_provider", "model_catalog_json", "model_providers.sub2api_quick":
+				case "model", "model_provider", "model_catalog_json", "model_providers.sub2api_quick", "mcp_servers.sub2api_image":
 					field = strings.Join(c.Path, ".")
 				}
 			}
