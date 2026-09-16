@@ -18,6 +18,39 @@ type GroupModelAllowlist struct {
 	Models  []string `json:"models,omitempty"`
 }
 
+// DefaultAllowedOpenAIImageModel resolves the model used when an image request
+// omits its model. An enabled group allowlist always wins over the global
+// default; the returned model is a concrete ID that the allowlist accepts.
+func DefaultAllowedOpenAIImageModel(group *Group) string {
+	const globalDefault = "gpt-image-2"
+	if group == nil || !group.ModelAllowlist.Enabled {
+		return globalDefault
+	}
+
+	preferred := []string{
+		"gpt-image-2.5-flare",
+		"gpt-image-2.5-sunburst",
+		"gpt-image-2",
+		"gpt-image-1.5",
+		"gpt-image-1",
+	}
+	for _, model := range preferred {
+		if group.ModelAllowlist.Allows(model) {
+			return model
+		}
+	}
+	for _, model := range group.ModelAllowlist.Models {
+		model = strings.TrimSpace(model)
+		if strings.HasSuffix(model, "*") {
+			continue
+		}
+		if strings.HasPrefix(strings.ToLower(model), "gpt-image-") && group.ModelAllowlist.Allows(model) {
+			return model
+		}
+	}
+	return ""
+}
+
 // DomainGroupModelAllowlist 把 service 白名单转换为 ent 持久化使用的 domain 类型。
 func DomainGroupModelAllowlist(cfg GroupModelAllowlist) domain.GroupModelAllowlist {
 	return domain.GroupModelAllowlist{Enabled: cfg.Enabled, Models: cfg.Models}

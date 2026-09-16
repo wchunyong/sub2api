@@ -30,8 +30,6 @@ type EditImageInput struct {
 	OutputFormat string `json:"output_format,omitempty"`
 }
 
-const DefaultImageModel = "gpt-image-2"
-
 type ImageResult struct {
 	URL           string `json:"url"`
 	MIMEType      string `json:"mime_type"`
@@ -148,9 +146,6 @@ func (s *Server) callTool(ctx context.Context, raw json.RawMessage) (any, ErrorC
 		}
 		input.Prompt = strings.TrimSpace(input.Prompt)
 		input.Model = strings.TrimSpace(input.Model)
-		if input.Model == "" {
-			input.Model = DefaultImageModel
-		}
 		input.Size = strings.TrimSpace(input.Size)
 		input.Quality = strings.TrimSpace(input.Quality)
 		input.OutputFormat = strings.TrimSpace(input.OutputFormat)
@@ -176,9 +171,6 @@ func (s *Server) callTool(ctx context.Context, raw json.RawMessage) (any, ErrorC
 		input.Image = strings.TrimSpace(input.Image)
 		input.Prompt = strings.TrimSpace(input.Prompt)
 		input.Model = strings.TrimSpace(input.Model)
-		if input.Model == "" {
-			input.Model = DefaultImageModel
-		}
 		input.Size = strings.TrimSpace(input.Size)
 		input.Quality = strings.TrimSpace(input.Quality)
 		input.OutputFormat = strings.TrimSpace(input.OutputFormat)

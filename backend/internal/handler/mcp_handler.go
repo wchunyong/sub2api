@@ -37,6 +37,7 @@ func (g *mcpImageGateway) GenerateImage(ctx context.Context, input mcp.GenerateI
 	if g == nil || g.source == nil || g.openAI == nil {
 		return mcp.ImageResult{}, mcp.NewToolError(mcp.ErrInternal, "", fmt.Errorf("image gateway unavailable"))
 	}
+	input.Model = g.resolveImageModel(input.Model)
 	if err := g.validateImageModel(input.Model); err != nil {
 		return mcp.ImageResult{}, err
 	}
@@ -51,6 +52,7 @@ func (g *mcpImageGateway) EditImage(ctx context.Context, input mcp.EditImageInpu
 	if g == nil || g.source == nil || g.openAI == nil {
 		return mcp.ImageResult{}, mcp.NewToolError(mcp.ErrInternal, "", fmt.Errorf("image gateway unavailable"))
 	}
+	input.Model = g.resolveImageModel(input.Model)
 	if err := g.validateImageModel(input.Model); err != nil {
 		return mcp.ImageResult{}, err
 	}
@@ -59,6 +61,18 @@ func (g *mcpImageGateway) EditImage(ctx context.Context, input mcp.EditImageInpu
 		return mcp.ImageResult{}, err
 	}
 	return g.callImages(ctx, "/v1/images/edits", body, input.Model, 1)
+}
+
+func (g *mcpImageGateway) resolveImageModel(model string) string {
+	model = strings.TrimSpace(model)
+	if model != "" {
+		return model
+	}
+	apiKey, ok := middleware2.GetAPIKeyFromContext(g.source)
+	if !ok || apiKey == nil {
+		return model
+	}
+	return service.DefaultAllowedOpenAIImageModel(apiKey.Group)
 }
 
 func (g *mcpImageGateway) validateImageModel(model string) error {

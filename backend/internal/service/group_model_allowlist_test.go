@@ -154,6 +154,30 @@ func TestGroupModelAllowlistEnabled(t *testing.T) {
 	}
 }
 
+func TestDefaultAllowedOpenAIImageModelPrefersAllowedFlare(t *testing.T) {
+	group := &Group{
+		ModelAllowlist: GroupModelAllowlist{
+			Enabled: true,
+			Models:  []string{"gpt-5.5", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst"},
+		},
+	}
+	if got := DefaultAllowedOpenAIImageModel(group); got != "gpt-image-2.5-flare" {
+		t.Fatalf("expected gpt-image-2.5-flare, got %q", got)
+	}
+}
+
+func TestDefaultAllowedOpenAIImageModelUsesPreferredWildcard(t *testing.T) {
+	group := &Group{
+		ModelAllowlist: GroupModelAllowlist{
+			Enabled: true,
+			Models:  []string{"gpt-image-2*"},
+		},
+	}
+	if got := DefaultAllowedOpenAIImageModel(group); got != "gpt-image-2.5-flare" {
+		t.Fatalf("expected wildcard to resolve to gpt-image-2.5-flare, got %q", got)
+	}
+}
+
 func TestGroupModelAllowlistFilterForListing(t *testing.T) {
 	source := []string{"claude-opus-4.6", "claude-sonnet-4.5", "gpt-5.4", "gpt-5.5-codex", "gpt-5.5-mini", "grok-4.6"}
 

@@ -146,7 +146,7 @@ func TestServerReturnsImageContentForDataURL(t *testing.T) {
 	}
 }
 
-func TestServerDefaultsGenerateImageModel(t *testing.T) {
+func TestServerLeavesOmittedGenerateImageModelUnresolved(t *testing.T) {
 	gateway := &fakeImageGateway{}
 	server := NewServer(gateway)
 	request := jsonRPCRequest(t, "tools/call", map[string]any{
@@ -155,8 +155,8 @@ func TestServerDefaultsGenerateImageModel(t *testing.T) {
 	})
 	serveMCP(t, server, request)
 
-	if gateway.generateInput.Model != DefaultImageModel {
-		t.Fatalf("expected default model %q, got %q", DefaultImageModel, gateway.generateInput.Model)
+	if gateway.generateInput.Model != "" {
+		t.Fatalf("expected omitted model to remain unresolved, got %q", gateway.generateInput.Model)
 	}
 }
 
