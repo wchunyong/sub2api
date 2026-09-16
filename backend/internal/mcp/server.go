@@ -163,7 +163,7 @@ func (s *Server) callTool(ctx context.Context, raw json.RawMessage) (any, ErrorC
 			return toolErrorDetails(err)
 		}
 		return toolTextResult(result), ErrorCode{}, ""
-	case "edit_image":
+	case "lianjieai_edit_image", "edit_image":
 		var input EditImageInput
 		if err := json.Unmarshal(req.Arguments, &input); err != nil {
 			return nil, ErrInvalidParams, ""
@@ -225,7 +225,7 @@ func initializeResult() map[string]any {
 	return map[string]any{
 		"protocolVersion": "2025-06-18",
 		"serverInfo": map[string]any{
-			"name":    "sub2api-image-mcp",
+			"name":    "lianjieai-image-mcp",
 			"version": "0.1.0",
 		},
 		"capabilities": map[string]any{
@@ -253,7 +253,7 @@ func imageTools() []map[string]any {
 			},
 		},
 		{
-			"name":        "edit_image",
+			"name":        "lianjieai_edit_image",
 			"description": "Edit an existing image through the authenticated Sub2API image gateway.",
 			"inputSchema": map[string]any{
 				"type":     "object",

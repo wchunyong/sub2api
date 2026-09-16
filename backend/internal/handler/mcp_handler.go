@@ -3,11 +3,16 @@ package handler
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"mime"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/mcp"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -128,7 +133,15 @@ func (g *mcpImageGateway) callImages(ctx context.Context, path string, body []by
 	if rec.Code < 200 || rec.Code >= 300 {
 		return mcp.ImageResult{}, classifyMCPImageResponse(rec.Code, rec.Body.Bytes())
 	}
-	return parseOpenAIImageResult(rec.Body.Bytes(), model, imageCount)
+	result, err := parseOpenAIImageResult(rec.Body.Bytes(), model, imageCount)
+	if err != nil {
+		return mcp.ImageResult{}, err
+	}
+	result, err = materializeMCPImageResult(ctx, result)
+	if err != nil {
+		return mcp.ImageResult{}, mcp.NewToolError(mcp.ErrUpstream, "", err)
+	}
+	return result, nil
 }
 
 func classifyMCPImageResponse(status int, body []byte) error {
@@ -191,5 +204,47 @@ func parseOpenAIImageResult(body []byte, model string, count int) (mcp.ImageResu
 	if result.URL == "" {
 		return mcp.ImageResult{}, fmt.Errorf("image response did not include a URL")
 	}
+	return result, nil
+}
+
+const maxMCPImageBytes int64 = 20 << 20
+
+func materializeMCPImageResult(ctx context.Context, result mcp.ImageResult) (mcp.ImageResult, error) {
+	raw := strings.TrimSpace(result.URL)
+	if strings.HasPrefix(strings.ToLower(raw), "data:image/") {
+		return result, nil
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return mcp.ImageResult{}, fmt.Errorf("image response URL is invalid")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
+	if err != nil {
+		return mcp.ImageResult{}, fmt.Errorf("download image result: %w", err)
+	}
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return mcp.ImageResult{}, fmt.Errorf("download image result: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return mcp.ImageResult{}, fmt.Errorf("download image result: unexpected HTTP status %d", resp.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxMCPImageBytes+1))
+	if err != nil || int64(len(data)) > maxMCPImageBytes {
+		if err == nil {
+			err = fmt.Errorf("image exceeds %d bytes", maxMCPImageBytes)
+		}
+		return mcp.ImageResult{}, fmt.Errorf("download image result: %w", err)
+	}
+	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
+	if mediaType, _, parseErr := mime.ParseMediaType(contentType); parseErr == nil {
+		contentType = mediaType
+	}
+	if !strings.HasPrefix(strings.ToLower(contentType), "image/") {
+		return mcp.ImageResult{}, fmt.Errorf("download image result: content type is not an image")
+	}
+	result.MIMEType = contentType
+	result.URL = "data:" + contentType + ";base64," + base64.StdEncoding.EncodeToString(data)
 	return result, nil
 }

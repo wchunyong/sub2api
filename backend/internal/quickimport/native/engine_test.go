@@ -365,7 +365,7 @@ func TestInstallRegistersImageMCPByDefault(t *testing.T) {
 			}
 			switch agent {
 			case "codex":
-				server := get(data, []string{"mcp_servers", "sub2api_image"}).Value.(map[string]any)
+				server := get(data, []string{"mcp_servers", "lianjieai_image"}).Value.(map[string]any)
 				if server["url"] != "https://example.test/mcp" {
 					t.Fatalf("bad Codex MCP server: %#v", server)
 				}
@@ -374,12 +374,12 @@ func TestInstallRegistersImageMCPByDefault(t *testing.T) {
 					t.Fatalf("bad Codex MCP auth header: %#v", headers)
 				}
 			case "opencode":
-				server := get(data, []string{"mcp", "servers", "sub2api_image"}).Value.(map[string]any)
+				server := get(data, []string{"mcp", "servers", "lianjieai_image"}).Value.(map[string]any)
 				if server["url"] != "https://example.test/mcp" || server["oauth"] != false {
 					t.Fatalf("bad OpenCode MCP server: %#v", server)
 				}
 			case "claude":
-				server := get(data, []string{"mcpServers", "sub2api-image"}).Value.(map[string]any)
+				server := get(data, []string{"mcpServers", "lianjieai-image"}).Value.(map[string]any)
 				if server["url"] != "https://example.test/mcp" {
 					t.Fatalf("bad Claude MCP server: %#v", server)
 				}
@@ -391,7 +391,7 @@ func TestInstallRegistersImageMCPByDefault(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				userServer := get(claudeUserData, []string{"mcpServers", "sub2api-image"}).Value.(map[string]any)
+				userServer := get(claudeUserData, []string{"mcpServers", "lianjieai-image"}).Value.(map[string]any)
 				if userServer["url"] != "https://example.test/mcp" {
 					t.Fatalf("bad Claude user MCP server: %#v", userServer)
 				}
@@ -435,7 +435,7 @@ func TestInstallUsesCurrentOpenCodeMCPShape(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !get(data, []string{"mcp", "servers", "sub2api_image"}).Exists {
+	if !get(data, []string{"mcp", "servers", "lianjieai_image"}).Exists {
 		t.Fatalf("current OpenCode MCP shape missing: %s", text)
 	}
 	if get(data, []string{"mcp", "sub2api_image"}).Exists {

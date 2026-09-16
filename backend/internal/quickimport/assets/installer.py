@@ -119,8 +119,8 @@ def render(text, agent, changes):
         else:
             if parts == ['model_providers', PROVIDER]:
                 table = f'model_providers.{PROVIDER}'
-            elif parts == ['mcp_servers', 'sub2api_image']:
-                table = 'mcp_servers.sub2api_image'
+            elif parts == ['mcp_servers', 'lianjieai_image']:
+                table = 'mcp_servers.lianjieai_image'
             else:
                 raise ValueError('Unsupported TOML change')
             pattern = rf'(?ms)^\[{re.escape(table)}\][ \t]*\r?\n.*?(?=^\[|\Z)'
@@ -156,12 +156,12 @@ def configuration(payload):
         if payload.get('claude_model_picker_supported', True):
             fields.append((['modelPicker'], {'options': [{'model': item['id'], 'label': 'lianjieai · ' + item['name']} for item in catalog], 'replaceBuiltInOptions': True}))
         if mcp_image_tools_enabled(payload):
-            fields.append((['mcpServers', 'sub2api-image'], {'type': 'http', 'url': mcp_endpoint, 'headers': {'Authorization': 'Bearer ' + key}}))
+            fields.append((['mcpServers', 'lianjieai-image'], {'type': 'http', 'url': mcp_endpoint, 'headers': {'Authorization': 'Bearer ' + key}}))
     elif agent == 'codex':
         fields = [(['model'], model), (['model_provider'], PROVIDER), (['model_providers', PROVIDER], dict(name='lianjieai', base_url=base, wire_api='responses', experimental_bearer_token=key, requires_openai_auth=False))]
         if payload.get('catalog_path'): fields.append((['model_catalog_json'], payload['catalog_path']))
         if mcp_image_tools_enabled(payload):
-            fields.append((['mcp_servers', 'sub2api_image'], {'url': mcp_endpoint, 'http_headers': {'Authorization': 'Bearer ' + key}, 'startup_timeout_sec': 20, 'tool_timeout_sec': 300}))
+            fields.append((['mcp_servers', 'lianjieai_image'], {'url': mcp_endpoint, 'http_headers': {'Authorization': 'Bearer ' + key}, 'startup_timeout_sec': 20, 'tool_timeout_sec': 300}))
     else:
         protocol = payload.get('protocol', 'openai')
         npm = {'openai': '@ai-sdk/openai', 'anthropic': '@ai-sdk/anthropic', 'compatible': '@ai-sdk/openai-compatible', 'gemini': '@ai-sdk/google'}.get(protocol)
@@ -172,7 +172,8 @@ def configuration(payload):
         fields = [(['provider', PROVIDER], provider), (['model'], f'{PROVIDER}/{model}')]
         if mcp_image_tools_enabled(payload):
             fields.append((['mcp', 'servers', 'sub2api_image'], DELETE))
-            fields.append((['mcp', 'sub2api_image'], {'type': 'remote', 'url': mcp_endpoint, 'oauth': False, 'headers': {'Authorization': 'Bearer ' + key}}))
+            fields.append((['mcp', 'sub2api_image'], DELETE))
+            fields.append((['mcp', 'servers', 'lianjieai_image'], {'type': 'remote', 'url': mcp_endpoint, 'oauth': False, 'headers': {'Authorization': 'Bearer ' + key}}))
     return [
         dict(path=path, value={'exists': False} if value is DELETE else {'exists': True, 'value': value})
         for path, value in fields
@@ -181,7 +182,7 @@ def configuration(payload):
 
 def claude_mcp_change(changes):
     for change in changes:
-        if change['path'] == ['mcpServers', 'sub2api-image']:
+        if change['path'] == ['mcpServers', 'lianjieai-image']:
             return change
     return None
 

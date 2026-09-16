@@ -73,7 +73,7 @@ func TestServerListsImageTools(t *testing.T) {
 			t.Fatalf("tool %s is missing inputSchema", tool["name"])
 		}
 	}
-	if !names["lianjieai_generate_image"] || !names["edit_image"] {
+	if !names["lianjieai_generate_image"] || !names["lianjieai_edit_image"] {
 		t.Fatalf("missing image tools: %#v", names)
 	}
 }
@@ -179,7 +179,7 @@ func TestServerCallsEditImage(t *testing.T) {
 	gateway := &fakeImageGateway{}
 	server := NewServer(gateway)
 	request := jsonRPCRequest(t, "tools/call", map[string]any{
-		"name": "edit_image",
+		"name": "lianjieai_edit_image",
 		"arguments": map[string]any{
 			"image":         "data:image/png;base64,QUJD",
 			"prompt":        "replace the background",
@@ -222,7 +222,7 @@ func TestServerRejectsInvalidGenerateImageCount(t *testing.T) {
 func TestServerRejectsInvalidEditImageReference(t *testing.T) {
 	server := NewServer(&fakeImageGateway{})
 	request := jsonRPCRequest(t, "tools/call", map[string]any{
-		"name":      "edit_image",
+		"name":      "lianjieai_edit_image",
 		"arguments": map[string]any{"image": "file:///etc/passwd", "prompt": "replace the background"},
 	})
 	response := serveMCP(t, server, request)

@@ -331,8 +331,8 @@ func render(text, agent string, changes []change) (string, error) {
 			switch {
 			case reflect.DeepEqual(c.Path, []string{"model_providers", provider}):
 				tableName = "model_providers." + provider
-			case reflect.DeepEqual(c.Path, []string{"mcp_servers", "sub2api_image"}):
-				tableName = "mcp_servers.sub2api_image"
+			case reflect.DeepEqual(c.Path, []string{"mcp_servers", "lianjieai_image"}):
+				tableName = "mcp_servers.lianjieai_image"
 			default:
 				return "", errors.New("unsupported TOML change")
 			}
@@ -455,7 +455,7 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 			add([]string{"modelPicker"}, map[string]any{"options": options, "replaceBuiltInOptions": true})
 		}
 		if mcpImageToolsEnabled(p) {
-			add([]string{"mcpServers", "sub2api-image"}, map[string]any{
+			add([]string{"mcpServers", "lianjieai-image"}, map[string]any{
 				"type":    "http",
 				"url":     mcpEndpoint,
 				"headers": map[string]any{"Authorization": "Bearer " + p.APIKey},
@@ -469,7 +469,7 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 			add([]string{"model_catalog_json"}, catalogPath)
 		}
 		if mcpImageToolsEnabled(p) {
-			add([]string{"mcp_servers", "sub2api_image"}, map[string]any{
+			add([]string{"mcp_servers", "lianjieai_image"}, map[string]any{
 				"url":                 mcpEndpoint,
 				"http_headers":        map[string]any{"Authorization": "Bearer " + p.APIKey},
 				"startup_timeout_sec": 20,
@@ -493,8 +493,9 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 		add([]string{"model"}, provider+"/"+p.Model)
 		if mcpImageToolsEnabled(p) {
 			changes = append(changes, change{Path: []string{"mcp", "sub2api_image"}, Value: value{Exists: false}})
+			changes = append(changes, change{Path: []string{"mcp", "servers", "sub2api_image"}, Value: value{Exists: false}})
 			// OpenCode v2 places each server under mcp.servers.
-			add([]string{"mcp", "servers", "sub2api_image"}, map[string]any{
+			add([]string{"mcp", "servers", "lianjieai_image"}, map[string]any{
 				"type":    "remote",
 				"url":     mcpEndpoint,
 				"oauth":   false,
@@ -507,7 +508,7 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 
 func claudeMCPChange(changes []change) (change, bool) {
 	for _, c := range changes {
-		if reflect.DeepEqual(c.Path, []string{"mcpServers", "sub2api-image"}) {
+		if reflect.DeepEqual(c.Path, []string{"mcpServers", "lianjieai-image"}) {
 			return c, true
 		}
 	}
@@ -542,7 +543,7 @@ func cleanClaudeUserMCPConfig(root string, rec *record) error {
 		return nil
 	}
 	for _, c := range rec.Changes {
-		if !reflect.DeepEqual(c.Path, []string{"mcpServers", "sub2api-image"}) || !c.Value.Exists {
+		if !reflect.DeepEqual(c.Path, []string{"mcpServers", "lianjieai-image"}) || !c.Value.Exists {
 			continue
 		}
 		path, err := claudeUserMCPConfigPath(root)
@@ -860,7 +861,7 @@ func Clean(root, agent string) error {
 			field := "managed configuration"
 			if agent == "codex" {
 				switch strings.Join(c.Path, ".") {
-				case "model", "model_provider", "model_catalog_json", "model_providers.sub2api_quick", "mcp_servers.sub2api_image":
+				case "model", "model_provider", "model_catalog_json", "model_providers.sub2api_quick", "mcp_servers.lianjieai_image":
 					field = strings.Join(c.Path, ".")
 				}
 			}

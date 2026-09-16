@@ -1,14 +1,35 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/mcp"
 )
+
+func TestMaterializeMCPRemoteImageAsDataURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write([]byte{0x89, 'P', 'N', 'G'})
+	}))
+	defer server.Close()
+
+	result, err := materializeMCPImageResult(context.Background(), mcp.ImageResult{
+		URL:      server.URL + "/image.png",
+		MIMEType: "image/png",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(result.URL, "data:image/png;base64,") {
+		t.Fatalf("expected embedded image data URL, got %q", result.URL)
+	}
+}
 
 func TestBuildMCPImageRequestForcesBase64Output(t *testing.T) {
 	body, err := buildMCPImageRequest("gpt-image-2.5-flare", "draw a puppy", "", "", "png", 1, nil)
