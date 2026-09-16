@@ -245,7 +245,7 @@ func imageTools() []map[string]any {
 	return []map[string]any{
 		{
 			"name":        "lianjieai_generate_image",
-			"description": "Generate an image through the authenticated Sub2API image gateway.",
+			"description": "Generate an image through the authenticated LianjieAI image gateway. This tool already returns a visible MCP image result; do not call a separate image-generation skill and do not emit a second Markdown or data-URL image in the final response.",
 			"inputSchema": map[string]any{
 				"type":     "object",
 				"required": []string{"prompt"},
@@ -261,7 +261,7 @@ func imageTools() []map[string]any {
 		},
 		{
 			"name":        "lianjieai_edit_image",
-			"description": "Edit an existing image through the authenticated Sub2API image gateway.",
+			"description": "Edit an existing image through the authenticated LianjieAI image gateway. This tool already returns a visible MCP image result; do not emit a second Markdown or data-URL image in the final response.",
 			"inputSchema": map[string]any{
 				"type":     "object",
 				"required": []string{"image", "prompt"},
@@ -309,6 +309,7 @@ func toolTextResult(result ImageResult) map[string]any {
 func imageResultSummary(result ImageResult) map[string]any {
 	summary := map[string]any{
 		"image_generated": true,
+		"display_note":    "The image is already attached as MCP image content; do not create a second image preview.",
 	}
 	_, inlineMIMEType, inline := decodeImageDataURL(result.URL, result.MIMEType)
 	if inline {

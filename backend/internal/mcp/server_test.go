@@ -118,6 +118,9 @@ func TestServerCallsGenerateImage(t *testing.T) {
 	if !bytes.Contains([]byte(text), []byte(`"mime_type":"image/png"`)) {
 		t.Fatalf("tool result did not include MIME metadata: %s", text)
 	}
+	if !bytes.Contains([]byte(text), []byte(`"display_note":"The image is already attached as MCP image content; do not create a second image preview."`)) {
+		t.Fatalf("tool result did not include display guidance: %s", text)
+	}
 }
 
 func TestToolResultIncludesResourceLinkForRemoteImage(t *testing.T) {
