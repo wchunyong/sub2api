@@ -492,9 +492,9 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 		add([]string{"provider", provider}, map[string]any{"npm": npm, "name": "lianjieai", "options": map[string]any{"baseURL": base, "apiKey": p.APIKey}, "models": models})
 		add([]string{"model"}, provider+"/"+p.Model)
 		if mcpImageToolsEnabled(p) {
-			changes = append(changes, change{Path: []string{"mcp", "servers", "sub2api_image"}, Value: value{Exists: false}})
-			// OpenCode's current schema places each server directly under mcp.
-			add([]string{"mcp", "sub2api_image"}, map[string]any{
+			changes = append(changes, change{Path: []string{"mcp", "sub2api_image"}, Value: value{Exists: false}})
+			// OpenCode v2 places each server under mcp.servers.
+			add([]string{"mcp", "servers", "sub2api_image"}, map[string]any{
 				"type":    "remote",
 				"url":     mcpEndpoint,
 				"oauth":   false,

@@ -374,7 +374,7 @@ func TestInstallRegistersImageMCPByDefault(t *testing.T) {
 					t.Fatalf("bad Codex MCP auth header: %#v", headers)
 				}
 			case "opencode":
-				server := get(data, []string{"mcp", "sub2api_image"}).Value.(map[string]any)
+				server := get(data, []string{"mcp", "servers", "sub2api_image"}).Value.(map[string]any)
 				if server["url"] != "https://example.test/mcp" || server["oauth"] != false {
 					t.Fatalf("bad OpenCode MCP server: %#v", server)
 				}
@@ -413,10 +413,10 @@ func TestInstallRegistersImageMCPByDefault(t *testing.T) {
 	}
 }
 
-func TestInstallMigratesLegacyOpenCodeMCPShape(t *testing.T) {
+func TestInstallUsesCurrentOpenCodeMCPShape(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, paths["opencode"])
-	legacy := `{"mcp":{"servers":{"sub2api_image":{"type":"remote","url":"https://legacy.example/mcp","headers":{"Authorization":"Bearer old-secret"}}}}}`
+	legacy := `{"mcp":{"sub2api_image":{"type":"remote","url":"https://legacy.example/mcp","headers":{"Authorization":"Bearer old-secret"}}}}`
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -435,11 +435,11 @@ func TestInstallMigratesLegacyOpenCodeMCPShape(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if get(data, []string{"mcp", "sub2api_image"}).Value == nil {
-		t.Fatalf("correct OpenCode MCP shape missing: %s", text)
+	if !get(data, []string{"mcp", "servers", "sub2api_image"}).Exists {
+		t.Fatalf("current OpenCode MCP shape missing: %s", text)
 	}
-	if get(data, []string{"mcp", "servers", "sub2api_image"}).Exists {
-		t.Fatalf("legacy OpenCode MCP shape was not removed: %s", text)
+	if get(data, []string{"mcp", "sub2api_image"}).Exists {
+		t.Fatalf("legacy direct OpenCode MCP shape was not removed: %s", text)
 	}
 }
 
