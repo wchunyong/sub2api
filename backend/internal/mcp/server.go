@@ -242,6 +242,19 @@ func initializeResult() map[string]any {
 }
 
 func imageTools() []map[string]any {
+	outputSchema := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"image_generated": map[string]any{"type": "boolean"},
+			"image_content":   map[string]any{"type": "string"},
+			"mime_type":       map[string]any{"type": "string"},
+			"image_count":     map[string]any{"type": "integer"},
+			"model":           map[string]any{"type": "string"},
+			"display_note":    map[string]any{"type": "string"},
+			"url":             map[string]any{"type": "string"},
+		},
+		"required": []string{"image_generated", "image_content"},
+	}
 	return []map[string]any{
 		{
 			"name":        "lianjieai_generate_image",
@@ -258,6 +271,7 @@ func imageTools() []map[string]any {
 					"n":             map[string]any{"type": "integer", "minimum": 1, "maximum": 4},
 				},
 			},
+			"outputSchema": outputSchema,
 		},
 		{
 			"name":        "lianjieai_edit_image",
@@ -274,6 +288,7 @@ func imageTools() []map[string]any {
 					"output_format": map[string]any{"type": "string"},
 				},
 			},
+			"outputSchema": outputSchema,
 		},
 	}
 }
@@ -302,7 +317,8 @@ func toolTextResult(result ImageResult) map[string]any {
 		})
 	}
 	return map[string]any{
-		"content": content,
+		"content":           content,
+		"structuredContent": imageResultSummary(result),
 	}
 }
 

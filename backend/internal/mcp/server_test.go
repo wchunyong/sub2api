@@ -76,6 +76,9 @@ func TestServerListsImageTools(t *testing.T) {
 		if tool["inputSchema"] == nil {
 			t.Fatalf("tool %s is missing inputSchema", tool["name"])
 		}
+		if tool["outputSchema"] == nil {
+			t.Fatalf("tool %s is missing outputSchema", tool["name"])
+		}
 	}
 	if !names["lianjieai_generate_image"] || !names["lianjieai_edit_image"] {
 		t.Fatalf("missing image tools: %#v", names)
@@ -111,6 +114,10 @@ func TestServerCallsGenerateImage(t *testing.T) {
 	}
 	result := body["result"].(map[string]any)
 	content := result["content"].([]any)
+	structured := result["structuredContent"].(map[string]any)
+	if structured["image_generated"] != true || structured["image_content"] != "resource_link" {
+		t.Fatalf("unexpected structured image result: %#v", structured)
+	}
 	text := content[0].(map[string]any)["text"].(string)
 	if !bytes.Contains([]byte(text), []byte("https://gateway.example.test/images/result.png")) {
 		t.Fatalf("tool result did not include image URL: %s", text)
@@ -156,6 +163,10 @@ func TestServerReturnsImageContentForDataURL(t *testing.T) {
 		t.Fatal(err)
 	}
 	content := body["result"].(map[string]any)["content"].([]any)
+	structured := body["result"].(map[string]any)["structuredContent"].(map[string]any)
+	if structured["image_generated"] != true || structured["image_content"] != "inline" {
+		t.Fatalf("unexpected structured inline image result: %#v", structured)
+	}
 	foundImage := false
 	for _, item := range content {
 		entry := item.(map[string]any)
