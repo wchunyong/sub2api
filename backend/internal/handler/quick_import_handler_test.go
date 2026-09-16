@@ -73,6 +73,17 @@ func TestQuickImportOwnershipRevocationAndExchange(t *testing.T) {
 	if w.Code != 200 || w.Header().Get("Cache-Control") != "no-store" || !strings.Contains(w.Body.String(), "mock-private-key") {
 		t.Fatalf("exchange failed %d", w.Code)
 	}
+	var exchangeBody struct {
+		Data struct {
+			MCPEndpoint string `json:"mcp_endpoint"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &exchangeBody); err != nil {
+		t.Fatal(err)
+	}
+	if exchangeBody.Data.MCPEndpoint != "https://gateway.example.com/mcp" {
+		t.Fatalf("bad MCP endpoint in exchange payload: %s", w.Body.String())
+	}
 	if w = request(h.Exchange, body, 0); w.Code == 200 {
 		t.Fatal("replay accepted")
 	}
