@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -270,6 +271,25 @@ func TestServerAcceptsInitializedNotification(t *testing.T) {
 	}
 	if body["error"] != nil {
 		t.Fatalf("initialized notification returned error: %s", response.Body.String())
+	}
+}
+
+func TestServerDoesNotRespondToInitializedNotificationWithoutID(t *testing.T) {
+	server := NewServer(&fakeImageGateway{})
+	body, err := json.Marshal(map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "notifications/initialized",
+		"params":  map[string]any{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := serveMCP(t, server, body)
+	if response.Code != http.StatusAccepted {
+		t.Fatalf("expected 202 for notification, got %d: %s", response.Code, response.Body.String())
+	}
+	if strings.TrimSpace(response.Body.String()) != "" {
+		t.Fatalf("notification should not have a response body: %q", response.Body.String())
 	}
 }
 

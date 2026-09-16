@@ -57,17 +57,17 @@ func NewServer(imageGateway ImageGateway) *Server {
 }
 
 type rpcRequest struct {
-	JSONRPC string          `json:"jsonrpc"`
-	ID      any             `json:"id"`
-	Method  string          `json:"method"`
-	Params  json.RawMessage `json:"params"`
+	JSONRPC string           `json:"jsonrpc"`
+	ID      *json.RawMessage `json:"id,omitempty"`
+	Method  string           `json:"method"`
+	Params  json.RawMessage  `json:"params"`
 }
 
 type rpcResponse struct {
-	JSONRPC string    `json:"jsonrpc"`
-	ID      any       `json:"id,omitempty"`
-	Result  any       `json:"result,omitempty"`
-	Error   *rpcError `json:"error,omitempty"`
+	JSONRPC string           `json:"jsonrpc"`
+	ID      *json.RawMessage `json:"id,omitempty"`
+	Result  any              `json:"result,omitempty"`
+	Error   *rpcError        `json:"error,omitempty"`
 }
 
 type rpcError struct {
@@ -114,7 +114,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "tools/list":
 		_ = json.NewEncoder(w).Encode(rpcResponse{JSONRPC: "2.0", ID: req.ID, Result: map[string]any{"tools": imageTools()}})
 	case "notifications/initialized":
-		_ = json.NewEncoder(w).Encode(rpcResponse{JSONRPC: "2.0", ID: req.ID, Result: map[string]any{}})
+		if req.ID != nil {
+			_ = json.NewEncoder(w).Encode(rpcResponse{JSONRPC: "2.0", ID: req.ID, Result: map[string]any{}})
+			return
+		}
+		w.WriteHeader(http.StatusAccepted)
 	case "tools/call":
 		result, code, message := s.callTool(r.Context(), req.Params)
 		if code.Code != 0 {
@@ -286,11 +290,11 @@ func toolTextResult(result ImageResult) map[string]any {
 	}
 }
 
-func errorResponse(id any, code ErrorCode) rpcResponse {
+func errorResponse(id *json.RawMessage, code ErrorCode) rpcResponse {
 	return rpcResponse{JSONRPC: "2.0", ID: id, Error: &rpcError{Code: code.Code, Message: code.Message}}
 }
 
-func errorResponseWithMessage(id any, code ErrorCode, message string) rpcResponse {
+func errorResponseWithMessage(id *json.RawMessage, code ErrorCode, message string) rpcResponse {
 	if message == "" {
 		return errorResponse(id, code)
 	}
