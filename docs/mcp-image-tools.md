@@ -1,4 +1,4 @@
-# Sub2API Image MCP
+# LianjieAI Image MCP
 
 Sub2API exposes image generation to tool-based agents through an authenticated
 MCP endpoint:
@@ -27,7 +27,7 @@ Invalid parameters return `-32602`.
 
 ## Tools
 
-`generate_image` is available for text-to-image requests.
+`lianjieai_generate_image` is available for text-to-image requests.
 
 ```json
 {
@@ -41,11 +41,14 @@ Invalid parameters return `-32602`.
 ```
 
 The tool converts this payload to the existing OpenAI-compatible images API and
-returns a text MCP result containing JSON metadata:
+returns compact JSON metadata plus a standard MCP `image` content item. The
+metadata never contains the inline Base64 payload, which keeps the result below
+client event-size limits:
 
 ```json
 {
-  "url": "https://gateway.example.test/images/result.png",
+  "image_generated": true,
+  "image_content": "inline",
   "mime_type": "image/png",
   "model": "gpt-image-2",
   "image_count": 1,
@@ -53,7 +56,7 @@ returns a text MCP result containing JSON metadata:
 }
 ```
 
-`edit_image` is available for URL or data URL based image editing.
+`lianjieai_edit_image` is available for URL or data URL based image editing.
 
 ```json
 {
@@ -107,10 +110,10 @@ normal API key/model configuration without MCP registration.
 
 The installer only updates the Sub2API-managed MCP entry:
 
-- Codex: `mcp_servers.sub2api_image`
-- Claude Code: `mcpServers.sub2api-image` in the normal Claude settings file
+- Codex: `mcp_servers.lianjieai_image`
+- Claude Code: `mcpServers.lianjieai-image` in the normal Claude settings file
   and in `~/.claude.json` for user-scope MCP discovery
-- OpenCode: `mcp.sub2api_image`
+- OpenCode: `mcp.servers.lianjieai_image`
 
 Cleanup removes only entries recorded in the Sub2API recovery journal. If a user
 edits the managed entry later, cleanup reports a conflict and preserves the

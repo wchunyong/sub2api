@@ -1,15 +1,22 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"image"
+	"image/color"
+	stddraw "image/draw"
+	"image/jpeg"
+	_ "image/png"
 	"mime"
 	"net/http"
 	"net/url"
 	"strings"
+
+	xdraw "golang.org/x/image/draw"
 )
 
 type GenerateImageInput struct {
@@ -272,9 +279,9 @@ func imageTools() []map[string]any {
 }
 
 func toolTextResult(result ImageResult) map[string]any {
-	body, err := json.Marshal(result)
+	body, err := json.Marshal(imageResultSummary(result))
 	if err != nil {
-		body = []byte(fmt.Sprintf(`{"url":%q}`, result.URL))
+		body = []byte(`{"image_generated":true}`)
 	}
 	content := []map[string]any{
 		{"type": "text", "text": string(body)},
@@ -297,6 +304,39 @@ func toolTextResult(result ImageResult) map[string]any {
 	return map[string]any{
 		"content": content,
 	}
+}
+
+func imageResultSummary(result ImageResult) map[string]any {
+	summary := map[string]any{
+		"image_generated": true,
+	}
+	if result.MIMEType != "" {
+		summary["mime_type"] = result.MIMEType
+	}
+	if result.Width > 0 {
+		summary["width"] = result.Width
+	}
+	if result.Height > 0 {
+		summary["height"] = result.Height
+	}
+	if result.Model != "" {
+		summary["model"] = result.Model
+	}
+	if result.ImageCount > 0 {
+		summary["image_count"] = result.ImageCount
+	}
+	if result.RevisedPrompt != "" {
+		summary["revised_prompt"] = result.RevisedPrompt
+	}
+	if _, _, ok := decodeImageDataURL(result.URL, result.MIMEType); ok {
+		summary["image_content"] = "inline"
+	} else if strings.HasPrefix(strings.ToLower(strings.TrimSpace(result.URL)), "data:image/") {
+		summary["image_content"] = "inline"
+	} else if strings.TrimSpace(result.URL) != "" {
+		summary["image_content"] = "resource_link"
+		summary["url"] = result.URL
+	}
+	return summary
 }
 
 func imageMIMEType(value string) string {
@@ -331,10 +371,53 @@ func decodeImageDataURL(rawURL, fallbackMIMEType string) (string, string, bool) 
 	if data == "" {
 		return "", "", false
 	}
-	if _, err := base64.StdEncoding.DecodeString(data); err != nil {
+	decoded, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		return "", "", false
+	}
+	data, mimeType, ok := compactMCPImage(decoded, mimeType)
+	if !ok {
 		return "", "", false
 	}
 	return data, mimeType, true
+}
+
+// Codex and other MCP clients cap persisted tool results at roughly 1 MiB.
+// Keep the encoded image well below that limit so a valid image is not
+// converted into a truncated text result by the client.
+const maxMCPInlineImageBytes = 700 << 10
+
+func compactMCPImage(raw []byte, mimeType string) (string, string, bool) {
+	if len(raw) <= maxMCPInlineImageBytes {
+		return base64.StdEncoding.EncodeToString(raw), mimeType, true
+	}
+
+	src, _, err := image.Decode(bytes.NewReader(raw))
+	if err != nil || src.Bounds().Empty() {
+		return "", "", false
+	}
+
+	bounds := src.Bounds()
+	scales := []float64{1, 0.75, 0.5, 0.375, 0.25}
+	qualities := []int{82, 72, 62, 52}
+	for _, scale := range scales {
+		width := max(1, int(float64(bounds.Dx())*scale))
+		height := max(1, int(float64(bounds.Dy())*scale))
+		dst := image.NewRGBA(image.Rect(0, 0, width, height))
+		stddraw.Draw(dst, dst.Bounds(), &image.Uniform{C: color.White}, image.Point{}, stddraw.Src)
+		xdraw.CatmullRom.Scale(dst, dst.Bounds(), src, bounds, stddraw.Over, nil)
+
+		for _, quality := range qualities {
+			var buf bytes.Buffer
+			if err := jpeg.Encode(&buf, dst, &jpeg.Options{Quality: quality}); err != nil {
+				return "", "", false
+			}
+			if buf.Len() <= maxMCPInlineImageBytes {
+				return base64.StdEncoding.EncodeToString(buf.Bytes()), "image/jpeg", true
+			}
+		}
+	}
+	return "", "", false
 }
 
 func errorResponse(id *json.RawMessage, code ErrorCode) rpcResponse {

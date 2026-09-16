@@ -3,8 +3,12 @@ package mcp
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"image"
+	"image/color"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -158,6 +162,58 @@ func TestServerReturnsImageContentForDataURL(t *testing.T) {
 	}
 	if !foundImage {
 		t.Fatalf("expected MCP image content, got %s", response.Body.String())
+	}
+	if strings.Contains(response.Body.String(), "data:image/png;base64,QUJD") {
+		t.Fatalf("tool text must not duplicate inline image data: %s", response.Body.String())
+	}
+}
+
+func TestServerCompactsLargeInlineImage(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 1400, 1400))
+	seed := uint32(0x12345678)
+	for y := 0; y < 1400; y++ {
+		for x := 0; x < 1400; x++ {
+			seed ^= seed << 13
+			seed ^= seed >> 17
+			seed ^= seed << 5
+			img.SetRGBA(x, y, color.RGBA{
+				R: uint8(seed),
+				G: uint8(seed >> 8),
+				B: uint8(seed >> 16),
+				A: 255,
+			})
+		}
+	}
+	var encoded bytes.Buffer
+	if err := png.Encode(&encoded, img); err != nil {
+		t.Fatal(err)
+	}
+	if encoded.Len() <= maxMCPInlineImageBytes {
+		t.Fatalf("test image is not large enough: %d bytes", encoded.Len())
+	}
+
+	result := toolTextResult(ImageResult{
+		URL:      "data:image/png;base64," + base64.StdEncoding.EncodeToString(encoded.Bytes()),
+		MIMEType: "image/png",
+	})
+	content := result["content"].([]map[string]any)
+	if len(content) != 2 {
+		t.Fatalf("expected compact text and image content, got %#v", content)
+	}
+	text := content[0]["text"].(string)
+	if strings.Contains(text, "data:image/") {
+		t.Fatalf("large inline image leaked into text content: %s", text)
+	}
+	imageContent := content[1]
+	if imageContent["type"] != "image" || imageContent["mimeType"] != "image/jpeg" {
+		t.Fatalf("expected compact JPEG image content, got %#v", imageContent)
+	}
+	data := imageContent["data"].(string)
+	if len(data) > maxMCPInlineImageBytes*2 {
+		t.Fatalf("encoded image remains too large: %d bytes", len(data))
+	}
+	if _, err := base64.StdEncoding.DecodeString(data); err != nil {
+		t.Fatalf("compact image is not valid base64: %v", err)
 	}
 }
 
