@@ -69,7 +69,7 @@ returns a text MCP result containing JSON metadata:
 The MCP layer converts this payload to `/v1/images/edits` JSON format:
 `images: [{"image_url": "..."}]`. First release MCP editing does not accept
 multipart file uploads directly; clients should provide a reachable image URL or
-data URL.
+data URL. `file://` and other local path schemes are rejected by the MCP layer.
 
 ## Security
 
@@ -81,6 +81,10 @@ The MCP layer rejects non-OpenAI platform groups for the first release and
 checks the group's model allowlist before it invokes the images handler. The
 inner images handler still performs image permission, billing eligibility,
 quota, concurrency, routing and upstream failover checks.
+
+MCP requests must use `Content-Type: application/json`. `generate_image.n` is
+limited to `1..4` at the MCP boundary before the request reaches the image
+gateway.
 
 ## Quick Import
 

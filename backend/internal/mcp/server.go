@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"mime"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -77,6 +79,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(errorResponse(nil, ErrInvalidRequest))
 		return
 	}
+	if !isJSONContentType(r.Header.Get("Content-Type")) {
+		w.WriteHeader(http.StatusUnsupportedMediaType)
+		_ = json.NewEncoder(w).Encode(errorResponse(nil, ErrInvalidRequest))
+		return
+	}
 
 	var req rpcRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -135,6 +142,9 @@ func (s *Server) callTool(ctx context.Context, raw json.RawMessage) (any, ErrorC
 		if input.N == 0 {
 			input.N = 1
 		}
+		if input.N < 1 || input.N > 4 {
+			return nil, ErrInvalidParams
+		}
 		result, err := s.imageGateway.GenerateImage(ctx, input)
 		if err != nil {
 			return nil, ErrInternal
@@ -154,7 +164,7 @@ func (s *Server) callTool(ctx context.Context, raw json.RawMessage) (any, ErrorC
 		input.Size = strings.TrimSpace(input.Size)
 		input.Quality = strings.TrimSpace(input.Quality)
 		input.OutputFormat = strings.TrimSpace(input.OutputFormat)
-		if input.Image == "" || input.Prompt == "" {
+		if input.Image == "" || input.Prompt == "" || !isAllowedImageReference(input.Image) {
 			return nil, ErrInvalidParams
 		}
 		result, err := s.imageGateway.EditImage(ctx, input)
@@ -165,6 +175,32 @@ func (s *Server) callTool(ctx context.Context, raw json.RawMessage) (any, ErrorC
 	default:
 		return nil, ErrUnknownTool
 	}
+}
+
+func isJSONContentType(contentType string) bool {
+	contentType = strings.TrimSpace(contentType)
+	if contentType == "" {
+		return false
+	}
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return false
+	}
+	mediaType = strings.ToLower(strings.TrimSpace(mediaType))
+	return mediaType == "application/json" || strings.HasSuffix(mediaType, "+json")
+}
+
+func isAllowedImageReference(value string) bool {
+	value = strings.TrimSpace(value)
+	lower := strings.ToLower(value)
+	if strings.HasPrefix(lower, "data:image/") {
+		return true
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Host == "" || parsed.User != nil {
+		return false
+	}
+	return parsed.Scheme == "https" || parsed.Scheme == "http"
 }
 
 func initializeResult() map[string]any {

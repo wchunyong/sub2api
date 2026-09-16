@@ -143,6 +143,54 @@ func TestServerCallsEditImage(t *testing.T) {
 	}
 }
 
+func TestServerRejectsInvalidGenerateImageCount(t *testing.T) {
+	server := NewServer(&fakeImageGateway{})
+	request := jsonRPCRequest(t, "tools/call", map[string]any{
+		"name":      "generate_image",
+		"arguments": map[string]any{"prompt": "draw a small red house", "n": 5},
+	})
+	response := serveMCP(t, server, request)
+
+	var body map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	errObj := body["error"].(map[string]any)
+	if errObj["code"].(float64) != float64(ErrInvalidParams.Code) {
+		t.Fatalf("unexpected error: %#v", errObj)
+	}
+}
+
+func TestServerRejectsInvalidEditImageReference(t *testing.T) {
+	server := NewServer(&fakeImageGateway{})
+	request := jsonRPCRequest(t, "tools/call", map[string]any{
+		"name":      "edit_image",
+		"arguments": map[string]any{"image": "file:///etc/passwd", "prompt": "replace the background"},
+	})
+	response := serveMCP(t, server, request)
+
+	var body map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	errObj := body["error"].(map[string]any)
+	if errObj["code"].(float64) != float64(ErrInvalidParams.Code) {
+		t.Fatalf("unexpected error: %#v", errObj)
+	}
+}
+
+func TestServerRejectsNonJSONContentType(t *testing.T) {
+	server := NewServer(&fakeImageGateway{})
+	req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(jsonRPCRequest(t, "tools/list", nil)))
+	req.Header.Set("Content-Type", "text/plain")
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnsupportedMediaType {
+		t.Fatalf("expected 415, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestServerAcceptsInitializedNotification(t *testing.T) {
 	server := NewServer(&fakeImageGateway{})
 	request := jsonRPCRequest(t, "notifications/initialized", map[string]any{})

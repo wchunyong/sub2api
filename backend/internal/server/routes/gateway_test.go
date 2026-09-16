@@ -32,12 +32,14 @@ func newGatewayRoutesTestRouterWithConfig(cfg *config.Config, platform ...string
 	if len(platform) > 0 && platform[0] != "" {
 		groupPlatform = platform[0]
 	}
+	openAIHandler := &handler.OpenAIGatewayHandler{}
 	RegisterGatewayRoutes(
 		router,
 		&handler.Handlers{
 			Gateway:       &handler.GatewayHandler{},
-			OpenAIGateway: &handler.OpenAIGatewayHandler{},
+			OpenAIGateway: openAIHandler,
 			AsyncImage:    handler.NewAsyncImageHandler(nil, nil),
+			MCP:           handler.NewMCPHandler(openAIHandler),
 		},
 		servermiddleware.APIKeyAuthMiddleware(func(c *gin.Context) {
 			groupID := int64(1)
@@ -56,6 +58,19 @@ func newGatewayRoutesTestRouterWithConfig(cfg *config.Config, platform ...string
 	)
 
 	return router
+}
+
+func TestGatewayRoutesMCPToolsListPathIsRegistered(t *testing.T) {
+	router := newGatewayRoutesTestRouter()
+	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), "generate_image")
+	require.Contains(t, w.Body.String(), "edit_image")
 }
 
 func TestGatewayRoutesOpenAIResponsesCompactPathIsRegistered(t *testing.T) {
