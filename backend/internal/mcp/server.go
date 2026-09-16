@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -283,11 +284,49 @@ func toolTextResult(result ImageResult) map[string]any {
 	if err != nil {
 		body = []byte(fmt.Sprintf(`{"url":%q}`, result.URL))
 	}
-	return map[string]any{
-		"content": []map[string]any{
-			{"type": "text", "text": string(body)},
-		},
+	content := []map[string]any{
+		{"type": "text", "text": string(body)},
 	}
+	if data, mimeType, ok := decodeImageDataURL(result.URL, result.MIMEType); ok {
+		content = append(content, map[string]any{
+			"type":     "image",
+			"data":     data,
+			"mimeType": mimeType,
+		})
+	}
+	return map[string]any{
+		"content": content,
+	}
+}
+
+func decodeImageDataURL(rawURL, fallbackMIMEType string) (string, string, bool) {
+	const prefix = "data:"
+	if !strings.HasPrefix(strings.ToLower(rawURL), prefix) {
+		return "", "", false
+	}
+	parts := strings.SplitN(rawURL[len(prefix):], ",", 2)
+	if len(parts) != 2 {
+		return "", "", false
+	}
+	metadata := strings.Split(parts[0], ";")
+	if len(metadata) < 2 || !strings.EqualFold(metadata[len(metadata)-1], "base64") {
+		return "", "", false
+	}
+	mimeType := strings.TrimSpace(metadata[0])
+	if mimeType == "" {
+		mimeType = strings.TrimSpace(fallbackMIMEType)
+	}
+	if mimeType == "" || !strings.HasPrefix(strings.ToLower(mimeType), "image/") {
+		return "", "", false
+	}
+	data := strings.TrimSpace(parts[1])
+	if data == "" {
+		return "", "", false
+	}
+	if _, err := base64.StdEncoding.DecodeString(data); err != nil {
+		return "", "", false
+	}
+	return data, mimeType, true
 }
 
 func errorResponse(id *json.RawMessage, code ErrorCode) rpcResponse {

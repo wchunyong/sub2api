@@ -15,12 +15,16 @@ type fakeImageGateway struct {
 	generateInput GenerateImageInput
 	editInput     EditImageInput
 	err           error
+	result        ImageResult
 }
 
 func (f *fakeImageGateway) GenerateImage(ctx context.Context, input GenerateImageInput) (ImageResult, error) {
 	f.generateInput = input
 	if f.err != nil {
 		return ImageResult{}, f.err
+	}
+	if f.result.URL != "" {
+		return f.result, nil
 	}
 	return ImageResult{
 		URL:        "https://gateway.example.test/images/result.png",
@@ -109,6 +113,36 @@ func TestServerCallsGenerateImage(t *testing.T) {
 	}
 	if !bytes.Contains([]byte(text), []byte(`"mime_type":"image/png"`)) {
 		t.Fatalf("tool result did not include MIME metadata: %s", text)
+	}
+}
+
+func TestServerReturnsImageContentForDataURL(t *testing.T) {
+	gateway := &fakeImageGateway{result: ImageResult{
+		URL:      "data:image/png;base64,QUJD",
+		MIMEType: "image/png",
+		Model:    "gpt-image-2",
+	}}
+	server := NewServer(gateway)
+	request := jsonRPCRequest(t, "tools/call", map[string]any{
+		"name":      "generate_image",
+		"arguments": map[string]any{"prompt": "draw a small red house"},
+	})
+	response := serveMCP(t, server, request)
+
+	var body map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	content := body["result"].(map[string]any)["content"].([]any)
+	foundImage := false
+	for _, item := range content {
+		entry := item.(map[string]any)
+		if entry["type"] == "image" && entry["data"] == "QUJD" && entry["mimeType"] == "image/png" {
+			foundImage = true
+		}
+	}
+	if !foundImage {
+		t.Fatalf("expected MCP image content, got %s", response.Body.String())
 	}
 }
 
