@@ -66,4 +66,11 @@ func TestConfigTargets(t *testing.T) {
 	if err != nil || c.BaseURL != "https://example.com/v1beta" {
 		t.Fatalf("bad gemini endpoint: %#v %v", c, err)
 	}
+	if c.MCPEndpoint != "https://example.com/mcp" {
+		t.Fatalf("bad MCP endpoint for gemini payload: %#v", c)
+	}
+	c, err = BuildConfig("opencode", "antigravity", false, "https://example.com/v1", "mock-key", "")
+	if err != nil || c.BaseURL != "https://example.com/antigravity/v1" || c.MCPEndpoint != "https://example.com/mcp" {
+		t.Fatalf("bad antigravity payload: %#v %v", c, err)
+	}
 }

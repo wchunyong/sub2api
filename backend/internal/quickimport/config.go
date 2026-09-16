@@ -18,6 +18,9 @@ type Config struct {
 	Model    string `json:"model"`
 	Protocol string `json:"protocol"`
 	ProbeURL string `json:"probe_url"`
+	// MCPEndpoint is always rooted at the gateway host, even when BaseURL points
+	// at protocol-specific paths such as /v1beta or /antigravity/v1.
+	MCPEndpoint string `json:"mcp_endpoint,omitempty"`
 }
 
 func BuildConfig(agent, platform string, messages bool, baseURL, apiKey, model string) (Config, error) {
@@ -67,5 +70,5 @@ func BuildConfig(agent, platform string, messages bool, baseURL, apiKey, model s
 			protocol = "compatible"
 		}
 	}
-	return Config{Version: 1, Agent: agent, APIKey: apiKey, BaseURL: endpoint, Model: model, Protocol: protocol, ProbeURL: root + "/v1/models"}, nil
+	return Config{Version: 1, Agent: agent, APIKey: apiKey, BaseURL: endpoint, Model: model, Protocol: protocol, ProbeURL: root + "/v1/models", MCPEndpoint: root + "/mcp"}, nil
 }
