@@ -73,7 +73,7 @@ func TestServerListsImageTools(t *testing.T) {
 			t.Fatalf("tool %s is missing inputSchema", tool["name"])
 		}
 	}
-	if !names["generate_image"] || !names["edit_image"] {
+	if !names["lianjieai_generate_image"] || !names["edit_image"] {
 		t.Fatalf("missing image tools: %#v", names)
 	}
 }
@@ -82,7 +82,7 @@ func TestServerCallsGenerateImage(t *testing.T) {
 	gateway := &fakeImageGateway{}
 	server := NewServer(gateway)
 	request := jsonRPCRequest(t, "tools/call", map[string]any{
-		"name": "generate_image",
+		"name": "lianjieai_generate_image",
 		"arguments": map[string]any{
 			"prompt":        "draw a small red house",
 			"model":         "gpt-image-2",
@@ -116,6 +116,21 @@ func TestServerCallsGenerateImage(t *testing.T) {
 	}
 }
 
+func TestToolResultIncludesResourceLinkForRemoteImage(t *testing.T) {
+	result := toolTextResult(ImageResult{
+		URL:      "https://gateway.example.test/images/result.png",
+		MIMEType: "image/png",
+	})
+	content := result["content"].([]map[string]any)
+	link := content[len(content)-1]
+	if link["type"] != "resource_link" || link["uri"] != "https://gateway.example.test/images/result.png" {
+		t.Fatalf("expected remote image resource link, got %#v", link)
+	}
+	if link["mimeType"] != "image/png" {
+		t.Fatalf("expected image MIME type, got %#v", link["mimeType"])
+	}
+}
+
 func TestServerReturnsImageContentForDataURL(t *testing.T) {
 	gateway := &fakeImageGateway{result: ImageResult{
 		URL:      "data:image/png;base64,QUJD",
@@ -124,7 +139,7 @@ func TestServerReturnsImageContentForDataURL(t *testing.T) {
 	}}
 	server := NewServer(gateway)
 	request := jsonRPCRequest(t, "tools/call", map[string]any{
-		"name":      "generate_image",
+		"name":      "lianjieai_generate_image",
 		"arguments": map[string]any{"prompt": "draw a small red house"},
 	})
 	response := serveMCP(t, server, request)
@@ -150,7 +165,7 @@ func TestServerLeavesOmittedGenerateImageModelUnresolved(t *testing.T) {
 	gateway := &fakeImageGateway{}
 	server := NewServer(gateway)
 	request := jsonRPCRequest(t, "tools/call", map[string]any{
-		"name":      "generate_image",
+		"name":      "lianjieai_generate_image",
 		"arguments": map[string]any{"prompt": "draw a small red house"},
 	})
 	serveMCP(t, server, request)
@@ -189,7 +204,7 @@ func TestServerCallsEditImage(t *testing.T) {
 func TestServerRejectsInvalidGenerateImageCount(t *testing.T) {
 	server := NewServer(&fakeImageGateway{})
 	request := jsonRPCRequest(t, "tools/call", map[string]any{
-		"name":      "generate_image",
+		"name":      "lianjieai_generate_image",
 		"arguments": map[string]any{"prompt": "draw a small red house", "n": 5},
 	})
 	response := serveMCP(t, server, request)
@@ -237,7 +252,7 @@ func TestServerRejectsNonJSONContentType(t *testing.T) {
 func TestServerMapsToolErrorsToStableCodes(t *testing.T) {
 	server := NewServer(&fakeImageGateway{err: NewToolError(ErrInsufficient, "", nil)})
 	request := jsonRPCRequest(t, "tools/call", map[string]any{
-		"name":      "generate_image",
+		"name":      "lianjieai_generate_image",
 		"arguments": map[string]any{"prompt": "draw a house"},
 	})
 	response := serveMCP(t, server, request)
@@ -258,7 +273,7 @@ func TestServerMapsToolErrorsToStableCodes(t *testing.T) {
 func TestServerDoesNotLeakUnknownGatewayErrors(t *testing.T) {
 	server := NewServer(&fakeImageGateway{err: errors.New("upstream Authorization: sk-secret")})
 	request := jsonRPCRequest(t, "tools/call", map[string]any{
-		"name":      "generate_image",
+		"name":      "lianjieai_generate_image",
 		"arguments": map[string]any{"prompt": "draw a house"},
 	})
 	response := serveMCP(t, server, request)

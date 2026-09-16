@@ -139,7 +139,7 @@ func (s *Server) callTool(ctx context.Context, raw json.RawMessage) (any, ErrorC
 		return nil, ErrInvalidParams, ""
 	}
 	switch req.Name {
-	case "generate_image":
+	case "lianjieai_generate_image", "generate_image":
 		var input GenerateImageInput
 		if err := json.Unmarshal(req.Arguments, &input); err != nil {
 			return nil, ErrInvalidParams, ""
@@ -237,7 +237,7 @@ func initializeResult() map[string]any {
 func imageTools() []map[string]any {
 	return []map[string]any{
 		{
-			"name":        "generate_image",
+			"name":        "lianjieai_generate_image",
 			"description": "Generate an image through the authenticated Sub2API image gateway.",
 			"inputSchema": map[string]any{
 				"type":     "object",
@@ -285,10 +285,26 @@ func toolTextResult(result ImageResult) map[string]any {
 			"data":     data,
 			"mimeType": mimeType,
 		})
+	} else if parsed, err := url.Parse(strings.TrimSpace(result.URL)); err == nil &&
+		(parsed.Scheme == "https" || parsed.Scheme == "http") && parsed.Host != "" {
+		content = append(content, map[string]any{
+			"type":     "resource_link",
+			"uri":      parsed.String(),
+			"name":     "generated-image",
+			"mimeType": imageMIMEType(result.MIMEType),
+		})
 	}
 	return map[string]any{
 		"content": content,
 	}
+}
+
+func imageMIMEType(value string) string {
+	value = strings.TrimSpace(value)
+	if strings.HasPrefix(strings.ToLower(value), "image/") {
+		return value
+	}
+	return "image/png"
 }
 
 func decodeImageDataURL(rawURL, fallbackMIMEType string) (string, string, bool) {
