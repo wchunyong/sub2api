@@ -35,7 +35,7 @@ type mcpImageGateway struct {
 
 func (g *mcpImageGateway) GenerateImage(ctx context.Context, input mcp.GenerateImageInput) (mcp.ImageResult, error) {
 	if g == nil || g.source == nil || g.openAI == nil {
-		return mcp.ImageResult{}, fmt.Errorf("image gateway unavailable")
+		return mcp.ImageResult{}, mcp.NewToolError(mcp.ErrInternal, "", fmt.Errorf("image gateway unavailable"))
 	}
 	if err := g.validateImageModel(input.Model); err != nil {
 		return mcp.ImageResult{}, err
@@ -56,7 +56,7 @@ func (g *mcpImageGateway) GenerateImage(ctx context.Context, input mcp.GenerateI
 
 func (g *mcpImageGateway) EditImage(ctx context.Context, input mcp.EditImageInput) (mcp.ImageResult, error) {
 	if g == nil || g.source == nil || g.openAI == nil {
-		return mcp.ImageResult{}, fmt.Errorf("image gateway unavailable")
+		return mcp.ImageResult{}, mcp.NewToolError(mcp.ErrInternal, "", fmt.Errorf("image gateway unavailable"))
 	}
 	if err := g.validateImageModel(input.Model); err != nil {
 		return mcp.ImageResult{}, err
@@ -79,13 +79,16 @@ func (g *mcpImageGateway) EditImage(ctx context.Context, input mcp.EditImageInpu
 func (g *mcpImageGateway) validateImageModel(model string) error {
 	apiKey, ok := middleware2.GetAPIKeyFromContext(g.source)
 	if !ok || apiKey == nil || apiKey.Group == nil {
-		return fmt.Errorf("authenticated API key context missing")
+		return mcp.NewToolError(mcp.ErrUnauthorized, "", fmt.Errorf("authenticated API key context missing"))
 	}
 	if apiKey.Group.Platform != service.PlatformOpenAI {
-		return fmt.Errorf("image MCP currently supports OpenAI platform groups")
+		return mcp.NewToolError(mcp.ErrModelNotAllowed, "", fmt.Errorf("image MCP currently supports OpenAI platform groups"))
+	}
+	if !service.GroupAllowsImageGeneration(apiKey.Group) {
+		return mcp.NewToolError(mcp.ErrPermission, service.ImageGenerationPermissionMessage(), nil)
 	}
 	if apiKey.Group.ModelAllowlistEnabled() && !apiKey.Group.ModelAllowlist.Allows(model) {
-		return fmt.Errorf("model is not allowed by this API key group")
+		return mcp.NewToolError(mcp.ErrModelNotAllowed, "", fmt.Errorf("model is not allowed by this API key group"))
 	}
 	return nil
 }
@@ -108,9 +111,41 @@ func (g *mcpImageGateway) callImages(ctx context.Context, path string, body []by
 
 	g.openAI.Images(imageContext)
 	if rec.Code < 200 || rec.Code >= 300 {
-		return mcp.ImageResult{}, fmt.Errorf("image request failed with status %d: %s", rec.Code, strings.TrimSpace(rec.Body.String()))
+		return mcp.ImageResult{}, classifyMCPImageResponse(rec.Code, rec.Body.Bytes())
 	}
 	return parseOpenAIImageResult(rec.Body.Bytes(), model, imageCount)
+}
+
+func classifyMCPImageResponse(status int, body []byte) error {
+	var payload struct {
+		Error struct {
+			Type    string `json:"type"`
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	_ = json.Unmarshal(body, &payload)
+	errType := strings.ToLower(strings.TrimSpace(payload.Error.Type))
+	errCode := strings.ToLower(strings.TrimSpace(payload.Error.Code))
+	msg := strings.TrimSpace(payload.Error.Message)
+	switch {
+	case status == http.StatusUnauthorized:
+		return mcp.NewToolError(mcp.ErrUnauthorized, "", nil)
+	case status == http.StatusForbidden && (errType == "permission_error" || strings.Contains(strings.ToLower(msg), "image generation is not enabled")):
+		return mcp.NewToolError(mcp.ErrPermission, service.ImageGenerationPermissionMessage(), nil)
+	case status == http.StatusForbidden && (errType == "billing_error" || strings.Contains(errCode, "insufficient") || strings.Contains(strings.ToLower(msg), "insufficient balance")):
+		return mcp.NewToolError(mcp.ErrInsufficient, "", nil)
+	case status == http.StatusTooManyRequests:
+		return mcp.NewToolError(mcp.ErrRateLimited, "", nil)
+	case status == http.StatusNotFound || strings.Contains(strings.ToLower(msg), "no available compatible accounts"):
+		return mcp.NewToolError(mcp.ErrNoAccount, "", nil)
+	case status == http.StatusBadGateway || status >= http.StatusInternalServerError:
+		return mcp.NewToolError(mcp.ErrUpstream, "", nil)
+	case status == http.StatusBadRequest && (strings.Contains(errCode, "model") || strings.Contains(strings.ToLower(msg), "model")):
+		return mcp.NewToolError(mcp.ErrModelNotAllowed, "", nil)
+	default:
+		return mcp.NewToolError(mcp.ErrInternal, "", nil)
+	}
 }
 
 func parseOpenAIImageResult(body []byte, model string, count int) (mcp.ImageResult, error) {

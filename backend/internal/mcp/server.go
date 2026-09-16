@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"mime"
 	"net/http"
@@ -49,6 +50,8 @@ type Server struct {
 	imageGateway ImageGateway
 }
 
+const maxRequestBodyBytes int64 = 1 << 20
+
 func NewServer(imageGateway ImageGateway) *Server {
 	return &Server{imageGateway: imageGateway}
 }
@@ -84,9 +87,19 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(errorResponse(nil, ErrInvalidRequest))
 		return
 	}
+	if r.ContentLength > maxRequestBodyBytes {
+		_ = json.NewEncoder(w).Encode(errorResponse(nil, ErrRequestTooLarge))
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
 
 	var req rpcRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			_ = json.NewEncoder(w).Encode(errorResponse(nil, ErrRequestTooLarge))
+			return
+		}
 		_ = json.NewEncoder(w).Encode(errorResponse(nil, ErrParse))
 		return
 	}
@@ -103,9 +116,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "notifications/initialized":
 		_ = json.NewEncoder(w).Encode(rpcResponse{JSONRPC: "2.0", ID: req.ID, Result: map[string]any{}})
 	case "tools/call":
-		result, code := s.callTool(r.Context(), req.Params)
+		result, code, message := s.callTool(r.Context(), req.Params)
 		if code.Code != 0 {
-			_ = json.NewEncoder(w).Encode(errorResponse(req.ID, code))
+			_ = json.NewEncoder(w).Encode(errorResponseWithMessage(req.ID, code, message))
 			return
 		}
 		_ = json.NewEncoder(w).Encode(rpcResponse{JSONRPC: "2.0", ID: req.ID, Result: result})
@@ -114,19 +127,19 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) callTool(ctx context.Context, raw json.RawMessage) (any, ErrorCode) {
+func (s *Server) callTool(ctx context.Context, raw json.RawMessage) (any, ErrorCode, string) {
 	var req struct {
 		Name      string          `json:"name"`
 		Arguments json.RawMessage `json:"arguments"`
 	}
 	if err := json.Unmarshal(raw, &req); err != nil {
-		return nil, ErrInvalidParams
+		return nil, ErrInvalidParams, ""
 	}
 	switch req.Name {
 	case "generate_image":
 		var input GenerateImageInput
 		if err := json.Unmarshal(req.Arguments, &input); err != nil {
-			return nil, ErrInvalidParams
+			return nil, ErrInvalidParams, ""
 		}
 		input.Prompt = strings.TrimSpace(input.Prompt)
 		input.Model = strings.TrimSpace(input.Model)
@@ -137,23 +150,23 @@ func (s *Server) callTool(ctx context.Context, raw json.RawMessage) (any, ErrorC
 		input.Quality = strings.TrimSpace(input.Quality)
 		input.OutputFormat = strings.TrimSpace(input.OutputFormat)
 		if input.Prompt == "" {
-			return nil, ErrInvalidParams
+			return nil, ErrInvalidParams, ""
 		}
 		if input.N == 0 {
 			input.N = 1
 		}
 		if input.N < 1 || input.N > 4 {
-			return nil, ErrInvalidParams
+			return nil, ErrInvalidParams, ""
 		}
 		result, err := s.imageGateway.GenerateImage(ctx, input)
 		if err != nil {
-			return nil, ErrInternal
+			return toolErrorDetails(err)
 		}
-		return toolTextResult(result), ErrorCode{}
+		return toolTextResult(result), ErrorCode{}, ""
 	case "edit_image":
 		var input EditImageInput
 		if err := json.Unmarshal(req.Arguments, &input); err != nil {
-			return nil, ErrInvalidParams
+			return nil, ErrInvalidParams, ""
 		}
 		input.Image = strings.TrimSpace(input.Image)
 		input.Prompt = strings.TrimSpace(input.Prompt)
@@ -165,16 +178,24 @@ func (s *Server) callTool(ctx context.Context, raw json.RawMessage) (any, ErrorC
 		input.Quality = strings.TrimSpace(input.Quality)
 		input.OutputFormat = strings.TrimSpace(input.OutputFormat)
 		if input.Image == "" || input.Prompt == "" || !isAllowedImageReference(input.Image) {
-			return nil, ErrInvalidParams
+			return nil, ErrInvalidParams, ""
 		}
 		result, err := s.imageGateway.EditImage(ctx, input)
 		if err != nil {
-			return nil, ErrInternal
+			return toolErrorDetails(err)
 		}
-		return toolTextResult(result), ErrorCode{}
+		return toolTextResult(result), ErrorCode{}, ""
 	default:
-		return nil, ErrUnknownTool
+		return nil, ErrUnknownTool, ""
 	}
+}
+
+func toolErrorDetails(err error) (any, ErrorCode, string) {
+	var toolErr *ToolError
+	if errors.As(err, &toolErr) && toolErr != nil {
+		return nil, toolErr.Code, toolErr.Message
+	}
+	return nil, ErrInternal, ""
 }
 
 func isJSONContentType(contentType string) bool {
@@ -267,4 +288,11 @@ func toolTextResult(result ImageResult) map[string]any {
 
 func errorResponse(id any, code ErrorCode) rpcResponse {
 	return rpcResponse{JSONRPC: "2.0", ID: id, Error: &rpcError{Code: code.Code, Message: code.Message}}
+}
+
+func errorResponseWithMessage(id any, code ErrorCode, message string) rpcResponse {
+	if message == "" {
+		return errorResponse(id, code)
+	}
+	return rpcResponse{JSONRPC: "2.0", ID: id, Error: &rpcError{Code: code.Code, Message: message}}
 }

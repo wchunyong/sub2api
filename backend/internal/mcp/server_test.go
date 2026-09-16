@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,10 +13,14 @@ import (
 type fakeImageGateway struct {
 	generateInput GenerateImageInput
 	editInput     EditImageInput
+	err           error
 }
 
 func (f *fakeImageGateway) GenerateImage(ctx context.Context, input GenerateImageInput) (ImageResult, error) {
 	f.generateInput = input
+	if f.err != nil {
+		return ImageResult{}, f.err
+	}
 	return ImageResult{
 		URL:        "https://gateway.example.test/images/result.png",
 		MIMEType:   "image/png",
@@ -28,6 +33,9 @@ func (f *fakeImageGateway) GenerateImage(ctx context.Context, input GenerateImag
 
 func (f *fakeImageGateway) EditImage(ctx context.Context, input EditImageInput) (ImageResult, error) {
 	f.editInput = input
+	if f.err != nil {
+		return ImageResult{}, f.err
+	}
 	return ImageResult{
 		URL:        "https://gateway.example.test/images/result.png",
 		MIMEType:   "image/png",
@@ -188,6 +196,63 @@ func TestServerRejectsNonJSONContentType(t *testing.T) {
 
 	if rec.Code != http.StatusUnsupportedMediaType {
 		t.Fatalf("expected 415, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestServerMapsToolErrorsToStableCodes(t *testing.T) {
+	server := NewServer(&fakeImageGateway{err: NewToolError(ErrInsufficient, "", nil)})
+	request := jsonRPCRequest(t, "tools/call", map[string]any{
+		"name":      "generate_image",
+		"arguments": map[string]any{"prompt": "draw a house"},
+	})
+	response := serveMCP(t, server, request)
+
+	var body map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	errObj := body["error"].(map[string]any)
+	if got := int(errObj["code"].(float64)); got != ErrInsufficient.Code {
+		t.Fatalf("expected %d, got %d: %s", ErrInsufficient.Code, got, response.Body.String())
+	}
+	if got := errObj["message"].(string); got != ErrInsufficient.Message {
+		t.Fatalf("unexpected safe message %q", got)
+	}
+}
+
+func TestServerDoesNotLeakUnknownGatewayErrors(t *testing.T) {
+	server := NewServer(&fakeImageGateway{err: errors.New("upstream Authorization: sk-secret")})
+	request := jsonRPCRequest(t, "tools/call", map[string]any{
+		"name":      "generate_image",
+		"arguments": map[string]any{"prompt": "draw a house"},
+	})
+	response := serveMCP(t, server, request)
+	if bytes.Contains(response.Body.Bytes(), []byte("sk-secret")) {
+		t.Fatalf("gateway error leaked credentials: %s", response.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if got := int(body["error"].(map[string]any)["code"].(float64)); got != ErrInternal.Code {
+		t.Fatalf("expected generic internal code, got %d", got)
+	}
+}
+
+func TestServerRejectsOversizedRequest(t *testing.T) {
+	server := NewServer(&fakeImageGateway{})
+	body := bytes.Repeat([]byte("x"), int(maxRequestBodyBytes)+1)
+	req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	var payload map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if got := int(payload["error"].(map[string]any)["code"].(float64)); got != ErrRequestTooLarge.Code {
+		t.Fatalf("expected %d, got %d: %s", ErrRequestTooLarge.Code, got, rec.Body.String())
 	}
 }
 
