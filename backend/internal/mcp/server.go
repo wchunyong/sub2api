@@ -310,7 +310,10 @@ func imageResultSummary(result ImageResult) map[string]any {
 	summary := map[string]any{
 		"image_generated": true,
 	}
-	if result.MIMEType != "" {
+	_, inlineMIMEType, inline := decodeImageDataURL(result.URL, result.MIMEType)
+	if inline {
+		summary["mime_type"] = inlineMIMEType
+	} else if result.MIMEType != "" {
 		summary["mime_type"] = result.MIMEType
 	}
 	if result.Width > 0 {
@@ -328,7 +331,7 @@ func imageResultSummary(result ImageResult) map[string]any {
 	if result.RevisedPrompt != "" {
 		summary["revised_prompt"] = result.RevisedPrompt
 	}
-	if _, _, ok := decodeImageDataURL(result.URL, result.MIMEType); ok {
+	if inline {
 		summary["image_content"] = "inline"
 	} else if strings.HasPrefix(strings.ToLower(strings.TrimSpace(result.URL)), "data:image/") {
 		summary["image_content"] = "inline"

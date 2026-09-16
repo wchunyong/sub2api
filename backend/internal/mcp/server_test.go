@@ -204,6 +204,9 @@ func TestServerCompactsLargeInlineImage(t *testing.T) {
 	if strings.Contains(text, "data:image/") {
 		t.Fatalf("large inline image leaked into text content: %s", text)
 	}
+	if !strings.Contains(text, `"mime_type":"image/jpeg"`) {
+		t.Fatalf("text metadata did not match compact image MIME type: %s", text)
+	}
 	imageContent := content[1]
 	if imageContent["type"] != "image" || imageContent["mimeType"] != "image/jpeg" {
 		t.Fatalf("expected compact JPEG image content, got %#v", imageContent)
