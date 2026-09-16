@@ -40,14 +40,7 @@ func (g *mcpImageGateway) GenerateImage(ctx context.Context, input mcp.GenerateI
 	if err := g.validateImageModel(input.Model); err != nil {
 		return mcp.ImageResult{}, err
 	}
-	body, err := json.Marshal(map[string]any{
-		"model":         input.Model,
-		"prompt":        input.Prompt,
-		"size":          input.Size,
-		"quality":       input.Quality,
-		"output_format": input.OutputFormat,
-		"n":             input.N,
-	})
+	body, err := buildMCPImageRequest(input.Model, input.Prompt, input.Size, input.Quality, input.OutputFormat, input.N, nil)
 	if err != nil {
 		return mcp.ImageResult{}, err
 	}
@@ -61,15 +54,7 @@ func (g *mcpImageGateway) EditImage(ctx context.Context, input mcp.EditImageInpu
 	if err := g.validateImageModel(input.Model); err != nil {
 		return mcp.ImageResult{}, err
 	}
-	body, err := json.Marshal(map[string]any{
-		"model":         input.Model,
-		"prompt":        input.Prompt,
-		"images":        []map[string]string{{"image_url": input.Image}},
-		"size":          input.Size,
-		"quality":       input.Quality,
-		"output_format": input.OutputFormat,
-		"n":             1,
-	})
+	body, err := buildMCPImageRequest(input.Model, input.Prompt, input.Size, input.Quality, input.OutputFormat, 1, []map[string]string{{"image_url": input.Image}})
 	if err != nil {
 		return mcp.ImageResult{}, err
 	}
@@ -91,6 +76,22 @@ func (g *mcpImageGateway) validateImageModel(model string) error {
 		return mcp.NewToolError(mcp.ErrModelNotAllowed, "", fmt.Errorf("model is not allowed by this API key group"))
 	}
 	return nil
+}
+
+func buildMCPImageRequest(model, prompt, size, quality, outputFormat string, n int, images []map[string]string) ([]byte, error) {
+	payload := map[string]any{
+		"model":           model,
+		"prompt":          prompt,
+		"size":            size,
+		"quality":         quality,
+		"output_format":   outputFormat,
+		"response_format": "b64_json",
+		"n":               n,
+	}
+	if images != nil {
+		payload["images"] = images
+	}
+	return json.Marshal(payload)
 }
 
 func (g *mcpImageGateway) callImages(ctx context.Context, path string, body []byte, model string, imageCount int) (mcp.ImageResult, error) {

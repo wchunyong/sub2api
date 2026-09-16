@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -8,6 +9,20 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/mcp"
 )
+
+func TestBuildMCPImageRequestForcesBase64Output(t *testing.T) {
+	body, err := buildMCPImageRequest("gpt-image-2.5-flare", "draw a puppy", "", "", "png", 1, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if got := payload["response_format"]; got != "b64_json" {
+		t.Fatalf("expected MCP image request to force b64_json, got %#v", got)
+	}
+}
 
 func TestClassifyMCPImageResponse(t *testing.T) {
 	tests := []struct {
