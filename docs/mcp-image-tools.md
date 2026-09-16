@@ -110,7 +110,7 @@ The installer only updates the Sub2API-managed MCP entry:
 - Codex: `mcp_servers.sub2api_image`
 - Claude Code: `mcpServers.sub2api-image` in the normal Claude settings file
   and in `~/.claude.json` for user-scope MCP discovery
-- OpenCode: `mcp.servers.sub2api_image`
+- OpenCode: `mcp.sub2api_image`
 
 Cleanup removes only entries recorded in the Sub2API recovery journal. If a user
 edits the managed entry later, cleanup reports a conflict and preserves the

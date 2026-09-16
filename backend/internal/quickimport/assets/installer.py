@@ -22,6 +22,7 @@ from contextlib import contextmanager
 
 PROVIDER = 'sub2api_quick'
 PATHS = {'claude': '.claude/settings.json', 'codex': '.codex/config.toml', 'opencode': '.config/opencode/opencode.json'}
+DELETE = object()
 
 
 def secure_dir(path):
@@ -170,8 +171,12 @@ def configuration(payload):
         provider = dict(npm=npm, name='lianjieai', options=dict(baseURL=base, apiKey=key), models=models)
         fields = [(['provider', PROVIDER], provider), (['model'], f'{PROVIDER}/{model}')]
         if mcp_image_tools_enabled(payload):
-            fields.append((['mcp', 'servers', 'sub2api_image'], {'type': 'remote', 'url': mcp_endpoint, 'oauth': False, 'headers': {'Authorization': 'Bearer ' + key}}))
-    return [dict(path=path, value={'exists': True, 'value': value}) for path, value in fields]
+            fields.append((['mcp', 'servers', 'sub2api_image'], DELETE))
+            fields.append((['mcp', 'sub2api_image'], {'type': 'remote', 'url': mcp_endpoint, 'oauth': False, 'headers': {'Authorization': 'Bearer ' + key}}))
+    return [
+        dict(path=path, value={'exists': False} if value is DELETE else {'exists': True, 'value': value})
+        for path, value in fields
+    ]
 
 
 def claude_mcp_change(changes):
