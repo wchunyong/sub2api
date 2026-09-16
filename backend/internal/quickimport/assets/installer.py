@@ -61,6 +61,15 @@ def target(root, agent):
     return path
 
 
+def claude_user_mcp_path(root):
+    path = root / '.claude.json'
+    for part in [path, *path.parents]:
+        if part == root.parent: break
+        if part.is_symlink() or (hasattr(part, 'is_junction') and part.is_junction()):
+            raise ValueError('Linked Claude MCP configuration path requires manual setup')
+    return path
+
+
 def load(text, agent):
     data = tomllib.loads(text) if agent == 'codex' else json.loads(text or '{}')
     if not isinstance(data, dict): raise ValueError('Configuration must be an object')
@@ -165,6 +174,42 @@ def configuration(payload):
     return [dict(path=path, value={'exists': True, 'value': value}) for path, value in fields]
 
 
+def claude_mcp_change(changes):
+    for change in changes:
+        if change['path'] == ['mcpServers', 'sub2api-image']:
+            return change
+    return None
+
+
+def sync_claude_user_mcp(root, changes):
+    change = claude_mcp_change(changes)
+    if not change or not change['value'].get('exists'):
+        return
+    path = claude_user_mcp_path(root)
+    before = path.read_text(encoding='utf-8-sig') if path.exists() else ''
+    after = render(before, 'claude', [change])
+    if after != before:
+        atomic_write(path, after)
+
+
+def clean_claude_user_mcp(root, record):
+    change = claude_mcp_change(record.get('changes', []))
+    if not change or not change['value'].get('exists'):
+        return
+    path = claude_user_mcp_path(root)
+    if not path.exists():
+        return
+    current = path.read_text(encoding='utf-8-sig')
+    data = load(current, 'claude')
+    if get(data, change['path']) != change['value']:
+        return
+    result = render(current, 'claude', [dict(path=change['path'], value={'exists': False})])
+    if load(result, 'claude'):
+        atomic_write(path, result)
+    else:
+        path.unlink(missing_ok=True)
+
+
 def mcp_image_tools_enabled(payload):
     return payload.get('mcp_image_tools_enabled', True) is not False
 
@@ -254,6 +299,8 @@ def install(root, payload):
         try:
             for item in owned: atomic_write(owned_path(root, folder, item), item['text'])
             atomic_write(path, after)
+            if agent == 'claude':
+                sync_claude_user_mcp(root, changes)
             # Save the complete standard-library runner for offline recovery.
             atomic_write(folder / 'restore.py', Path(__file__).read_text(encoding='utf-8'))
             record['pending'] = False; write_journal(folder, records)
@@ -296,6 +343,8 @@ def clean(root, agent):
             record.pop('cleanup_pending')
             write_journal(folder, records)
         check_pending(records)
+        if agent == 'claude':
+            clean_claude_user_mcp(root, record)
         data = load(current, agent)
         for change in record['changes']:
             if get(data, change['path']) != change['value']: raise ValueError('Configuration conflict: later edits preserved. Restore the changed fields manually or revert them and retry.')

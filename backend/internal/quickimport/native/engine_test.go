@@ -383,6 +383,18 @@ func TestInstallRegistersImageMCPByDefault(t *testing.T) {
 				if server["url"] != "https://example.test/mcp" {
 					t.Fatalf("bad Claude MCP server: %#v", server)
 				}
+				claudeUserMCP, err := os.ReadFile(filepath.Join(root, ".claude.json"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				claudeUserData, err := load(string(claudeUserMCP), "claude")
+				if err != nil {
+					t.Fatal(err)
+				}
+				userServer := get(claudeUserData, []string{"mcpServers", "sub2api-image"}).Value.(map[string]any)
+				if userServer["url"] != "https://example.test/mcp" {
+					t.Fatalf("bad Claude user MCP server: %#v", userServer)
+				}
 			}
 			if err := Clean(root, agent); err != nil {
 				t.Fatal(err)
@@ -390,6 +402,12 @@ func TestInstallRegistersImageMCPByDefault(t *testing.T) {
 			after, _ := os.ReadFile(filepath.Join(root, paths[agent]))
 			if strings.Contains(string(after), "sub2api_image") || strings.Contains(string(after), "test-secret") {
 				t.Fatalf("cleanup left MCP data: %s", after)
+			}
+			if agent == "claude" {
+				claudeUserMCP, _ := os.ReadFile(filepath.Join(root, ".claude.json"))
+				if strings.Contains(string(claudeUserMCP), "sub2api-image") || strings.Contains(string(claudeUserMCP), "test-secret") {
+					t.Fatalf("cleanup left Claude user MCP data: %s", claudeUserMCP)
+				}
 			}
 		})
 	}

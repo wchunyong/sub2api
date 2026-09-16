@@ -119,6 +119,11 @@ func target(root, agent string) (string, error) {
 	path := filepath.Join(root, p)
 	return path, safePath(root, path)
 }
+
+func claudeUserMCPConfigPath(root string) (string, error) {
+	path := filepath.Join(root, ".claude.json")
+	return path, safePath(root, path)
+}
 func lock(root, agent string) (string, func(), error) {
 	if _, err := target(root, agent); err != nil {
 		return "", nil, err
@@ -498,6 +503,80 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 	return changes, nil
 }
 
+func claudeMCPChange(changes []change) (change, bool) {
+	for _, c := range changes {
+		if reflect.DeepEqual(c.Path, []string{"mcpServers", "sub2api-image"}) {
+			return c, true
+		}
+	}
+	return change{}, false
+}
+
+func syncClaudeUserMCPConfig(root string, changes []change) error {
+	c, ok := claudeMCPChange(changes)
+	if !ok || !c.Value.Exists {
+		return nil
+	}
+	path, err := claudeUserMCPConfigPath(root)
+	if err != nil {
+		return err
+	}
+	before, _, err := readText(path)
+	if err != nil {
+		return err
+	}
+	after, err := render(before, "claude", []change{c})
+	if err != nil {
+		return err
+	}
+	if after == before {
+		return nil
+	}
+	return atomicWrite(path, after)
+}
+
+func cleanClaudeUserMCPConfig(root string, rec *record) error {
+	if rec == nil {
+		return nil
+	}
+	for _, c := range rec.Changes {
+		if !reflect.DeepEqual(c.Path, []string{"mcpServers", "sub2api-image"}) || !c.Value.Exists {
+			continue
+		}
+		path, err := claudeUserMCPConfigPath(root)
+		if err != nil {
+			return err
+		}
+		current, exists, err := readText(path)
+		if err != nil || !exists {
+			return err
+		}
+		data, err := load(current, "claude")
+		if err != nil {
+			return err
+		}
+		if !equal(get(data, c.Path), c.Value) {
+			return nil
+		}
+		result, err := render(current, "claude", []change{{Path: c.Path, Value: value{Exists: false}}})
+		if err != nil {
+			return err
+		}
+		restored, err := load(result, "claude")
+		if err != nil {
+			return err
+		}
+		if len(restored) == 0 {
+			if err = os.Remove(path); err != nil && !os.IsNotExist(err) {
+				return err
+			}
+			return nil
+		}
+		return atomicWrite(path, result)
+	}
+	return nil
+}
+
 func mcpImageToolsEnabled(p Payload) bool {
 	return p.MCPImageToolsEnabled == nil || *p.MCPImageToolsEnabled
 }
@@ -672,6 +751,11 @@ func Install(root string, p Payload) error {
 		}()
 		return errors.Join(err, rollback)
 	}
+	if p.Agent == "claude" {
+		if err = syncClaudeUserMCPConfig(root, changes); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -754,6 +838,11 @@ func Clean(root, agent string) error {
 	}
 	if err = checkPending(records); err != nil {
 		return err
+	}
+	if agent == "claude" {
+		if err = cleanClaudeUserMCPConfig(root, rec); err != nil {
+			return err
+		}
 	}
 	data, err := load(current, agent)
 	if err != nil {
