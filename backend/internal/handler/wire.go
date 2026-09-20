@@ -248,7 +248,7 @@ var ProviderSet = wire.NewSet(
 	NewModelPlazaHandler,
 	NewAsyncImageHandler,
 	ProvideBatchImageHandler,
-	NewMCPHandler,
+	NewMCPHandlerWithImageStorage,
 
 	// Admin handlers
 	admin.NewDashboardHandler,

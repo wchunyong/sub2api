@@ -251,6 +251,7 @@ func imageTools() []map[string]any {
 			"image_count":     map[string]any{"type": "integer"},
 			"model":           map[string]any{"type": "string"},
 			"display_note":    map[string]any{"type": "string"},
+			"image_url":       map[string]any{"type": "string"},
 			"url":             map[string]any{"type": "string"},
 		},
 		"required": []string{"image_generated", "image_content"},
@@ -294,7 +295,8 @@ func imageTools() []map[string]any {
 }
 
 func toolTextResult(result ImageResult) map[string]any {
-	body, err := json.Marshal(imageResultSummary(result))
+	summary := imageResultSummary(result)
+	body, err := json.Marshal(summary)
 	if err != nil {
 		body = []byte(`{"image_generated":true}`)
 	}
@@ -309,6 +311,10 @@ func toolTextResult(result ImageResult) map[string]any {
 		})
 	} else if parsed, err := url.Parse(strings.TrimSpace(result.URL)); err == nil &&
 		(parsed.Scheme == "https" || parsed.Scheme == "http") && parsed.Host != "" {
+		content = append(content, map[string]any{
+			"type": "text",
+			"text": "![生成的图片](" + parsed.String() + ")",
+		})
 		content = append(content, map[string]any{
 			"type":     "resource_link",
 			"uri":      parsed.String(),
@@ -325,9 +331,9 @@ func toolTextResult(result ImageResult) map[string]any {
 func imageResultSummary(result ImageResult) map[string]any {
 	summary := map[string]any{
 		"image_generated": true,
-		"display_note":    "The image is already attached as MCP image content; do not create a second image preview.",
 	}
 	_, inlineMIMEType, inline := decodeImageDataURL(result.URL, result.MIMEType)
+	rawURL := strings.TrimSpace(result.URL)
 	if inline {
 		summary["mime_type"] = inlineMIMEType
 	} else if result.MIMEType != "" {
@@ -350,11 +356,15 @@ func imageResultSummary(result ImageResult) map[string]any {
 	}
 	if inline {
 		summary["image_content"] = "inline"
-	} else if strings.HasPrefix(strings.ToLower(strings.TrimSpace(result.URL)), "data:image/") {
+		summary["display_note"] = "The image is already attached as MCP image content; do not create a second image preview."
+	} else if strings.HasPrefix(strings.ToLower(rawURL), "data:image/") {
 		summary["image_content"] = "inline"
-	} else if strings.TrimSpace(result.URL) != "" {
-		summary["image_content"] = "resource_link"
-		summary["url"] = result.URL
+		summary["display_note"] = "The image is already attached as MCP image content; do not create a second image preview."
+	} else if rawURL != "" {
+		summary["image_content"] = "url"
+		summary["image_url"] = rawURL
+		summary["url"] = rawURL
+		summary["display_note"] = "Return the generated image in the final answer as Markdown using image_url."
 	}
 	return summary
 }

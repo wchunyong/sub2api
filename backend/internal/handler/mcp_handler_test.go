@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -10,7 +11,27 @@ import (
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/mcp"
+	"github.com/Wei-Shaw/sub2api/internal/service"
 )
+
+type mcpHandlerSavedImage struct {
+	key         string
+	contentType string
+	data        []byte
+}
+
+type mcpHandlerFakeImageStorage struct {
+	saved []mcpHandlerSavedImage
+}
+
+func (f *mcpHandlerFakeImageStorage) Save(_ context.Context, key, contentType string, data []byte) (string, error) {
+	f.saved = append(f.saved, mcpHandlerSavedImage{
+		key:         key,
+		contentType: contentType,
+		data:        append([]byte(nil), data...),
+	})
+	return "https://img.example.test/" + key, nil
+}
 
 func TestMaterializeMCPRemoteImageAsDataURL(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -28,6 +49,50 @@ func TestMaterializeMCPRemoteImageAsDataURL(t *testing.T) {
 	}
 	if !strings.HasPrefix(result.URL, "data:image/png;base64,") {
 		t.Fatalf("expected embedded image data URL, got %q", result.URL)
+	}
+}
+
+func TestRewriteMCPImageResponseOffloadsB64JSON(t *testing.T) {
+	storage := &mcpHandlerFakeImageStorage{}
+	uploader := service.NewImageResultUploader(storage, "generated/", 0, nil)
+	resolver := func() (*service.ImageResultUploader, bool) {
+		return uploader, true
+	}
+	rawPNG := []byte("\x89PNG\r\n\x1a\nmcp-image")
+	body := []byte(`{"created":1,"data":[{"b64_json":"` + base64.StdEncoding.EncodeToString(rawPNG) + `","revised_prompt":"kept"}]}`)
+
+	rewritten, offloaded, err := rewriteMCPImageResponse(context.Background(), resolver, "mcpreq_test", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !offloaded {
+		t.Fatal("expected MCP image response to be offloaded when image storage is enabled")
+	}
+	if len(storage.saved) != 1 {
+		t.Fatalf("expected one uploaded image, got %#v", storage.saved)
+	}
+	if storage.saved[0].key != "generated/mcpreq_test-0.png" {
+		t.Fatalf("unexpected storage key %q", storage.saved[0].key)
+	}
+	if storage.saved[0].contentType != "image/png" {
+		t.Fatalf("unexpected content type %q", storage.saved[0].contentType)
+	}
+	if string(storage.saved[0].data) != string(rawPNG) {
+		t.Fatalf("uploaded bytes changed: %#v", storage.saved[0].data)
+	}
+	if strings.Contains(string(rewritten), "b64_json") {
+		t.Fatalf("rewritten MCP image response still contains base64: %s", string(rewritten))
+	}
+
+	parsed, err := parseOpenAIImageResult(rewritten, "gpt-image-2", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.URL != "https://img.example.test/generated/mcpreq_test-0.png" {
+		t.Fatalf("unexpected parsed URL %q", parsed.URL)
+	}
+	if parsed.RevisedPrompt != "kept" {
+		t.Fatalf("revised prompt was not preserved: %#v", parsed)
 	}
 }
 

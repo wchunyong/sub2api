@@ -56,6 +56,119 @@ client event-size limits:
 }
 ```
 
+## Markdown Image URL Mode
+
+Some MCP clients cannot reliably render the standard MCP `image` content item
+when the result is carried as inline Base64. For those clients, Sub2API should
+support an OSS-backed URL mode: upload the generated image bytes to object
+storage and return a Markdown image that points at an HTTPS image URL.
+
+Recommended flow:
+
+```text
+server calls image-generation upstream
+        ↓
+decode Base64 image result into bytes
+        ↓
+upload bytes to S3-compatible object storage from memory
+        ↓
+return the uploaded image URL from MCP
+        ↓
+final answer includes: ![生成的图片](<image URL>)
+```
+
+The upload does not need a temporary server-side file. Decode the upstream
+`b64_json` payload into memory, detect or keep the response MIME type, and pass
+the bytes directly to the existing image-storage abstraction. When the upstream
+already returns a URL, the server may either return it as-is when it is known to
+be durable and directly renderable, or download and re-host it through the same
+storage path when durability or display compatibility matters.
+
+### OSS region and endpoint
+
+Aliyun OSS does not require the bucket to be in mainland China. Choose the
+region based on the server and user locations, then measure upload latency and
+failure rate:
+
+- Canada server and mostly North America users: prefer testing a US OSS region.
+- Mostly mainland China users: mainland OSS can be considered, but test the
+  Canada-to-China upload path before relying on it.
+- Existing mainland bucket and low image volume: reuse it first, then decide
+  whether the measured latency and failure rate justify moving.
+
+For a Canada-hosted Sub2API instance, upload through the public OSS endpoint.
+Do not use `-internal` endpoints unless the server is actually running in the
+matching Aliyun private network.
+
+Initial OSS deployment target:
+
+```text
+S3_ENDPOINT=https://oss-cn-guangzhou.aliyuncs.com
+S3_ACCESS_KEY=<set in deployment environment>
+S3_SECRET_KEY=<set in deployment environment>
+S3_BUCKET=lianjieai-image
+S3_REGION=oss-cn-guangzhou
+S3_ADDRESSING_STYLE=virtual
+```
+
+Do not commit `S3_SECRET_KEY` or real access credentials to the repository. If
+the implementation reuses the existing `image_storage` configuration, map these
+values to `IMAGE_STORAGE_ENDPOINT`, `IMAGE_STORAGE_ACCESS_KEY_ID`,
+`IMAGE_STORAGE_SECRET_ACCESS_KEY`, `IMAGE_STORAGE_BUCKET`,
+`IMAGE_STORAGE_REGION`, and `IMAGE_STORAGE_FORCE_PATH_STYLE=false`.
+
+### URL lifetime
+
+Choose the URL strategy before enabling Markdown URL mode:
+
+| Image use case | Recommended access mode |
+| --- | --- |
+| Public image; historical conversations should keep rendering | Public bucket or CDN/custom HTTPS image domain with stable object URLs |
+| Private image; temporary preview is enough | Private bucket plus expiring signed URL |
+
+Signed URLs will stop rendering in historical Markdown after they expire. If
+long-term display is required, return a stable HTTPS URL, preferably through a
+custom image domain such as:
+
+```markdown
+![生成的图片](https://img.example.com/generated/<unique-id>.png)
+```
+
+### Renderable response requirements
+
+Uploaded objects must set the correct `Content-Type`, for example `image/png`,
+`image/jpeg`, or `image/webp`. For image preview in MCP clients, prefer a custom
+HTTPS image domain over the default OSS bucket domain, then verify that the
+target client renders the returned Markdown instead of downloading the object.
+
+Object keys should be unique and non-guessable enough for the selected access
+model, for example:
+
+```text
+generated/{yyyy}/{mm}/{dd}/{request-id}-{image-index}.png
+```
+
+The MCP tool result should continue to include compact JSON metadata, but the
+image payload mode changes from inline to URL:
+
+```json
+{
+  "image_generated": true,
+  "image_content": "url",
+  "image_url": "https://img.example.com/generated/...",
+  "mime_type": "image/png",
+  "model": "gpt-image-2",
+  "image_count": 1,
+  "revised_prompt": ""
+}
+```
+
+The final assistant-visible content should include the Markdown image:
+
+```markdown
+![生成的图片](https://img.example.com/generated/...)
+```
+
 `lianjieai_edit_image` is available for URL or data URL based image editing.
 
 ```json

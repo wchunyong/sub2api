@@ -79,6 +79,11 @@ func TestServerListsImageTools(t *testing.T) {
 		if tool["outputSchema"] == nil {
 			t.Fatalf("tool %s is missing outputSchema", tool["name"])
 		}
+		outputSchema := tool["outputSchema"].(map[string]any)
+		properties := outputSchema["properties"].(map[string]any)
+		if properties["image_url"] == nil {
+			t.Fatalf("tool %s outputSchema is missing image_url: %#v", tool["name"], outputSchema)
+		}
 	}
 	if !names["lianjieai_generate_image"] || !names["lianjieai_edit_image"] {
 		t.Fatalf("missing image tools: %#v", names)
@@ -115,8 +120,11 @@ func TestServerCallsGenerateImage(t *testing.T) {
 	result := body["result"].(map[string]any)
 	content := result["content"].([]any)
 	structured := result["structuredContent"].(map[string]any)
-	if structured["image_generated"] != true || structured["image_content"] != "resource_link" {
+	if structured["image_generated"] != true || structured["image_content"] != "url" {
 		t.Fatalf("unexpected structured image result: %#v", structured)
+	}
+	if structured["image_url"] != "https://gateway.example.test/images/result.png" {
+		t.Fatalf("structured image URL missing: %#v", structured)
 	}
 	text := content[0].(map[string]any)["text"].(string)
 	if !bytes.Contains([]byte(text), []byte("https://gateway.example.test/images/result.png")) {
@@ -125,7 +133,7 @@ func TestServerCallsGenerateImage(t *testing.T) {
 	if !bytes.Contains([]byte(text), []byte(`"mime_type":"image/png"`)) {
 		t.Fatalf("tool result did not include MIME metadata: %s", text)
 	}
-	if !bytes.Contains([]byte(text), []byte(`"display_note":"The image is already attached as MCP image content; do not create a second image preview."`)) {
+	if !bytes.Contains([]byte(text), []byte(`"display_note":"Return the generated image in the final answer as Markdown using image_url."`)) {
 		t.Fatalf("tool result did not include display guidance: %s", text)
 	}
 }
@@ -136,6 +144,24 @@ func TestToolResultIncludesResourceLinkForRemoteImage(t *testing.T) {
 		MIMEType: "image/png",
 	})
 	content := result["content"].([]map[string]any)
+	structured := result["structuredContent"].(map[string]any)
+
+	if structured["image_content"] != "url" {
+		t.Fatalf("expected URL image content, got %#v", structured)
+	}
+	if structured["image_url"] != "https://gateway.example.test/images/result.png" {
+		t.Fatalf("expected structured image_url, got %#v", structured)
+	}
+	foundMarkdown := false
+	for _, item := range content {
+		if item["type"] == "text" && strings.Contains(item["text"].(string), "![生成的图片](https://gateway.example.test/images/result.png)") {
+			foundMarkdown = true
+		}
+	}
+	if !foundMarkdown {
+		t.Fatalf("expected Markdown image in text content, got %#v", content)
+	}
+
 	link := content[len(content)-1]
 	if link["type"] != "resource_link" || link["uri"] != "https://gateway.example.test/images/result.png" {
 		t.Fatalf("expected remote image resource link, got %#v", link)

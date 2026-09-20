@@ -18,24 +18,35 @@ import (
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type MCPHandler struct {
-	openAI *OpenAIGatewayHandler
+	openAI               *OpenAIGatewayHandler
+	imageStorageResolver service.ImageStorageResolver
 }
 
 func NewMCPHandler(openAI *OpenAIGatewayHandler) *MCPHandler {
 	return &MCPHandler{openAI: openAI}
 }
 
+func NewMCPHandlerWithImageStorage(openAI *OpenAIGatewayHandler, imageStorage *service.ImageStorageSettingService) *MCPHandler {
+	h := NewMCPHandler(openAI)
+	if imageStorage != nil {
+		h.imageStorageResolver = imageStorage.Resolver()
+	}
+	return h
+}
+
 func (h *MCPHandler) Serve(c *gin.Context) {
-	server := mcp.NewServer(&mcpImageGateway{source: c, openAI: h.openAI})
+	server := mcp.NewServer(&mcpImageGateway{source: c, openAI: h.openAI, imageStorageResolver: h.imageStorageResolver})
 	server.ServeHTTP(c.Writer, c.Request)
 }
 
 type mcpImageGateway struct {
-	source *gin.Context
-	openAI *OpenAIGatewayHandler
+	source               *gin.Context
+	openAI               *OpenAIGatewayHandler
+	imageStorageResolver service.ImageStorageResolver
 }
 
 func (g *mcpImageGateway) GenerateImage(ctx context.Context, input mcp.GenerateImageInput) (mcp.ImageResult, error) {
@@ -133,15 +144,40 @@ func (g *mcpImageGateway) callImages(ctx context.Context, path string, body []by
 	if rec.Code < 200 || rec.Code >= 300 {
 		return mcp.ImageResult{}, classifyMCPImageResponse(rec.Code, rec.Body.Bytes())
 	}
-	result, err := parseOpenAIImageResult(rec.Body.Bytes(), model, imageCount)
-	if err != nil {
-		return mcp.ImageResult{}, err
-	}
-	result, err = materializeMCPImageResult(ctx, result)
+	body, offloaded, err := rewriteMCPImageResponse(ctx, g.imageStorageResolver, newMCPImageStorageID(), rec.Body.Bytes())
 	if err != nil {
 		return mcp.ImageResult{}, mcp.NewToolError(mcp.ErrUpstream, "", err)
 	}
+	result, err := parseOpenAIImageResult(body, model, imageCount)
+	if err != nil {
+		return mcp.ImageResult{}, err
+	}
+	if !offloaded {
+		result, err = materializeMCPImageResult(ctx, result)
+		if err != nil {
+			return mcp.ImageResult{}, mcp.NewToolError(mcp.ErrUpstream, "", err)
+		}
+	}
 	return result, nil
+}
+
+func rewriteMCPImageResponse(ctx context.Context, resolver service.ImageStorageResolver, requestID string, body []byte) ([]byte, bool, error) {
+	if resolver == nil {
+		return body, false, nil
+	}
+	uploader, enabled := resolver()
+	if !enabled || uploader == nil {
+		return body, false, nil
+	}
+	rewritten, err := uploader.Rewrite(ctx, requestID, json.RawMessage(body))
+	if err != nil {
+		return nil, false, fmt.Errorf("store generated image to object storage: %w", err)
+	}
+	return []byte(rewritten), true, nil
+}
+
+func newMCPImageStorageID() string {
+	return "mcpreq_" + strings.ReplaceAll(uuid.NewString(), "-", "")
 }
 
 func classifyMCPImageResponse(status int, body []byte) error {
