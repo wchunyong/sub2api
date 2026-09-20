@@ -16,6 +16,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ticketproxy"
 	"github.com/google/uuid"
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
@@ -44,6 +45,10 @@ type openAICodexTicket struct {
 	Verified              bool      `json:"verified"`
 	ConfigRevision        string    `json:"config_revision"`
 	FixedProxyFingerprint string    `json:"fixed_proxy_fingerprint"`
+}
+
+type codexTicketProxyRefiller interface {
+	RefillIfEmpty(context.Context) (*ticketproxy.FetchResult, error)
 }
 
 func openAICodexTicketKey(accountID int64, model string) string {
@@ -254,7 +259,82 @@ func (s *OpenAIGatewayService) applyOpenAICodexTicket(ctx context.Context, accou
 	return err
 }
 
-func (s *OpenAIGatewayService) applyOpenAICodexTicketWithReceipt(ctx context.Context, account *Account, model string, h http.Header) (*codexTicketReceipt, error) {
+// OpenAICodexTicketReceipt records the ticket selected for this request. It must
+// never contain the state blob, and must not be reconstructed after dispatch:
+// a background refresh could otherwise report a different ticket.
+type OpenAICodexTicketReceipt struct {
+	Status     string     `json:"status"`
+	AccountID  int64      `json:"account_id,omitempty"`
+	Model      string     `json:"model,omitempty"`
+	Length     int        `json:"length,omitempty"`
+	CapturedAt *time.Time `json:"captured_at,omitempty"`
+	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
+}
+
+func (s *OpenAIGatewayService) applyOpenAICodexTicketWithReceipt(ctx context.Context, account *Account, model string, h http.Header) (OpenAICodexTicketReceipt, error) {
+	model = normalizeOpenAICodexTicketModel(model)
+	r := OpenAICodexTicketReceipt{Status: "not_applicable", Model: model}
+	if account != nil {
+		r.AccountID = account.ID
+	}
+	if !isOpenAICodexTicketAccount(account) {
+		return r, nil
+	}
+	if s == nil || h == nil {
+		r.Status = "unavailable"
+		return r, nil
+	}
+	if !s.openAICodexTicketEnabledContext(ctx) {
+		r.Status = "disabled"
+		return r, nil
+	}
+	live, err := s.codexTicketLiveAccount(ctx, account)
+	if err != nil {
+		if codexAccountTicketConfigOf(account).Enabled {
+			r.Status = "unavailable"
+			return r, ErrOpenAICodexTicketUnavailable
+		}
+		r.Status = "not_applicable"
+		return r, nil
+	}
+	ac := codexAccountTicketConfigOf(live)
+	if !isOpenAICodexTicketAccount(live) || !ac.Enabled || ac.Model != normalizeOpenAICodexTicketModel(model) {
+		r.Status = "not_required"
+		return r, nil
+	}
+	// A scheduler snapshot with a different business proxy must be reselected.
+	if codexTicketFixedProxyFingerprint(account) != codexTicketFixedProxyFingerprint(live) {
+		r.Status = "unavailable"
+		return r, ErrOpenAICodexTicketUnavailable
+	}
+	ticket := s.lookupOpenAICodexTicket(live, model)
+	if ticket.validFor(live, ac, time.Now()) {
+		h.Set(openAICodexTurnStateHeader, ticket.State)
+		r.Status, r.Length = "injected", len(h.Get(openAICodexTurnStateHeader))
+		r.CapturedAt, r.ExpiresAt = &ticket.CapturedAt, &ticket.ExpiresAt
+		return r, nil
+	}
+	r.Status = "missing"
+	if candidate := s.openAICodexTicketCandidate(live, model); candidate != nil && !candidate.ExpiresAt.IsZero() && !time.Now().Before(candidate.ExpiresAt) {
+		r.Status = "expired"
+	}
+	return r, ErrOpenAICodexTicketUnavailable
+}
+
+func (s *OpenAIGatewayService) openAICodexTicketCandidate(account *Account, model string) *openAICodexTicket {
+	if s == nil || account == nil {
+		return nil
+	}
+	key := openAICodexTicketKey(account.ID, model)
+	if raw, ok := s.openaiCodexTickets.Load(key); ok {
+		if ticket, _ := raw.(*openAICodexTicket); ticket != nil {
+			return ticket
+		}
+	}
+	return parseOpenAICodexTicketFromAny(account.ID, model, account.Extra[openAICodexTicketExtraKey(model)])
+}
+
+func (s *OpenAIGatewayService) applyOpenAICodexTicketWithWatchdogReceipt(ctx context.Context, account *Account, model string, h http.Header) (*codexTicketReceipt, error) {
 	if s == nil || h == nil || !isOpenAICodexTicketAccount(account) || !s.openAICodexTicketEnabledContext(ctx) {
 		return nil, nil
 	}
@@ -269,7 +349,6 @@ func (s *OpenAIGatewayService) applyOpenAICodexTicketWithReceipt(ctx context.Con
 	if !isOpenAICodexTicketAccount(live) || !ac.Enabled || ac.Model != normalizeOpenAICodexTicketModel(model) {
 		return nil, nil
 	}
-	// A scheduler snapshot with a different business proxy must be reselected.
 	if codexTicketFixedProxyFingerprint(account) != codexTicketFixedProxyFingerprint(live) {
 		return nil, ErrOpenAICodexTicketUnavailable
 	}
@@ -490,6 +569,19 @@ func (s *OpenAIGatewayService) refreshOpenAICodexTickets(ctx context.Context) {
 	if !s.openAICodexTicketEnabledContext(ctx) {
 		s.cancelCodexTicketJobs()
 		return
+	}
+	refiller := s.codexTicketProxyRefiller
+	if refiller == nil {
+		refiller = ticketproxy.OnesProxy
+	}
+	refilled, refillErr := refiller.RefillIfEmpty(ctx)
+	if ctx.Err() != nil {
+		return
+	}
+	if refillErr != nil {
+		logger.L().Warn("openai_codex_ticket automatic proxy refill failed; retry in 60 seconds", zap.Error(refillErr))
+	} else if refilled != nil {
+		logger.L().Info("openai_codex_ticket proxy pool automatically refilled", zap.Int("added", refilled.Added), zap.Int("count", refilled.Count))
 	}
 	accounts, err := s.accountRepo.ListByPlatform(ctx, PlatformOpenAI)
 	if err != nil {

@@ -720,7 +720,7 @@ describe("admin SettingsView payment visible method controls", () => {
     adminSettingsFetch.mockResolvedValue(undefined);
   });
 
-  it("submits the Codex ticket harvest toggle", async () => {
+  it("saves the Codex ticket master switch", async () => {
     getSettings.mockResolvedValueOnce({
       ...baseSettingsResponse,
       openai_codex_ticket_enabled: false,

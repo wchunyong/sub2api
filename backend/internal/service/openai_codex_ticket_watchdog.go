@@ -80,7 +80,7 @@ func (s *OpenAIGatewayService) codexTicketRejectedByWatchdog(ticket *openAICodex
 }
 
 func (s *OpenAIGatewayService) applyOpenAICodexTicketToRequest(ctx context.Context, account *Account, model string, req *http.Request) error {
-	receipt, err := s.applyOpenAICodexTicketWithReceipt(ctx, account, model, req.Header)
+	receipt, err := s.applyOpenAICodexTicketWithWatchdogReceipt(ctx, account, model, req.Header)
 	if err != nil {
 		return err
 	}

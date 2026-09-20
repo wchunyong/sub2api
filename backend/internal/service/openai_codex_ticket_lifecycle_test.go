@@ -2,13 +2,16 @@ package service
 
 import (
 	"context"
-	"github.com/Wei-Shaw/sub2api/internal/config"
-	"github.com/stretchr/testify/require"
 	"net/http"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ticketproxy"
+	"github.com/stretchr/testify/require"
 )
 
 type codexTicketFuncUpstream struct {
@@ -38,6 +41,7 @@ func ticketJobService(t *testing.T, u HTTPUpstream) (*OpenAIGatewayService, *cod
 	r := &codexTicketRefreshRepo{accounts: []Account{*ticketTestAccount(41)}}
 	s := ticketTestService(t, config.OpenAICodexTicketConfig{Enabled: true, HarvestAttemptTimeoutSeconds: 2}, u)
 	s.accountRepo = r
+	s.codexTicketProxyPool = ticketproxy.NewStore(filepath.Join(t.TempDir(), "ticket-proxy-pool.json"))
 	t.Cleanup(s.StopOpenAICodexTicketHarvester)
 	return s, r
 }

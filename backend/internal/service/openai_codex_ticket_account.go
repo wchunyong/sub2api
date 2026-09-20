@@ -17,6 +17,7 @@ import (
 	"time"
 
 	apperrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ticketproxy"
 	"github.com/google/uuid"
 	"github.com/tidwall/gjson"
 )
@@ -147,6 +148,57 @@ func (s *OpenAIGatewayService) codexTicketLiveAccount(ctx context.Context, accou
 	}
 	return live, nil
 }
+
+func (s *OpenAIGatewayService) codexTicketProxyStore() *ticketproxy.Store {
+	if s != nil && s.codexTicketProxyPool != nil {
+		return s.codexTicketProxyPool
+	}
+	return ticketproxy.Default
+}
+
+func (s *OpenAIGatewayService) codexTicketHarvestProxySnapshot(ctx context.Context) string {
+	store := s.codexTicketProxyStore()
+	if store != nil {
+		if status, err := store.Status(); err == nil && status.Managed {
+			return fmt.Sprintf("pool:%d:%d", status.Count, status.Removed)
+		}
+	}
+	proxy := s.openAICodexTicketHarvestProxyURLContext(ctx)
+	if proxy != "" && ValidateOpenAICodexTicketHarvestProxyURL(proxy) == nil {
+		return proxy
+	}
+	return ""
+}
+
+func (s *OpenAIGatewayService) acquireCodexTicketHarvestProxy(ctx context.Context) (proxyURL, leaseID string, managed bool, ok bool) {
+	store := s.codexTicketProxyStore()
+	if store != nil {
+		lease, isManaged, err := store.Acquire()
+		if err == nil && isManaged && lease.URL != "" {
+			return lease.URL, lease.ID, true, true
+		}
+		if isManaged {
+			return "", "", true, false
+		}
+	}
+	proxy := s.openAICodexTicketHarvestProxyURLContext(ctx)
+	if proxy != "" && ValidateOpenAICodexTicketHarvestProxyURL(proxy) == nil {
+		return freshCodexTicketProxyURL(proxy), "", false, true
+	}
+	return "", "", false, false
+}
+
+func (s *OpenAIGatewayService) reportCodexTicketHarvestProxy(leaseID string, managed bool, success bool) {
+	if !managed || leaseID == "" {
+		return
+	}
+	store := s.codexTicketProxyStore()
+	if store == nil {
+		return
+	}
+	_, _ = store.Report(leaseID, success)
+}
+
 func (s *OpenAIGatewayService) codexTicketAccountByID(ctx context.Context, id int64) (*Account, error) {
 	if s == nil || s.accountRepo == nil {
 		return nil, apperrors.New(503, "CODEX_TICKET_UNAVAILABLE", "Ticket service is unavailable")
@@ -167,11 +219,13 @@ func (s *OpenAIGatewayService) GetCodexAccountTicketStatus(ctx context.Context, 
 		return nil, err
 	}
 	ac := codexAccountTicketConfigOf(account)
-	pool := s.openAICodexTicketHarvestProxyURLContext(ctx)
-	poolConfigured := pool != "" && ValidateOpenAICodexTicketHarvestProxyURL(pool) == nil
+	pool := s.codexTicketHarvestProxySnapshot(ctx)
+	poolConfigured := pool != ""
 	status := &CodexAccountTicketStatus{TicketPlan: ac.TicketPlan, TargetLength: codexTicketTargetLength(ac.TicketPlan), Enabled: ac.Enabled, GlobalEnabled: s.openAICodexTicketEnabledContext(ctx), Model: ac.Model, ProxyConfigured: poolConfigured, FixedProxyConfigured: account.Proxy != nil && account.ProxyID != nil, State: "waiting"}
 	status.Watchdog = codexTicketWatchdogStatusOf(account, ac.Enabled && status.GlobalEnabled)
-	if parsed, err := url.Parse(strings.ReplaceAll(pool, "{sid}", "%7Bsid%7D")); err == nil {
+	if strings.HasPrefix(pool, "pool:") {
+		status.ProxyDisplay = "ticket proxy pool"
+	} else if parsed, err := url.Parse(strings.ReplaceAll(pool, "{sid}", "%7Bsid%7D")); err == nil {
 		status.ProxyDisplay = parsed.Host
 	}
 	if !ac.Enabled {
@@ -251,8 +305,8 @@ func (s *OpenAIGatewayService) ConfigureCodexAccountTicket(ctx context.Context, 
 		s.openaiCodexAccountMu.Unlock()
 		return nil, apperrors.BadRequest("CODEX_TICKET_GLOBAL_PROXY", "Configure the dynamic proxy pool in gateway settings, not per account")
 	}
-	pool := s.openAICodexTicketHarvestProxyURLContext(ctx)
-	if next.Enabled && (pool == "" || ValidateOpenAICodexTicketHarvestProxyURL(pool) != nil || account.Proxy == nil || account.ProxyID == nil) {
+	pool := s.codexTicketHarvestProxySnapshot(ctx)
+	if next.Enabled && (pool == "" || account.Proxy == nil || account.ProxyID == nil) {
 		s.openaiCodexAccountMu.Unlock()
 		return nil, apperrors.BadRequest("CODEX_TICKET_PROXY_REQUIRED", "Configure the global dynamic proxy pool and this account's fixed business proxy first")
 	}
@@ -315,8 +369,8 @@ func (s *OpenAIGatewayService) HarvestCodexAccountTicket(ctx context.Context, id
 	if !codexAccountTicketEligible(account) {
 		return nil, apperrors.BadRequest("CODEX_TICKET_ACCOUNT_INACTIVE", "Account must be active and have a fixed business proxy")
 	}
-	pool := s.openAICodexTicketHarvestProxyURLContext(ctx)
-	if pool == "" || ValidateOpenAICodexTicketHarvestProxyURL(pool) != nil {
+	pool := s.codexTicketHarvestProxySnapshot(ctx)
+	if pool == "" {
 		return nil, apperrors.BadRequest("CODEX_TICKET_GLOBAL_PROXY", "Configure the global dynamic proxy pool in gateway settings")
 	}
 	s.startCodexAccountTicketJob(context.Background(), id, true)
@@ -350,8 +404,8 @@ func (s *OpenAIGatewayService) startCodexAccountTicketJob(ctx context.Context, i
 		return nil
 	}
 	ac := codexAccountTicketConfigOf(account)
-	pool := s.openAICodexTicketHarvestProxyURLContext(ctx)
-	if !ac.Enabled || pool == "" || ValidateOpenAICodexTicketHarvestProxyURL(pool) != nil {
+	pool := s.codexTicketHarvestProxySnapshot(ctx)
+	if !ac.Enabled || pool == "" {
 		return nil
 	}
 	if s.openaiCodexAccountJobs == nil {
@@ -414,7 +468,7 @@ func (s *OpenAIGatewayService) runCodexAccountTicketJob(ctx context.Context, id 
 			return
 		}
 		ac := codexAccountTicketConfigOf(account)
-		if !codexAccountTicketEligible(account) || !ac.Enabled || ac.Revision != job.revision || codexTicketFixedProxyFingerprint(account) != job.fixedFingerprint || s.openAICodexTicketHarvestProxyURLContext(ctx) != job.harvestProxyURL {
+		if !codexAccountTicketEligible(account) || !ac.Enabled || ac.Revision != job.revision || codexTicketFixedProxyFingerprint(account) != job.fixedFingerprint || s.codexTicketHarvestProxySnapshot(ctx) != job.harvestProxyURL {
 			return
 		}
 		// Token helpers are permitted to update metadata, but not shared account maps.
@@ -428,18 +482,32 @@ func (s *OpenAIGatewayService) runCodexAccountTicketJob(ctx context.Context, id 
 			lastError = "Account authentication failed"
 			return
 		}
-		harvestProxy := freshCodexTicketProxyURL(job.harvestProxyURL)
+		harvestProxy, leaseID, managedProxy, ok := s.acquireCodexTicketHarvestProxy(ctx)
+		if !ok {
+			lastError = "No available STATE harvest proxy"
+			return
+		}
 		state, status, err := s.fireCodexAccountTicketProbe(ctx, account, token, ac.Model, harvestProxy, "", timeout)
 		if reason := codexTicketProbeRejection(status); reason != "" {
+			if ctx.Err() == nil {
+				s.reportCodexTicketHarvestProxy(leaseID, managedProxy, false)
+			}
 			lastError = reason
 			return
 		}
 		if err != nil || status != 200 || !validCodexTicketState(state) {
+			if ctx.Err() == nil {
+				s.reportCodexTicketHarvestProxy(leaseID, managedProxy, false)
+			}
 			lastError = "Harvest did not return a completed target-model response and valid STATE"
 		} else if len(state) != codexTicketTargetLength(ac.TicketPlan) {
+			if ctx.Err() == nil {
+				s.reportCodexTicketHarvestProxy(leaseID, managedProxy, false)
+			}
 			lastError = fmt.Sprintf("STATE length does not match selected %s plan (expected %d, received %d)", ac.TicketPlan, codexTicketTargetLength(ac.TicketPlan), len(state))
 		} else {
-			if ctx.Err() != nil || !s.openAICodexTicketEnabledContext(ctx) || s.openAICodexTicketHarvestProxyURLContext(ctx) != job.harvestProxyURL {
+			s.reportCodexTicketHarvestProxy(leaseID, managedProxy, true)
+			if ctx.Err() != nil || !s.openAICodexTicketEnabledContext(ctx) || s.codexTicketHarvestProxySnapshot(ctx) != job.harvestProxyURL {
 				return
 			}
 			replayState, status, err := s.fireCodexAccountTicketProbe(ctx, account, token, ac.Model, account.Proxy.URL(), state, timeout)
@@ -451,8 +519,13 @@ func (s *OpenAIGatewayService) runCodexAccountTicketJob(ctx context.Context, id 
 				// Serialize against account opt-out/source changes; reread persistent values immediately before publication.
 				s.openaiCodexAccountMu.Lock()
 				live, readErr := s.codexTicketAccountByID(ctx, id)
-				if readErr == nil && ctx.Err() == nil && s.openaiCodexAccountJobs[id] == job && s.openAICodexTicketEnabledContext(ctx) && s.openAICodexTicketHarvestProxyURLContext(ctx) == job.harvestProxyURL && codexAccountTicketEligible(live) && codexAccountTicketConfigOf(live).Enabled && codexAccountTicketConfigOf(live).Revision == job.revision && codexTicketFixedProxyFingerprint(live) == job.fixedFingerprint {
+				if readErr == nil && ctx.Err() == nil && s.openaiCodexAccountJobs[id] == job && s.openAICodexTicketEnabledContext(ctx) && s.codexTicketHarvestProxySnapshot(ctx) == job.harvestProxyURL && codexAccountTicketEligible(live) && codexAccountTicketConfigOf(live).Enabled && codexAccountTicketConfigOf(live).Revision == job.revision && codexTicketFixedProxyFingerprint(live) == job.fixedFingerprint {
 					now := time.Now()
+					if revoked, ok := s.openaiCodexWatchdogRevoked.Load(openAICodexTicketKey(id, ac.Model)); ok {
+						if revokedThrough, ok := revoked.(time.Time); ok && !now.After(revokedThrough) {
+							now = revokedThrough.Add(time.Nanosecond)
+						}
+					}
 					ticket := &openAICodexTicket{AccountID: id, Model: ac.Model, State: state, Length: len(state), CapturedAt: now, ExpiresAt: now.Add(time.Hour), Attempts: attempt, Verified: true, ConfigRevision: job.revision, FixedProxyFingerprint: job.fixedFingerprint}
 					s.storeOpenAICodexTicket(ctx, live, ticket)
 					if got := s.lookupOpenAICodexTicket(live, ac.Model); got != nil && got.CapturedAt.Equal(now) {

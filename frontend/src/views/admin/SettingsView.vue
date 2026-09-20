@@ -4526,6 +4526,10 @@
                   {{ t("admin.settings.gatewayForwarding.codexTicketAccountHint") }}
                   <a href="/admin/accounts" class="font-medium text-primary-600 underline dark:text-primary-400">{{ t("admin.settings.gatewayForwarding.codexTicketAccountsLink") }}</a>
                 </p>
+                <router-link to="/admin/codex-tickets" class="flex items-center justify-between gap-4 rounded-xl bg-gray-50 p-4 text-sm dark:bg-dark-800">
+                  <span class="font-medium text-gray-800 dark:text-gray-100">{{ t("admin.settings.gatewayForwarding.ticketPageTitle") }}</span>
+                  <span class="text-primary-600 dark:text-primary-400">{{ t("admin.settings.gatewayForwarding.ticketManage") }} →</span>
+                </router-link>
                 <div>
                   <h3 class="text-base font-semibold text-gray-900 dark:text-white">
                     {{ t("admin.settings.gatewayForwarding.codexClientRestrictionTitle") }}

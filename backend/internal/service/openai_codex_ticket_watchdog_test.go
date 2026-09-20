@@ -66,7 +66,7 @@ func TestCodexTicketWatchdogResponseRecoversWithoutReplayingBusiness(t *testing.
 			require.Equal(t, int64(2), probes.Load(), "only harvest + original fixed-proxy replay")
 			status, err := s.GetCodexAccountTicketStatus(context.Background(), 41)
 			require.NoError(t, err)
-			require.Equal(t, "ready", status.State)
+			require.Equal(t, "ready", status.State, "status=%+v", status)
 			require.True(t, status.Watchdog.Enabled)
 			require.Equal(t, reason, status.Watchdog.LastReason)
 			require.Equal(t, int64(1), status.Watchdog.TriggerCount)
