@@ -399,6 +399,16 @@
                 <span class="text-xs">{{ t('keys.quickImport.title') }}</span>
               </button>
 
+              <!-- Import to CC Switch Button -->
+              <button
+                v-if="!publicSettings?.hide_ccs_import_button"
+                @click="importToCcswitch(row)"
+                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
+              >
+                <Icon name="upload" size="sm" />
+                <span class="text-xs">{{ t('keys.importToCcSwitch') }}</span>
+              </button>
+
               <!-- Toggle Status Button -->
               <button
                 @click="toggleKeyStatus(row)"
@@ -1088,6 +1098,40 @@
       @cancel="showResetRateLimitDialog = false"
     />
 
+    <!-- CCS Client Selection Dialog for Antigravity -->
+    <BaseDialog
+      :show="showCcsClientSelect"
+      :title="t('keys.ccsClientSelect.title')"
+      width="narrow"
+      @close="closeCcsClientSelect"
+    >
+      <div class="space-y-4">
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+          {{ t('keys.ccsClientSelect.description') }}
+        </p>
+        <div class="grid grid-cols-2 gap-3">
+          <button
+            @click="handleCcsClientSelect('claude')"
+            class="flex flex-col items-center gap-2 rounded-xl border-2 border-gray-200 p-4 transition-all hover:border-primary-500 hover:bg-primary-50 dark:border-dark-600 dark:hover:border-primary-500 dark:hover:bg-primary-900/20"
+          >
+            <Icon name="terminal" size="xl" class="text-gray-600 dark:text-gray-400" />
+            <span class="font-medium text-gray-900 dark:text-white">{{
+              t('keys.ccsClientSelect.claudeCode')
+            }}</span>
+          </button>
+          <button
+            @click="handleCcsClientSelect('gemini')"
+            class="flex flex-col items-center gap-2 rounded-xl border-2 border-gray-200 p-4 transition-all hover:border-primary-500 hover:bg-primary-50 dark:border-dark-600 dark:hover:border-primary-500 dark:hover:bg-primary-900/20"
+          >
+            <Icon name="sparkles" size="xl" class="text-gray-600 dark:text-gray-400" />
+            <span class="font-medium text-gray-900 dark:text-white">{{
+              t('keys.ccsClientSelect.geminiCli')
+            }}</span>
+          </button>
+        </div>
+      </div>
+    </BaseDialog>
+
     <BaseDialog :show="!!createdKeyForImport" :title="t('keys.keyCreatedSuccess')" @close="createdKeyForImport = null">
       <div class="flex gap-3">
         <button class="btn btn-primary" @click="openUseKeyModal(createdKeyForImport!); createdKeyForImport = null">{{ t('keys.quickImport.title') }}</button>
@@ -1102,10 +1146,10 @@
       :key-name="selectedKey?.name"
       :active="selectedKey?.status === 'active'"
       :hide-ccs="publicSettings?.hide_ccs_import_button"
-      :claude-code-only="selectedKey?.group?.claude_code_only"
       :api-key="selectedKey?.key || ''"
       :base-url="publicSettings?.api_base_url || ''"
       :platform="selectedKey?.group?.platform || null"
+      :claude-code-only="selectedKey?.group?.claude_code_only || false"
       :allow-messages-dispatch="selectedKey?.group?.allow_messages_dispatch || false"
       @close="closeUseKeyModal"
     />
@@ -1146,6 +1190,11 @@ import { maskApiKey } from '@/utils/maskApiKey'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import { platformBadgeLightClass } from '@/utils/platformColors'
 import { KEY_GROUP_PROVIDERS, KEY_GROUP_PROVIDER_ICONS, getKeyGroupProvider, type KeyGroupProvider } from '@/utils/keyGroupProviders'
+import {
+  CC_SWITCH_USAGE_SCRIPT,
+  buildCcSwitchImportDeeplink,
+  type CcSwitchClientType
+} from '@/utils/ccswitchImport'
 
 // Helper to format date for datetime-local input
 const formatDateTimeLocal = (isoDate: string): string => {
@@ -1313,7 +1362,9 @@ const showResetQuotaDialog = ref(false)
 const showResetRateLimitDialog = ref(false)
 const showUseKeyModal = ref(false)
 const createdKeyForImport = ref<ApiKey | null>(null)
+const showCcsClientSelect = ref(false)
 const showColumnDropdown = ref(false)
+const pendingCcsRow = ref<ApiKey | null>(null)
 const selectedKey = ref<ApiKey | null>(null)
 const copiedKeyId = ref<number | null>(null)
 const publicSettings = ref<PublicSettings | null>(null)
@@ -1839,6 +1890,63 @@ const resetRateLimitUsage = async () => {
     const errorMsg = error.response?.data?.detail || t('keys.failedToResetRateLimit')
     appStore.showError(errorMsg)
   }
+}
+
+const importToCcswitch = (row: ApiKey) => {
+  const platform = row.group?.platform || 'anthropic'
+
+  // For antigravity platform, show client selection dialog
+  if (platform === 'antigravity') {
+    pendingCcsRow.value = row
+    showCcsClientSelect.value = true
+    return
+  }
+
+  // For other platforms, execute directly
+  executeCcsImport(row, platform === 'gemini' ? 'gemini' : 'claude')
+}
+
+const executeCcsImport = (row: ApiKey, clientType: CcSwitchClientType) => {
+  const baseUrl = publicSettings.value?.api_base_url || window.location.origin
+  const platform = row.group?.platform || 'anthropic'
+
+  const usageScript = CC_SWITCH_USAGE_SCRIPT
+  const providerName = (publicSettings.value?.site_name || 'sub2api').trim() || 'sub2api'
+  const deeplink = buildCcSwitchImportDeeplink({
+    baseUrl,
+    platform,
+    clientType,
+    providerName,
+    apiKey: row.key,
+    usageScript
+  })
+
+  try {
+    window.open(deeplink, '_self')
+
+    // Check if the protocol handler worked by detecting if we're still focused
+    setTimeout(() => {
+      if (document.hasFocus()) {
+        // Still focused means the protocol handler likely failed
+        appStore.showError(t('keys.ccSwitchNotInstalled'))
+      }
+    }, 100)
+  } catch (error) {
+    appStore.showError(t('keys.ccSwitchNotInstalled'))
+  }
+}
+
+const handleCcsClientSelect = (clientType: CcSwitchClientType) => {
+  if (pendingCcsRow.value) {
+    executeCcsImport(pendingCcsRow.value, clientType)
+  }
+  showCcsClientSelect.value = false
+  pendingCcsRow.value = null
+}
+
+const closeCcsClientSelect = () => {
+  showCcsClientSelect.value = false
+  pendingCcsRow.value = null
 }
 
 function formatResetTime(resetAt: string | null): string {
