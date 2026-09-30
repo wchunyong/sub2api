@@ -315,6 +315,19 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/national-day-2026',
+    name: 'NationalDayPromotion2026',
+    component: () => import('@/views/user/NationalDayPromotionView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'National Day Promotion',
+      titleKey: 'payment.nationalDayPageTitle',
+      descriptionKey: 'payment.nationalDayPageDescription',
+      requiresPayment: true
+    }
+  },
+  {
     path: '/orders',
     name: 'OrderList',
     component: () => import('@/views/user/UserOrdersView.vue'),

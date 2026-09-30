@@ -288,6 +288,8 @@ export default {
   // Payment System
   payment: {
     title: 'Recharge',
+    nationalDayPageTitle: 'National Day Campaign',
+    nationalDayPageDescription: 'National Day recharge campaign details',
     amountLabel: 'Amount',
     paymentAmount: 'Payment Amount',
     creditedBalance: 'Credited Balance',

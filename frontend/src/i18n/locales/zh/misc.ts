@@ -312,6 +312,8 @@ export default {
   // Payment System
   payment: {
     title: '充值',
+    nationalDayPageTitle: '国庆活动',
+    nationalDayPageDescription: '国庆充值双重福利活动说明',
     amountLabel: '充值金额',
     paymentAmount: '支付金额',
     creditedBalance: '到账余额',
