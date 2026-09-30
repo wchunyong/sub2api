@@ -173,7 +173,7 @@ func (s *PaymentService) applyNationalDayDailyBenefit(ctx context.Context, o *db
 	if s == nil || s.entClient == nil || s.groupRepo == nil || s.subscriptionSvc == nil || o == nil {
 		return nil
 	}
-	if o.Amount < nationalDay2026DailyBenefitMinRecharge {
+	if o.Amount < nationalDay2026DailyBenefitMinRecharge || !nationalDayPromotionActiveAt(paidAt) {
 		return nil
 	}
 	if s.hasAuditLog(ctx, o.ID, nationalDayPromotionDailyBenefitAuditAction) {
@@ -183,20 +183,26 @@ func (s *PaymentService) applyNationalDayDailyBenefit(ctx context.Context, o *db
 	if err != nil {
 		return err
 	}
-	validityDays := nationalDayPromotionDaysUntilEnd(paidAt)
-	_, err = s.subscriptionSvc.AssignSubscription(ctx, &AssignSubscriptionInput{
-		UserID:       o.UserID,
-		GroupID:      group.ID,
-		ValidityDays: validityDays,
-		Notes:        "national_day_2026_daily_benefit",
-	})
+	expiresAt := nationalDayPromotionEnd()
+	_, err = s.subscriptionSvc.assignSubscriptionUntil(ctx, &AssignSubscriptionInput{
+		UserID:  o.UserID,
+		GroupID: group.ID,
+		Notes:   "national_day_2026_daily_benefit",
+	}, expiresAt)
+	if errors.Is(err, ErrSubscriptionExpired) {
+		// Delayed fulfillment must not grant usable daily quota after the campaign.
+		s.writeAuditLog(ctx, o.ID, nationalDayPromotionDailyBenefitAuditAction, "system", map[string]any{
+			"groupID": group.ID, "expiresAt": expiresAt, "skipped": "campaign_ended",
+		})
+		return nil
+	}
 	if err != nil && !nationalDayPromotionIgnoreExistingDailyBenefitError(err) {
 		return err
 	}
 	s.writeAuditLog(ctx, o.ID, nationalDayPromotionDailyBenefitAuditAction, "system", map[string]any{
-		"groupID":      group.ID,
-		"groupName":    group.Name,
-		"validityDays": validityDays,
+		"groupID":   group.ID,
+		"groupName": group.Name,
+		"expiresAt": expiresAt,
 	})
 	return nil
 }
@@ -245,21 +251,6 @@ func (s *PaymentService) nationalDayPromotionGroupByName(ctx context.Context, na
 		}
 	}
 	return nil, ErrGroupNotFound
-}
-
-func nationalDayPromotionDaysUntilEnd(now time.Time) int {
-	remaining := nationalDayPromotionEnd().Sub(now.In(nationalDayPromotionLocation()))
-	if remaining <= 0 {
-		return 1
-	}
-	days := int(remaining / (24 * time.Hour))
-	if remaining%(24*time.Hour) != 0 {
-		days++
-	}
-	if days < 1 {
-		return 1
-	}
-	return days
 }
 
 func nationalDayPromotionIgnoreExistingDailyBenefitError(err error) bool {

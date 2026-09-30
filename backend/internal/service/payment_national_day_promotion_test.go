@@ -9,11 +9,75 @@ import (
 	"testing"
 	"time"
 
+	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/internal/payment"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/stretchr/testify/require"
 )
+
+func TestNationalDayDailyBenefitUsesExactDeadline(t *testing.T) {
+	ctx := context.Background()
+	for _, paidAt := range []time.Time{
+		nationalDayPromotionStart(),
+		time.Date(2026, 10, 6, 23, 30, 0, 0, nationalDayPromotionLocation()),
+		nationalDayPromotionEnd().Add(-time.Second),
+	} {
+		t.Run(paidAt.Format(time.RFC3339), func(t *testing.T) {
+			client := newPaymentOrderLifecycleTestClient(t)
+			groups := &nationalDayPromotionGroupRepoStub{byName: map[string]*Group{
+				nationalDayPromotionDailyBenefitGroupName: {ID: 10, Name: nationalDayPromotionDailyBenefitGroupName, Status: StatusActive, SubscriptionType: SubscriptionTypeSubscription},
+			}}
+			repo := newSubscriptionUserSubRepoStub()
+			subs := NewSubscriptionService(groups, repo, nil, nil, nil)
+			subs.now = func() time.Time { return paidAt }
+			svc := &PaymentService{entClient: client, groupRepo: groups, subscriptionSvc: subs}
+			order := &dbent.PaymentOrder{ID: 101, UserID: 42, Amount: 10, PaidAt: &paidAt}
+			require.NoError(t, svc.applyNationalDayDailyBenefit(ctx, order, paidAt))
+			sub, err := repo.GetByUserIDAndGroupID(ctx, 42, 10)
+			require.NoError(t, err)
+			require.Equal(t, nationalDayPromotionEnd(), sub.ExpiresAt)
+			require.Equal(t, paidAt, sub.StartsAt)
+			require.Equal(t, 1, repo.createCalls)
+
+			// A second order must not extend the campaign or clear consumed quota.
+			sub.DailyUsageUSD = 6
+			require.NoError(t, repo.Update(ctx, sub))
+			order.ID++
+			require.NoError(t, svc.applyNationalDayDailyBenefit(ctx, order, paidAt))
+			reused, err := repo.GetByUserIDAndGroupID(ctx, 42, 10)
+			require.NoError(t, err)
+			require.Equal(t, nationalDayPromotionEnd(), reused.ExpiresAt)
+			require.Equal(t, 6.0, reused.DailyUsageUSD)
+			require.Equal(t, 1, repo.createCalls)
+
+			subs.now = nationalDayPromotionEnd
+			_, err = subs.ValidateAndCheckLimits(reused, groups.byName[nationalDayPromotionDailyBenefitGroupName])
+			require.ErrorIs(t, err, ErrSubscriptionExpired)
+		})
+	}
+}
+
+func TestNationalDayDailyBenefitDelayedFulfillmentDoesNotGrantAfterEnd(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentOrderLifecycleTestClient(t)
+	groups := &nationalDayPromotionGroupRepoStub{byName: map[string]*Group{
+		nationalDayPromotionDailyBenefitGroupName: {ID: 10, Name: nationalDayPromotionDailyBenefitGroupName, Status: StatusActive, SubscriptionType: SubscriptionTypeSubscription},
+	}}
+	repo := newSubscriptionUserSubRepoStub()
+	subs := NewSubscriptionService(groups, repo, nil, nil, nil)
+	subs.now = nationalDayPromotionEnd
+	svc := &PaymentService{entClient: client, groupRepo: groups, subscriptionSvc: subs}
+	paidAt := nationalDayPromotionEnd().Add(-time.Second)
+	order := &dbent.PaymentOrder{ID: 102, UserID: 42, Amount: 10, PaidAt: &paidAt}
+	require.NoError(t, svc.applyNationalDayDailyBenefit(ctx, order, paidAt))
+	require.Zero(t, repo.createCalls)
+	_, err := repo.GetByUserIDAndGroupID(ctx, 42, 10)
+	require.ErrorIs(t, err, ErrSubscriptionNotFound)
+	log, err := client.PaymentAuditLog.Query().Where(paymentauditlog.ActionEQ(nationalDayPromotionDailyBenefitAuditAction)).Only(ctx)
+	require.NoError(t, err)
+	require.Contains(t, log.Detail, "campaign_ended")
+}
 
 type nationalDayPromotionGroupRepoStub struct {
 	groupRepoNoop
