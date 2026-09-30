@@ -299,6 +299,9 @@ export default {
     createOrder: 'Confirm Payment',
     rechargeBonusBadge: 'Bonus',
     rechargeBonusPreview: 'Pay ¥{paid}, receive ${credited}',
+    nationalDayPromotionIncluded: 'National Day bonus included',
+    nationalDayDailyBenefitBadge: 'Unlock daily $10 seven-day benefit',
+    nationalDayOldUserLimitedQuota: 'Returning users get ${amount} limited quota',
     methods: {
       easypay: 'EasyPay',
       alipay: 'Alipay',

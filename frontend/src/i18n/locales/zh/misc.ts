@@ -323,6 +323,9 @@ export default {
     createOrder: '确认支付',
     rechargeBonusBadge: '优惠',
     rechargeBonusPreview: '支付 ¥{paid}，到账 ${credited}',
+    nationalDayPromotionIncluded: '国庆赠送已包含',
+    nationalDayDailyBenefitBadge: '解锁每日 10 元七天福利',
+    nationalDayOldUserLimitedQuota: '老用户另享 ${amount} 限时额度',
     methods: {
       easypay: '易支付',
       alipay: '支付宝',

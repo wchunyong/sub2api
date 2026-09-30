@@ -78,6 +78,17 @@
                 <p v-if="creditedAmount !== validAmount" class="border-t border-gray-200 pt-2 text-xs text-gray-500 dark:border-dark-600 dark:text-gray-400">
                   {{ t('payment.rechargeBonusPreview', { paid: validAmount.toFixed(2), credited: creditedAmount.toFixed(2) }) }}
                 </p>
+                <div v-if="nationalDayPromotionActive && validAmount > 0" class="flex flex-wrap gap-2 border-t border-gray-200 pt-2 dark:border-dark-600">
+                  <span class="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-200">
+                    {{ t('payment.nationalDayPromotionIncluded') }}
+                  </span>
+                  <span v-if="nationalDayDailyBenefitUnlocked" class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                    {{ t('payment.nationalDayDailyBenefitBadge') }}
+                  </span>
+                  <span v-if="nationalDayOldUserLimitedQuota > 0" data-test="national-day-old-user-quota" class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
+                    {{ t('payment.nationalDayOldUserLimitedQuota', { amount: nationalDayOldUserLimitedQuota.toFixed(0) }) }}
+                  </span>
+                </div>
               </div>
             </div>
             <button :class="['btn w-full py-3 text-base font-medium', paymentButtonClass]" :disabled="!canSubmit || submitting" @click="handleSubmitRecharge">
@@ -515,6 +526,12 @@ const rechargeCreditByPaymentAmount = new Map<number, number>([
   [800, 840],
 ])
 
+function lookupNationalDayPromotionAmount(source: Record<string, number> | undefined, paymentAmount: number): number | null {
+  if (!source || paymentAmount <= 0) return null
+  const value = source[String(paymentAmount)]
+  return Number.isFinite(value) ? value : null
+}
+
 const renderedHelpText = computed(() => DOMPurify.sanitize(
   marked.parse(checkout.value.help_text || '', { async: false, gfm: true, breaks: false }),
 ))
@@ -531,10 +548,31 @@ const subscriptionUsdToCnyRate = computed(() => {
   const rate = checkout.value.subscription_usd_to_cny_rate
   return Number.isFinite(rate) && rate > 0 ? rate : 0
 })
+const nationalDayPromotionActive = computed(() => checkout.value.national_day_promotion?.active === true)
+const nationalDayPromotionCreditedAmount = computed(() => {
+  if (!nationalDayPromotionActive.value) return null
+  return lookupNationalDayPromotionAmount(
+    checkout.value.national_day_promotion?.credited_amount_by_payment_amount,
+    validAmount.value,
+  )
+})
 const creditedAmount = computed(() => {
+  if (nationalDayPromotionCreditedAmount.value != null) return nationalDayPromotionCreditedAmount.value
   const fixedCredit = rechargeCreditByPaymentAmount.get(validAmount.value)
   if (fixedCredit != null) return fixedCredit
   return Math.round((validAmount.value * balanceRechargeMultiplier.value) * 100) / 100
+})
+const nationalDayDailyBenefitUnlocked = computed(() => {
+  const minRecharge = checkout.value.national_day_promotion?.daily_benefit_min_recharge ?? 0
+  return nationalDayPromotionActive.value && minRecharge > 0 && validAmount.value >= minRecharge
+})
+const nationalDayOldUserLimitedQuota = computed(() => {
+  const promotion = checkout.value.national_day_promotion
+  if (!nationalDayPromotionActive.value || !promotion?.is_old_user) return 0
+  return lookupNationalDayPromotionAmount(
+    promotion.old_user_limited_quota_by_payment_amount,
+    validAmount.value,
+  ) ?? 0
 })
 
 // Adaptive grid: center single card, 2-col for 2 plans, 3-col for 3+

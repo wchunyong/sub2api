@@ -53,6 +53,14 @@ export interface MethodLimit {
   available: boolean
 }
 
+export interface NationalDayPromotionCheckout {
+  active: boolean
+  is_old_user: boolean
+  daily_benefit_min_recharge: number
+  credited_amount_by_payment_amount: Record<string, number>
+  old_user_limited_quota_by_payment_amount: Record<string, number>
+}
+
 /** Response from /payment/limits API */
 export interface MethodLimitsResponse {
   methods: Record<string, MethodLimit>
@@ -78,6 +86,7 @@ export interface CheckoutInfoResponse {
   alipay_force_qrcode?: boolean
   /** When true, official Alipay mobile orders use precreate plus an Alipay app deep link */
   alipay_mobile_precreate_deep_link?: boolean
+  national_day_promotion?: NationalDayPromotionCheckout
 }
 
 // ==================== Orders ====================

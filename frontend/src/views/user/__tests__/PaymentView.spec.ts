@@ -368,6 +368,72 @@ describe('PaymentView recharge-only user checkout', () => {
     expect(wrapper.text()).toContain('$210.00')
     expect(wrapper.text()).toContain('payment.rechargeBonusPreview')
   })
+
+  it('shows the national day total credited amount when the promotion is active', async () => {
+    const wrapper = await mountRechargePage({
+      checkout: {
+        national_day_promotion: {
+          active: true,
+          is_old_user: false,
+          daily_benefit_min_recharge: 10,
+          credited_amount_by_payment_amount: {
+            10: 15,
+            20: 30,
+            50: 75,
+            100: 150,
+            200: 300,
+            400: 600,
+            800: 1200,
+          },
+          old_user_limited_quota_by_payment_amount: {
+            10: 2,
+            20: 4,
+            50: 10,
+            100: 20,
+            200: 40,
+            400: 80,
+            800: 160,
+          },
+        },
+      },
+    })
+
+    const amountInput = wrapper.findComponent(AmountInput)
+    await amountInput.vm.$emit('update:modelValue', 100)
+    await flushPromises()
+
+    const text = wrapper.text()
+    expect(text).toContain('payment.creditedBalance')
+    expect(text).toContain('$150.00')
+    expect(text).toContain('payment.nationalDayPromotionIncluded')
+    expect(text).toContain('payment.nationalDayDailyBenefitBadge')
+    expect(text).not.toContain('payment.nationalDayOldUserLimitedQuota')
+  })
+
+  it('shows old-user limited quota on national day recharge preview', async () => {
+    const wrapper = await mountRechargePage({
+      checkout: {
+        national_day_promotion: {
+          active: true,
+          is_old_user: true,
+          daily_benefit_min_recharge: 10,
+          credited_amount_by_payment_amount: {
+            100: 150,
+          },
+          old_user_limited_quota_by_payment_amount: {
+            100: 20,
+          },
+        },
+      },
+    })
+
+    const amountInput = wrapper.findComponent(AmountInput)
+    await amountInput.vm.$emit('update:modelValue', 100)
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="national-day-old-user-quota"]').exists()).toBe(true)
+    expect(translate).toHaveBeenCalledWith('payment.nationalDayOldUserLimitedQuota', { amount: '20' })
+  })
 })
 
 describe('PaymentView help text', () => {
