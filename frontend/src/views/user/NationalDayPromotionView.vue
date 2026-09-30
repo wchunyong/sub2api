@@ -1,618 +1,247 @@
 <template>
   <AppLayout>
-    <main class="national-day-page">
-      <section class="hero-section">
-        <div class="hero-copy">
-          <p class="activity-kicker">2026 国庆限时活动</p>
-          <h1>国庆七天乐，双重福利限时开启</h1>
-          <p class="hero-subtitle">储值赠送到账额度，单笔满 10 元解锁每日福利。</p>
-          <div class="hero-meta">
-            <span><Icon name="calendar" size="sm" /> 2026/09/30 18:00 - 2026/10/08 00:00</span>
-            <span><Icon name="clock" size="sm" /> 上海时区</span>
-          </div>
-          <div class="hero-actions">
-            <button class="primary-action" @click="goRecharge">立即充值</button>
-            <a href="#rules" class="secondary-action">查看活动规则</a>
-          </div>
+    <div class="national-day-page">
+      <header class="campaign-header">
+        <p class="activity-kicker"><Icon name="gift" size="sm" /> 2026 国庆限时礼遇</p>
+        <h1>国庆七天乐<span>双重福利，一起享</span></h1>
+        <p class="campaign-description">充值赠礼，每日再享免费额度。新老用户均可参与，两重福利可叠加。</p>
+        <div class="campaign-toolbar">
+          <p class="campaign-date">
+            <Icon name="calendar" size="sm" />
+            <span><time datetime="2026-09-30T18:00:00+08:00">2026/09/30 18:00</time><span class="date-divider">至</span><time datetime="2026-10-08T00:00:00+08:00">2026/10/08 00:00</time></span>
+          </p>
+          <RouterLink to="/purchase" class="btn btn-primary recharge-action">
+            立即充值 <Icon name="arrowRight" size="sm" />
+          </RouterLink>
         </div>
-        <div class="festival-visual" aria-hidden="true">
-          <div class="sunburst"></div>
-          <div class="gate">
-            <div class="gate-roof"></div>
-            <div class="gate-body">
-              <span>50%</span>
-              <small>储值赠送</small>
-            </div>
-          </div>
-          <div class="benefit-chip chip-one">每日 10 元</div>
-          <div class="benefit-chip chip-two">老用户 +20%</div>
-        </div>
-      </section>
+      </header>
 
       <section class="benefit-grid" aria-label="活动福利">
-        <article class="benefit-panel">
-          <div class="panel-icon"><Icon name="creditCard" size="lg" /></div>
-          <p class="panel-label">活动一</p>
-          <h2>国庆储值赠送</h2>
-          <p>活动期内任意固定档位充值均可参与，充值页展示的到账额度已包含 50% 赠送。</p>
-          <div class="panel-stat"><strong>到账 150</strong><span>充值 100 示例</span></div>
+        <article class="benefit-panel recharge-benefit">
+          <div class="panel-topline">
+            <span class="panel-icon"><Icon name="creditCard" size="lg" /></span>
+            <span class="panel-label">活动一 · 新老同享</span>
+          </div>
+          <h2>国庆储值赠礼</h2>
+          <p class="benefit-amount">50<span>%</span><small>充值即赠</small></p>
+          <p class="benefit-description">活动期间，充值即赠送充值金额的 50%，新老用户均可享受。</p>
+          <div class="benefit-footer"><Icon name="checkCircle" size="sm" /><span>充值 100 元，到账 150 元额度</span></div>
         </article>
 
-        <article class="benefit-panel">
-          <div class="panel-icon"><Icon name="gift" size="lg" /></div>
-          <p class="panel-label">活动二</p>
-          <h2>10 元解锁七天福利</h2>
-          <p>单笔余额充值大于等于 10 元即可解锁，每天 0 点刷新 10 元额度，当天有效。</p>
-          <div class="panel-stat"><strong>10 元/天</strong><span>每日刷新，不累计</span></div>
+        <article class="benefit-panel daily-benefit">
+          <div class="panel-topline">
+            <span class="panel-icon"><Icon name="gift" size="lg" /></span>
+            <span class="panel-label">活动二 · 每日福利</span>
+          </div>
+          <h2>10 元解锁国庆七天福利</h2>
+          <p class="benefit-amount">10<span>元</span><small>每日免费额度</small></p>
+          <p class="benefit-description">单笔充值满 10 元，即可解锁国庆七天福利，每天享受 10 元免费额度。</p>
+          <div class="benefit-footer"><Icon name="calendar" size="sm" /><span>每日 0 点刷新，当天有效</span></div>
         </article>
 
-        <article class="benefit-panel">
-          <div class="panel-icon"><Icon name="badge" size="lg" /></div>
-          <p class="panel-label">老用户专享</p>
-          <h2>额外限时额度</h2>
-          <p>2026/09/30 18:00 前有成功余额充值记录的用户，额外获得充值金额 20% 的限时额度。</p>
-          <div class="panel-stat"><strong>+20%</strong><span>有效期 1 个月</span></div>
+        <article class="benefit-panel loyalty-benefit">
+          <div class="panel-topline">
+            <span class="panel-icon"><Icon name="badge" size="lg" /></span>
+            <span class="panel-label">储值加享 · 老用户专属</span>
+          </div>
+          <h2>再享限时额度</h2>
+          <p class="benefit-amount">20<span>%</span><small>额外赠送</small></p>
+          <p class="benefit-description">老用户（历史充值过的用户）同享 50% 储值赠礼，再额外获赠充值金额 20% 的限时额度。</p>
+          <div class="benefit-footer"><Icon name="checkCircle" size="sm" /><span>限时额度有效期 1 个月</span></div>
         </article>
       </section>
 
-      <section class="example-section" aria-label="充值示例">
+      <section class="example-section" aria-labelledby="example-heading">
         <div class="section-heading">
-          <p>充值示例</p>
-          <h2>两个活动独立判定，可以叠加享受</h2>
+          <div>
+            <p class="section-kicker">福利叠加享</p>
+            <h2 id="example-heading">充多少，享多少</h2>
+          </div>
+          <p class="section-caption">以充值 100 元为例</p>
         </div>
-        <div class="example-table">
-          <div class="example-row header">
-            <span>用户类型</span>
-            <span>充值</span>
-            <span>活动权益</span>
-          </div>
-          <div class="example-row">
-            <span>新用户</span>
-            <span>100</span>
-            <span>到账 150，并解锁每日 10 元七天福利</span>
-          </div>
-          <div class="example-row">
-            <span>老用户</span>
-            <span>100</span>
-            <span>到账 150，另享 20 限时额度，并解锁每日 10 元七天福利</span>
-          </div>
-          <div class="example-row">
-            <span>任意用户</span>
-            <span>10</span>
-            <span>到账 15，并解锁每日 10 元七天福利</span>
-          </div>
+        <div class="example-table-wrap">
+          <table class="example-table">
+            <thead>
+              <tr><th scope="col">用户类型</th><th scope="col">充值金额</th><th scope="col">到账额度</th><th scope="col">额外限时额度</th><th scope="col">每日免费额度</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">新用户</th><td>100 元</td><td class="credited-amount">150 元</td><td class="muted-cell">—</td><td><span class="daily-quota">10 元 / 天</span></td>
+              </tr>
+              <tr>
+                <th scope="row">老用户</th><td>100 元</td><td class="credited-amount">150 元</td><td class="limited-amount">+20 元</td><td><span class="daily-quota">10 元 / 天</span></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
-      <section id="rules" class="rules-section" aria-label="活动规则">
-        <div class="section-heading">
-          <p>活动规则</p>
-          <h2>关键口径</h2>
+      <footer class="campaign-footer">
+        <div class="footer-copy">
+          <Icon name="sparkles" size="lg" />
+          <div><p>国庆好礼，充值即享</p><span>赠送额度将在支付成功后自动发放</span></div>
         </div>
-        <div class="rules-list">
-          <div v-for="rule in rules" :key="rule" class="rule-item">
-            <Icon name="checkCircle" size="sm" />
-            <span>{{ rule }}</span>
-          </div>
-        </div>
-      </section>
-
-      <div class="sticky-cta">
-        <button @click="goRecharge">去充值</button>
-        <span>赠送额度将在支付成功后自动发放</span>
-      </div>
-    </main>
+        <RouterLink to="/purchase" class="btn btn-primary recharge-action">
+          去充值 <Icon name="arrowRight" size="sm" />
+        </RouterLink>
+      </footer>
+    </div>
   </AppLayout>
 </template>
 
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
-
-const router = useRouter()
-
-const rules = [
-  '储值赠送不设 10 元门槛，活动期内余额充值均可参与。',
-  '10 元七天福利需单笔余额充值大于等于 10 元。',
-  '两个活动分开判定，满足条件时可以叠加。',
-  '老用户以 2026/09/30 18:00 前成功余额充值记录为准，管理员赠送不计入。',
-  '活动资格以支付成功时间为准。',
-]
-
-function goRecharge() {
-  router.push('/purchase')
-}
 </script>
 
 <style scoped>
 .national-day-page {
-  --festival-red: #b91c1c;
-  --festival-deep: #7f1d1d;
-  --festival-gold: #f59e0b;
-  --festival-ink: #1f2937;
-  min-height: calc(100vh - 4rem);
-  padding: 20px 16px 96px;
-  color: var(--festival-ink);
-  background:
-    linear-gradient(180deg, #fff7ed 0%, #fff 42%, #fff7ed 100%);
-}
-
-.hero-section {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
-  gap: 28px;
-  overflow: hidden;
+  @apply text-gray-900 dark:text-gray-100;
   max-width: 1120px;
   margin: 0 auto;
-  padding: 46px;
-  border-radius: 8px;
-  background:
-    radial-gradient(circle at 80% 18%, rgba(245, 158, 11, 0.24), transparent 30%),
-    linear-gradient(135deg, #991b1b 0%, #dc2626 48%, #f97316 100%);
-  box-shadow: 0 24px 60px rgba(153, 27, 27, 0.22);
+  letter-spacing: 0;
 }
 
-.hero-section::before,
-.hero-section::after {
-  position: absolute;
-  content: "";
-  width: 220px;
-  height: 220px;
-  border: 1px solid rgba(255, 237, 213, 0.36);
-  transform: rotate(28deg);
-}
-
-.hero-section::before {
-  right: -80px;
-  top: -82px;
-}
-
-.hero-section::after {
-  left: -130px;
-  bottom: -150px;
-}
-
-.hero-copy {
-  position: relative;
-  z-index: 1;
-  align-self: center;
-  color: #fff7ed;
+.campaign-header {
+  @apply border-b border-gray-200 dark:border-dark-700/60;
+  padding: 12px 0 28px;
 }
 
 .activity-kicker {
-  margin: 0 0 12px;
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0;
-  color: #fde68a;
-}
-
-.hero-copy h1 {
-  max-width: 620px;
-  margin: 0;
-  font-size: clamp(34px, 7vw, 64px);
-  line-height: 1.05;
-  letter-spacing: 0;
-}
-
-.hero-subtitle {
-  max-width: 560px;
-  margin: 18px 0 0;
-  font-size: 18px;
-  line-height: 1.7;
-  color: #ffedd5;
-}
-
-.hero-meta {
+  @apply text-red-700 dark:text-red-300;
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 24px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 600;
 }
 
-.hero-meta span {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 34px;
-  padding: 7px 11px;
-  border: 1px solid rgba(254, 243, 199, 0.3);
-  border-radius: 8px;
-  background: rgba(127, 29, 29, 0.28);
-  font-size: 13px;
+.campaign-header h1 {
+  margin: 0;
+  font-size: 36px;
+  line-height: 1.4;
   font-weight: 700;
 }
 
-.hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 30px;
+.campaign-header h1 span {
+  @apply text-primary-700 dark:text-primary-300;
+  display: inline-block;
+  margin-left: 20px;
 }
 
-.primary-action,
-.secondary-action,
-.sticky-cta button {
-  min-height: 44px;
-  border-radius: 8px;
-  font-weight: 800;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
-}
-
-.primary-action {
-  padding: 0 22px;
-  color: #7f1d1d;
-  background: #fef3c7;
-  box-shadow: 0 12px 24px rgba(120, 53, 15, 0.24);
-}
-
-.secondary-action {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 18px;
-  color: #fff7ed;
-  border: 1px solid rgba(255, 247, 237, 0.55);
-}
-
-.primary-action:hover,
-.secondary-action:hover,
-.sticky-cta button:hover {
-  transform: translateY(-1px);
-}
-
-.festival-visual {
-  position: relative;
-  z-index: 1;
-  min-height: 360px;
-}
-
-.sunburst {
-  position: absolute;
-  inset: 18px 42px auto auto;
-  width: 260px;
-  height: 260px;
-  border-radius: 50%;
-  background: repeating-conic-gradient(from 0deg, rgba(254, 243, 199, 0.95) 0deg 8deg, rgba(251, 191, 36, 0.18) 8deg 16deg);
-  opacity: 0.82;
-}
-
-.gate {
-  position: absolute;
-  right: 28px;
-  bottom: 16px;
-  width: min(320px, 84%);
-  color: #7f1d1d;
-}
-
-.gate-roof {
-  height: 68px;
-  border-radius: 8px 8px 2px 2px;
-  background: linear-gradient(180deg, #fde68a, #f59e0b);
-  clip-path: polygon(8% 100%, 20% 16%, 80% 16%, 92% 100%);
-}
-
-.gate-body {
-  display: grid;
-  place-items: center;
-  min-height: 178px;
-  border: 2px solid rgba(253, 230, 138, 0.8);
-  border-radius: 0 0 8px 8px;
-  background: rgba(255, 247, 237, 0.92);
-}
-
-.gate-body span {
-  font-size: 76px;
-  line-height: 1;
-  font-weight: 900;
-}
-
-.gate-body small {
-  margin-top: -34px;
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.benefit-chip {
-  position: absolute;
-  min-width: 124px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  color: #7f1d1d;
-  background: #fff7ed;
-  box-shadow: 0 12px 30px rgba(127, 29, 29, 0.2);
+.campaign-description {
+  @apply text-gray-600 dark:text-dark-300;
+  margin-top: 12px;
   font-size: 15px;
-  font-weight: 900;
-  text-align: center;
+  line-height: 1.8;
 }
 
-.chip-one {
-  left: 28px;
-  top: 76px;
+.campaign-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 24px;
 }
 
-.chip-two {
-  right: 4px;
-  top: 160px;
+.campaign-date {
+  @apply text-gray-500 dark:text-dark-400;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.8;
 }
 
-.benefit-grid,
-.example-section,
-.rules-section {
-  max-width: 1120px;
-  margin: 24px auto 0;
-}
+.campaign-date svg { flex-shrink: 0; }
+.campaign-date time { display: inline-block; }
+.date-divider { margin: 0 10px; }
+.recharge-action { min-height: 42px; border-radius: 8px; white-space: nowrap; }
 
 .benefit-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 18px;
+  margin-top: 28px;
 }
 
 .benefit-panel {
-  min-height: 260px;
-  padding: 24px;
-  border: 1px solid #fed7aa;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 14px 36px rgba(127, 29, 29, 0.08);
-}
-
-.panel-icon {
-  display: grid;
-  width: 44px;
-  height: 44px;
-  place-items: center;
-  border-radius: 8px;
-  color: #991b1b;
-  background: #ffedd5;
-}
-
-.panel-label {
-  margin: 18px 0 6px;
-  font-size: 12px;
-  font-weight: 900;
-  color: #b45309;
-}
-
-.benefit-panel h2,
-.section-heading h2 {
-  margin: 0;
-  color: #111827;
-  letter-spacing: 0;
-}
-
-.benefit-panel h2 {
-  font-size: 22px;
-}
-
-.benefit-panel > p:not(.panel-label) {
-  margin: 12px 0 0;
-  min-height: 74px;
-  color: #4b5563;
-  line-height: 1.7;
-}
-
-.panel-stat {
+  @apply border border-gray-200 bg-white shadow-sm dark:border-dark-700/60 dark:bg-dark-800/50;
   display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid #ffedd5;
-}
-
-.panel-stat strong {
-  color: #b91c1c;
-  font-size: 26px;
-}
-
-.panel-stat span {
-  color: #6b7280;
-  font-size: 13px;
-}
-
-.example-section,
-.rules-section {
-  padding: 28px;
-  border-radius: 8px;
-  background: #fff;
-  border: 1px solid #fed7aa;
-}
-
-.section-heading p {
-  margin: 0 0 6px;
-  color: #b45309;
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.section-heading h2 {
-  font-size: 28px;
-}
-
-.example-table {
-  margin-top: 20px;
-  overflow: hidden;
-  border: 1px solid #ffedd5;
-  border-radius: 8px;
-}
-
-.example-row {
-  display: grid;
-  grid-template-columns: 0.8fr 0.6fr 1.8fr;
-  gap: 12px;
-  align-items: center;
-  min-height: 56px;
-  padding: 12px 16px;
-  border-top: 1px solid #ffedd5;
-}
-
-.example-row:first-child {
-  border-top: 0;
-}
-
-.example-row.header {
-  min-height: 46px;
-  background: #fff7ed;
-  color: #7f1d1d;
-  font-weight: 900;
-}
-
-.example-row span {
+  flex-direction: column;
   min-width: 0;
-  line-height: 1.55;
-  word-break: break-word;
-}
-
-.rules-list {
-  display: grid;
-  gap: 12px;
-  margin-top: 18px;
-}
-
-.rule-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 14px;
+  padding: 24px;
   border-radius: 8px;
-  background: #fff7ed;
-  color: #374151;
-  line-height: 1.6;
 }
 
-.rule-item svg {
-  flex: 0 0 auto;
-  margin-top: 3px;
-  color: #b91c1c;
+.panel-topline { display: flex; align-items: center; gap: 10px; }
+.panel-icon { display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0; border-radius: 8px; }
+.panel-label { @apply text-gray-500 dark:text-dark-400; font-size: 12px; line-height: 1.5; }
+.recharge-benefit .panel-icon { @apply bg-primary-50 text-primary-700 dark:bg-primary-400/10 dark:text-primary-300; }
+.daily-benefit .panel-icon { @apply bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-300; }
+.loyalty-benefit .panel-icon { @apply bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300; }
+
+.benefit-panel h2 { margin-top: 20px; font-size: 18px; font-weight: 600; line-height: 1.6; }
+.benefit-amount { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 4px; margin-top: 12px; font-size: 48px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.benefit-amount > span { font-size: 24px; }
+.benefit-amount small { @apply text-gray-500 dark:text-dark-400; margin-left: 6px; font-size: 12px; font-weight: 400; }
+.recharge-benefit .benefit-amount { @apply text-primary-700 dark:text-primary-300; }
+.daily-benefit .benefit-amount { @apply text-red-600 dark:text-red-300; }
+.loyalty-benefit .benefit-amount { @apply text-amber-700 dark:text-amber-300; }
+.benefit-description { @apply text-gray-600 dark:text-dark-300; flex: 1; margin: 18px 0 24px; font-size: 14px; line-height: 1.85; }
+.benefit-footer { @apply border-t border-gray-100 text-gray-500 dark:border-dark-700/60 dark:text-dark-400; display: flex; gap: 8px; align-items: center; padding-top: 16px; font-size: 12px; line-height: 1.7; }
+.benefit-footer svg { flex-shrink: 0; }
+
+.example-section { margin-top: 36px; }
+.section-heading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 18px; }
+.section-kicker { @apply text-primary-700 dark:text-primary-300; font-size: 12px; margin-bottom: 6px; font-weight: 600; }
+.section-heading h2 { font-size: 20px; font-weight: 600; }
+.section-caption { @apply text-gray-500 dark:text-dark-400; font-size: 13px; }
+.example-table-wrap { overflow-x: auto; }
+.example-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+.example-table th, .example-table td { @apply border-b border-gray-200 dark:border-dark-700/60; padding: 18px 16px; line-height: 1.6; }
+.example-table thead { @apply bg-gray-100/70 text-gray-500 dark:bg-dark-800/40 dark:text-dark-400; font-size: 12px; }
+.example-table th { font-weight: 500; }
+.example-table tbody td { font-variant-numeric: tabular-nums; }
+.credited-amount { @apply text-primary-700 dark:text-primary-300; font-weight: 700; }
+.limited-amount { @apply text-amber-700 dark:text-amber-300; font-weight: 600; }
+.muted-cell { @apply text-gray-400 dark:text-dark-500; }
+.daily-quota { @apply text-gray-700 dark:text-dark-200; white-space: nowrap; }
+
+.campaign-footer { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 28px 0 12px; }
+.footer-copy { display: flex; align-items: center; gap: 12px; }
+.footer-copy > svg { @apply text-primary-600 dark:text-primary-400; flex-shrink: 0; }
+.footer-copy p { font-size: 14px; font-weight: 500; }
+.footer-copy span { @apply text-gray-500 dark:text-dark-400; display: block; margin-top: 4px; font-size: 12px; line-height: 1.6; }
+
+@media (max-width: 1279px) {
+  .benefit-grid { gap: 12px; }
+  .benefit-panel { padding: 20px; }
+  .campaign-header h1 { font-size: 30px; }
+  .campaign-header h1 span { margin-left: 12px; }
+  .benefit-amount small { width: 100%; margin: 8px 0 0; }
 }
 
-.sticky-cta {
-  position: fixed;
-  z-index: 20;
-  right: 22px;
-  bottom: 22px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  max-width: calc(100vw - 44px);
-  padding: 10px;
-  border: 1px solid #fed7aa;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 16px 40px rgba(127, 29, 29, 0.14);
-  backdrop-filter: blur(10px);
-}
-
-.sticky-cta button {
-  padding: 0 20px;
-  color: #fff7ed;
-  background: #dc2626;
-}
-
-.sticky-cta span {
-  color: #6b7280;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-@media (max-width: 900px) {
-  .hero-section {
-    grid-template-columns: 1fr;
-    padding: 34px 24px 24px;
-  }
-
-  .festival-visual {
-    min-height: 280px;
-  }
-
-  .benefit-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 640px) {
-  .national-day-page {
-    padding: 12px 12px 112px;
-  }
-
-  .hero-copy h1 {
-    font-size: 38px;
-  }
-
-  .hero-subtitle {
-    font-size: 16px;
-  }
-
-  .hero-actions,
-  .hero-actions > * {
-    width: 100%;
-  }
-
-  .primary-action,
-  .secondary-action {
-    justify-content: center;
-  }
-
-  .festival-visual {
-    min-height: 240px;
-  }
-
-  .sunburst {
-    width: 190px;
-    height: 190px;
-  }
-
-  .gate {
-    right: 12px;
-    width: 82%;
-  }
-
-  .gate-body {
-    min-height: 132px;
-  }
-
-  .gate-body span {
-    font-size: 52px;
-  }
-
-  .gate-body small {
-    margin-top: -24px;
-    font-size: 15px;
-  }
-
-  .chip-one {
-    left: 0;
-    top: 42px;
-  }
-
-  .chip-two {
-    right: 0;
-    top: 126px;
-  }
-
-  .example-section,
-  .rules-section,
-  .benefit-panel {
-    padding: 20px;
-  }
-
-  .example-row {
-    grid-template-columns: 1fr;
-    gap: 4px;
-  }
-
-  .example-row.header {
-    display: none;
-  }
-
-  .sticky-cta {
-    right: 12px;
-    left: 12px;
-    bottom: 12px;
-    justify-content: space-between;
-  }
+@media (max-width: 767px) {
+  .campaign-header { padding-top: 4px; padding-bottom: 24px; }
+  .campaign-header h1 { font-size: 28px; }
+  .campaign-header h1 span { display: block; margin: 4px 0 0; font-size: 24px; }
+  .campaign-description { font-size: 14px; }
+  .campaign-toolbar { align-items: stretch; flex-direction: column; margin-top: 20px; }
+  .campaign-date { font-size: 12px; }
+  .date-divider { margin: 0 6px; }
+  .benefit-grid { grid-template-columns: 1fr; gap: 16px; margin-top: 24px; }
+  .benefit-panel { padding: 22px; }
+  .benefit-panel h2 { margin-top: 16px; }
+  .benefit-amount small { width: auto; margin: 0 0 0 8px; }
+  .benefit-description { margin: 14px 0 20px; }
+  .example-section { margin-top: 28px; }
+  .example-table th, .example-table td { padding: 14px 6px; font-size: 12px; }
+  .example-table thead th { max-width: 62px; }
+  .daily-quota { white-space: normal; }
+  .campaign-footer { align-items: stretch; flex-direction: column; }
 }
 </style>
