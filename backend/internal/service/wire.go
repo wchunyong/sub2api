@@ -252,7 +252,6 @@ func ProvideAccountUsageService(
 }
 
 func ProvideAccountTestService(
-	db *sql.DB,
 	accountRepo AccountRepository,
 	geminiTokenProvider *GeminiTokenProvider,
 	claudeTokenProvider *ClaudeTokenProvider,
@@ -279,7 +278,6 @@ func ProvideAccountTestService(
 	service.SetOpenAIGatewayService(openAIGatewayService)
 	service.SetSettingService(settingService)
 	service.SetPluginManager(pluginManager)
-	service.qualityChecks = NewQualityCheckService(db, service)
 	return service
 }
 
