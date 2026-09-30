@@ -2,7 +2,7 @@
   <AppLayout>
     <div class="custom-page-layout">
       <div class="card flex-1 min-h-0 overflow-hidden">
-        <div v-if="loading" class="flex h-full items-center justify-center py-12">
+        <div v-if="loading || internalRoute" class="flex h-full items-center justify-center py-12">
           <div
             class="h-8 w-8 animate-spin rounded-full border-2 border-primary-500 border-t-transparent"
           ></div>
@@ -127,7 +127,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useResizeObserver } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores'
@@ -137,6 +137,7 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { buildApiUrl } from '@/api/client'
 import { buildEmbeddedUrl, detectTheme } from '@/utils/embedded-url'
+import { resolveCustomMenuRoute } from '@/utils/custom-menu-route'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 
@@ -148,6 +149,7 @@ interface TocItem {
 
 const { t, locale } = useI18n()
 const route = useRoute()
+const router = useRouter()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const adminSettingsStore = useAdminSettingsStore()
@@ -241,8 +243,16 @@ const markdownSlug = computed(() => {
 
 const isMarkdownMode = computed(() => !!markdownSlug.value)
 
+const internalRoute = computed(() => menuItem.value
+  ? resolveCustomMenuRoute(menuItem.value, window.location.origin)
+  : null)
+
+watch(internalRoute, (target) => {
+  if (target) void router.replace(target)
+}, { immediate: true })
+
 const embeddedUrl = computed(() => {
-  if (!menuItem.value || isMarkdownMode.value) return ''
+  if (!menuItem.value || isMarkdownMode.value || internalRoute.value) return ''
   return buildEmbeddedUrl(
     menuItem.value.url,
     authStore.user?.id,

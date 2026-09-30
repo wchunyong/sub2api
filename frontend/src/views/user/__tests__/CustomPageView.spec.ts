@@ -3,7 +3,8 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import CustomPageView from '../CustomPageView.vue'
 
-const { appStore } = vi.hoisted(() => ({
+const { appStore, replaceRoute } = vi.hoisted(() => ({
+  replaceRoute: vi.fn(),
   appStore: {
     publicSettingsLoaded: true,
     cachedPublicSettings: { custom_menu_items: [{ id: 'docs', url: 'https://example.com/docs' }] },
@@ -11,7 +12,10 @@ const { appStore } = vi.hoisted(() => ({
 }))
 
 vi.mock('@/components/layout/AppLayout.vue', () => ({ default: { template: '<div><slot /></div>' } }))
-vi.mock('vue-router', () => ({ useRoute: () => ({ params: { id: 'docs' } }) }))
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ params: { id: 'docs' } }),
+  useRouter: () => ({ replace: replaceRoute }),
+}))
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key, locale: { value: 'en' } }) }))
 vi.mock('@/stores', () => ({ useAppStore: () => appStore }))
 vi.mock('@/stores/auth', () => ({ useAuthStore: () => ({ isAdmin: false, user: { id: 7 }, token: 'test-token' }) }))
@@ -66,6 +70,7 @@ function click(button: HTMLElement, detail = 1) {
 
 describe('custom page open button', () => {
   beforeEach(() => {
+    replaceRoute.mockReset()
     appStore.cachedPublicSettings.custom_menu_items = [{ id: 'docs', url: 'https://example.com/docs' }]
     vi.stubGlobal('ResizeObserver', class {
       constructor(callback: () => void) { notifyResize = callback }
@@ -84,6 +89,27 @@ describe('custom page open button', () => {
     const wrapper = mountPage()
     expect(wrapper.find('.custom-open-fab').exists()).toBe(hidden !== true)
     expect(wrapper.get('iframe').attributes('src')).toContain('https://example.com/docs')
+  })
+
+  it.each([
+    '/national-day-2026',
+    `${window.location.origin}/national-day-2026`,
+    `${window.location.origin}/national-day-2026?from=menu#benefits`,
+  ])('opens the local campaign through the router instead of an iframe: %s', async (url) => {
+    appStore.cachedPublicSettings.custom_menu_items = [{ id: 'docs', url }]
+    const wrapper = mountPage()
+    await flushPromises()
+    const target = new URL(url, window.location.origin)
+    expect(replaceRoute).toHaveBeenCalledWith(target.pathname + target.search + target.hash)
+    expect(wrapper.find('iframe').exists()).toBe(false)
+    expect(wrapper.find('.custom-open-fab').exists()).toBe(false)
+  })
+
+  it('keeps another origin with the same campaign path embedded', () => {
+    appStore.cachedPublicSettings.custom_menu_items = [{ id: 'docs', url: 'https://example.com/national-day-2026' }]
+    const wrapper = mountPage()
+    expect(replaceRoute).not.toHaveBeenCalled()
+    expect(wrapper.get('iframe').attributes('src')).toContain('https://example.com/national-day-2026')
   })
 
   it('preserves the embedded URL, secure link attributes, and normal clicks with small pointer movements', async () => {
