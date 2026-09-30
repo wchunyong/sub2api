@@ -2,6 +2,7 @@ package service
 
 import (
 	"math"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/payment"
 	"github.com/shopspring/decimal"
@@ -43,6 +44,13 @@ func calculateCreditedBalance(paymentAmount, multiplier float64) float64 {
 		Mul(decimal.NewFromFloat(normalizeBalanceRechargeMultiplier(multiplier))).
 		Round(2).
 		InexactFloat64()
+}
+
+func calculateBalanceOrderAmount(paymentAmount, multiplier float64, createdAt time.Time) float64 {
+	if nationalDayPromotionActiveAt(createdAt) {
+		return paymentAmount
+	}
+	return calculateCreditedBalance(paymentAmount, multiplier)
 }
 
 func calculateGatewayRefundAmount(orderAmount, payAmount, refundAmount float64, currency string) float64 {

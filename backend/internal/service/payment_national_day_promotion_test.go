@@ -26,6 +26,16 @@ func TestBuildNationalDayPromotionCheckoutActivePreview(t *testing.T) {
 	require.Equal(t, 20.0, preview.OldUserLimitedQuotaByPaymentAmount["100"])
 }
 
+func TestCalculateBalanceOrderAmountKeepsPaidAmountDuringNationalDayPromotion(t *testing.T) {
+	t.Parallel()
+
+	activeAt := time.Date(2026, 10, 1, 12, 0, 0, 0, nationalDayPromotionLocation())
+	before := time.Date(2026, 9, 30, 17, 59, 59, 0, nationalDayPromotionLocation())
+
+	require.Equal(t, 200.0, calculateBalanceOrderAmount(200, 1, activeAt))
+	require.Equal(t, 210.0, calculateBalanceOrderAmount(200, 1, before))
+}
+
 func TestBuildNationalDayPromotionCheckoutOldUserRequiresCompletedBalanceOrderBeforeCutoff(t *testing.T) {
 	ctx := context.Background()
 	client := newPaymentOrderLifecycleTestClient(t)
