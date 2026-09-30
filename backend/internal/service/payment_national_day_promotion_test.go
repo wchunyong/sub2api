@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/internal/payment"
 	"github.com/stretchr/testify/require"
 )
@@ -34,6 +35,63 @@ func TestCalculateBalanceOrderAmountKeepsPaidAmountDuringNationalDayPromotion(t 
 
 	require.Equal(t, 200.0, calculateBalanceOrderAmount(200, 1, activeAt))
 	require.Equal(t, 210.0, calculateBalanceOrderAmount(200, 1, before))
+}
+
+func TestApplyNationalDayPromotionBalanceBonusIsIdempotent(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentOrderLifecycleTestClient(t)
+	now := time.Date(2026, 10, 1, 12, 0, 0, 0, nationalDayPromotionLocation())
+
+	user, err := client.User.Create().
+		SetEmail("national-day-bonus-" + strconv.FormatInt(time.Now().UnixNano(), 10) + "@example.com").
+		SetPasswordHash("hash").
+		SetUsername("national-day-bonus-user").
+		Save(ctx)
+	require.NoError(t, err)
+
+	order, err := client.PaymentOrder.Create().
+		SetUserID(user.ID).
+		SetUserEmail(user.Email).
+		SetUserName(user.Username).
+		SetAmount(100).
+		SetPayAmount(100).
+		SetFeeRate(0).
+		SetRechargeCode("PAY-NATIONAL-DAY-BONUS").
+		SetOutTradeNo("sub2_national_day_bonus_" + strconv.FormatInt(time.Now().UnixNano(), 10)).
+		SetPaymentType(payment.TypeAlipay).
+		SetPaymentTradeNo("trade-national-day-bonus").
+		SetOrderType(payment.OrderTypeBalance).
+		SetStatus(OrderStatusCompleted).
+		SetPaidAt(now).
+		SetExpiresAt(now.Add(10 * time.Minute)).
+		SetClientIP("127.0.0.1").
+		SetSrcHost("api.example.com").
+		Save(ctx)
+	require.NoError(t, err)
+
+	balance := 100.0
+	adjustCalls := 0
+	userRepo := &mockUserRepo{}
+	userRepo.adjustBalanceFn = func(_ context.Context, id int64, delta float64) (BalanceChange, error) {
+		require.Equal(t, user.ID, id)
+		adjustCalls++
+		old := balance
+		balance += delta
+		return BalanceChange{Old: old, New: balance}, nil
+	}
+
+	svc := &PaymentService{entClient: client, userRepo: userRepo}
+	require.NoError(t, svc.applyNationalDayPromotionForOrder(ctx, order))
+	require.NoError(t, svc.applyNationalDayPromotionForOrder(ctx, order))
+
+	require.Equal(t, 1, adjustCalls)
+	require.Equal(t, 150.0, balance)
+
+	count, err := client.PaymentAuditLog.Query().
+		Where(paymentauditlog.OrderIDEQ(strconv.FormatInt(order.ID, 10)), paymentauditlog.ActionEQ(nationalDayPromotionBalanceBonusAuditAction)).
+		Count(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
 }
 
 func TestBuildNationalDayPromotionCheckoutOldUserRequiresCompletedBalanceOrderBeforeCutoff(t *testing.T) {

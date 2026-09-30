@@ -380,7 +380,13 @@ func (s *PaymentService) doBalance(ctx context.Context, o *dbent.PaymentOrder, l
 			return err
 		}
 		// Code already created and redeemed — just mark completed
-		return s.markCompleted(ctx, o, lease, "RECHARGE_SUCCESS")
+		if err := s.markCompleted(ctx, o, lease, "RECHARGE_SUCCESS"); err != nil {
+			return err
+		}
+		if err := s.applyNationalDayPromotionForOrder(ctx, o); err != nil {
+			s.logNationalDayPromotionFailure(ctx, o, err)
+		}
+		return nil
 	case redeemActionCreate:
 		rc := &RedeemCode{Code: o.RechargeCode, Type: RedeemTypeBalance, Value: o.Amount, Status: StatusUnused}
 		if err := s.redeemService.CreateCode(ctx, rc); err != nil {
@@ -395,7 +401,13 @@ func (s *PaymentService) doBalance(ctx context.Context, o *dbent.PaymentOrder, l
 	if err := s.applyAffiliateRebateForOrder(ctx, o); err != nil {
 		return err
 	}
-	return s.markCompleted(ctx, o, lease, "RECHARGE_SUCCESS")
+	if err := s.markCompleted(ctx, o, lease, "RECHARGE_SUCCESS"); err != nil {
+		return err
+	}
+	if err := s.applyNationalDayPromotionForOrder(ctx, o); err != nil {
+		s.logNationalDayPromotionFailure(ctx, o, err)
+	}
+	return nil
 }
 
 func (s *PaymentService) markCompleted(ctx context.Context, o *dbent.PaymentOrder, lease *paymentFulfillmentLease, auditAction string) error {

@@ -5,12 +5,15 @@ import (
 	"strconv"
 	"time"
 
+	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/internal/payment"
 	"github.com/shopspring/decimal"
 )
 
 const nationalDay2026DailyBenefitMinRecharge = 10
+const nationalDayPromotionBalanceBonusAuditAction = "NATIONAL_DAY_2026_BALANCE_BONUS_APPLIED"
+const nationalDayPromotionFailedAuditAction = "NATIONAL_DAY_2026_PROMOTION_FAILED"
 
 var nationalDay2026RechargeAmounts = []float64{10, 20, 50, 100, 200, 400, 800}
 
@@ -89,4 +92,61 @@ func (s *PaymentService) nationalDayPromotionIsOldUser(ctx context.Context, user
 			paymentorder.PaidAtLT(nationalDayPromotionStart()),
 		).
 		Exist(ctx)
+}
+
+func (s *PaymentService) applyNationalDayPromotionForOrder(ctx context.Context, o *dbent.PaymentOrder) error {
+	if o == nil || o.OrderType != payment.OrderTypeBalance {
+		return nil
+	}
+	paidAt := time.Now()
+	if o.PaidAt != nil {
+		paidAt = *o.PaidAt
+	}
+	if !nationalDayPromotionActiveAt(paidAt) {
+		return nil
+	}
+	if err := s.applyNationalDayBalanceBonus(ctx, o); err != nil {
+		return err
+	}
+	return nil
+}
+
+func nationalDayBalanceBonusAmount(paymentAmount float64) float64 {
+	return decimal.NewFromFloat(paymentAmount).
+		Mul(decimal.NewFromFloat(0.5)).
+		Round(2).
+		InexactFloat64()
+}
+
+func (s *PaymentService) applyNationalDayBalanceBonus(ctx context.Context, o *dbent.PaymentOrder) error {
+	if s == nil || s.entClient == nil || s.userRepo == nil || o == nil {
+		return nil
+	}
+	if s.hasAuditLog(ctx, o.ID, nationalDayPromotionBalanceBonusAuditAction) {
+		return nil
+	}
+	bonus := nationalDayBalanceBonusAmount(o.Amount)
+	if bonus <= 0 {
+		return nil
+	}
+	change, err := s.userRepo.AdjustBalance(ctx, o.UserID, bonus)
+	if err != nil {
+		return err
+	}
+	s.writeAuditLog(ctx, o.ID, nationalDayPromotionBalanceBonusAuditAction, "system", map[string]any{
+		"baseAmount": o.Amount,
+		"bonus":      bonus,
+		"oldBalance": change.Old,
+		"newBalance": change.New,
+	})
+	return nil
+}
+
+func (s *PaymentService) logNationalDayPromotionFailure(ctx context.Context, o *dbent.PaymentOrder, err error) {
+	if s == nil || s.entClient == nil || o == nil || err == nil {
+		return
+	}
+	s.writeAuditLog(ctx, o.ID, nationalDayPromotionFailedAuditAction, "system", map[string]any{
+		"error": err.Error(),
+	})
 }
