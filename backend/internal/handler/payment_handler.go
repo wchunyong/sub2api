@@ -95,6 +95,10 @@ func (h *PaymentHandler) GetPlans(c *gin.Context) {
 // GET /api/v1/payment/checkout-info
 func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 	ctx := c.Request.Context()
+	subject, ok := requireAuth(c)
+	if !ok {
+		return
+	}
 
 	// Fetch limits (methods + global range)
 	limitsResp, err := h.configService.GetAvailableMethodLimits(ctx)
@@ -139,6 +143,11 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 			ProductName: p.ProductName,
 		})
 	}
+	nationalDayPromotion, err := h.paymentService.BuildNationalDayPromotionCheckout(ctx, subject.UserID, time.Now())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 
 	response.Success(c, checkoutInfoResponse{
 		Methods:                       limitsResp.Methods,
@@ -154,23 +163,25 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 		StripePublishableKey:          cfg.StripePublishableKey,
 		AlipayForceQRCode:             cfg.AlipayForceQRCode,
 		AlipayMobilePrecreateDeepLink: alipayMobilePrecreateDeepLink,
+		NationalDayPromotion:          nationalDayPromotion,
 	})
 }
 
 type checkoutInfoResponse struct {
-	Methods                       map[string]service.MethodLimits `json:"methods"`
-	GlobalMin                     float64                         `json:"global_min"`
-	GlobalMax                     float64                         `json:"global_max"`
-	Plans                         []checkoutPlan                  `json:"plans"`
-	BalanceDisabled               bool                            `json:"balance_disabled"`
-	BalanceRechargeMultiplier     float64                         `json:"balance_recharge_multiplier"`
-	SubscriptionUSDToCNYRate      float64                         `json:"subscription_usd_to_cny_rate"`
-	RechargeFeeRate               float64                         `json:"recharge_fee_rate"`
-	HelpText                      string                          `json:"help_text"`
-	HelpImageURL                  string                          `json:"help_image_url"`
-	StripePublishableKey          string                          `json:"stripe_publishable_key"`
-	AlipayForceQRCode             bool                            `json:"alipay_force_qrcode"`
-	AlipayMobilePrecreateDeepLink bool                            `json:"alipay_mobile_precreate_deep_link"`
+	Methods                       map[string]service.MethodLimits       `json:"methods"`
+	GlobalMin                     float64                               `json:"global_min"`
+	GlobalMax                     float64                               `json:"global_max"`
+	Plans                         []checkoutPlan                        `json:"plans"`
+	BalanceDisabled               bool                                  `json:"balance_disabled"`
+	BalanceRechargeMultiplier     float64                               `json:"balance_recharge_multiplier"`
+	SubscriptionUSDToCNYRate      float64                               `json:"subscription_usd_to_cny_rate"`
+	RechargeFeeRate               float64                               `json:"recharge_fee_rate"`
+	HelpText                      string                                `json:"help_text"`
+	HelpImageURL                  string                                `json:"help_image_url"`
+	StripePublishableKey          string                                `json:"stripe_publishable_key"`
+	AlipayForceQRCode             bool                                  `json:"alipay_force_qrcode"`
+	AlipayMobilePrecreateDeepLink bool                                  `json:"alipay_mobile_precreate_deep_link"`
+	NationalDayPromotion          *service.NationalDayPromotionCheckout `json:"national_day_promotion,omitempty"`
 }
 
 type checkoutPlan struct {
