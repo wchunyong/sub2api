@@ -5,13 +5,45 @@ package service
 import (
 	"context"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/internal/payment"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/stretchr/testify/require"
 )
+
+type nationalDayPromotionGroupRepoStub struct {
+	groupRepoNoop
+	byName map[string]*Group
+	byID   map[int64]*Group
+}
+
+func (s *nationalDayPromotionGroupRepoStub) ListWithFilters(_ context.Context, _ pagination.PaginationParams, _, _, search string, _ *bool) ([]Group, *pagination.PaginationResult, error) {
+	var groups []Group
+	for name, group := range s.byName {
+		if strings.Contains(name, search) {
+			groups = append(groups, *group)
+		}
+	}
+	return groups, &pagination.PaginationResult{Total: int64(len(groups))}, nil
+}
+
+func (s *nationalDayPromotionGroupRepoStub) GetByID(_ context.Context, id int64) (*Group, error) {
+	if s.byID == nil {
+		s.byID = make(map[int64]*Group, len(s.byName))
+		for _, group := range s.byName {
+			s.byID[group.ID] = group
+		}
+	}
+	group := s.byID[id]
+	if group == nil {
+		return nil, ErrGroupNotFound
+	}
+	return group, nil
+}
 
 func TestBuildNationalDayPromotionCheckoutActivePreview(t *testing.T) {
 	t.Parallel()
@@ -92,6 +124,97 @@ func TestApplyNationalDayPromotionBalanceBonusIsIdempotent(t *testing.T) {
 		Count(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
+}
+
+func TestApplyNationalDayPromotionAssignsDailyAndOldUserSubscriptions(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentOrderLifecycleTestClient(t)
+	now := time.Date(2026, 10, 1, 12, 0, 0, 0, nationalDayPromotionLocation())
+
+	user, err := client.User.Create().
+		SetEmail("national-day-subs-" + strconv.FormatInt(time.Now().UnixNano(), 10) + "@example.com").
+		SetPasswordHash("hash").
+		SetUsername("national-day-subs-user").
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = client.PaymentOrder.Create().
+		SetUserID(user.ID).
+		SetUserEmail(user.Email).
+		SetUserName(user.Username).
+		SetAmount(10).
+		SetPayAmount(10).
+		SetFeeRate(0).
+		SetRechargeCode("PAY-NATIONAL-DAY-OLD-MARKER").
+		SetOutTradeNo("sub2_national_day_old_marker_" + strconv.FormatInt(time.Now().UnixNano(), 10)).
+		SetPaymentType(payment.TypeAlipay).
+		SetPaymentTradeNo("trade-national-day-old-marker").
+		SetOrderType(payment.OrderTypeBalance).
+		SetStatus(OrderStatusCompleted).
+		SetPaidAt(time.Date(2026, 9, 30, 17, 30, 0, 0, nationalDayPromotionLocation())).
+		SetExpiresAt(now).
+		SetClientIP("127.0.0.1").
+		SetSrcHost("api.example.com").
+		Save(ctx)
+	require.NoError(t, err)
+
+	order, err := client.PaymentOrder.Create().
+		SetUserID(user.ID).
+		SetUserEmail(user.Email).
+		SetUserName(user.Username).
+		SetAmount(100).
+		SetPayAmount(100).
+		SetFeeRate(0).
+		SetRechargeCode("PAY-NATIONAL-DAY-SUBS").
+		SetOutTradeNo("sub2_national_day_subs_" + strconv.FormatInt(time.Now().UnixNano(), 10)).
+		SetPaymentType(payment.TypeAlipay).
+		SetPaymentTradeNo("trade-national-day-subs").
+		SetOrderType(payment.OrderTypeBalance).
+		SetStatus(OrderStatusCompleted).
+		SetPaidAt(now).
+		SetExpiresAt(now.Add(10 * time.Minute)).
+		SetClientIP("127.0.0.1").
+		SetSrcHost("api.example.com").
+		Save(ctx)
+	require.NoError(t, err)
+
+	balance := 100.0
+	userRepo := &mockUserRepo{}
+	userRepo.adjustBalanceFn = func(_ context.Context, id int64, delta float64) (BalanceChange, error) {
+		require.Equal(t, user.ID, id)
+		old := balance
+		balance += delta
+		return BalanceChange{Old: old, New: balance}, nil
+	}
+
+	groupRepo := &nationalDayPromotionGroupRepoStub{
+		byName: map[string]*Group{
+			nationalDayPromotionDailyBenefitGroupName: {
+				ID:               10,
+				Name:             nationalDayPromotionDailyBenefitGroupName,
+				Status:           StatusActive,
+				SubscriptionType: SubscriptionTypeSubscription,
+			},
+			"国庆老用户限时额度-20": {
+				ID:               20,
+				Name:             "国庆老用户限时额度-20",
+				Status:           StatusActive,
+				SubscriptionType: SubscriptionTypeSubscription,
+			},
+		},
+	}
+	subRepo := newSubscriptionUserSubRepoStub()
+	subscriptionSvc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	svc := &PaymentService{entClient: client, userRepo: userRepo, groupRepo: groupRepo, subscriptionSvc: subscriptionSvc}
+
+	require.NoError(t, svc.applyNationalDayPromotionForOrder(ctx, order))
+
+	_, err = subRepo.GetByUserIDAndGroupID(ctx, user.ID, 10)
+	require.NoError(t, err)
+	oldUserSub, err := subRepo.GetByUserIDAndGroupID(ctx, user.ID, 20)
+	require.NoError(t, err)
+	require.Contains(t, oldUserSub.Notes, "national_day_2026_old_user_limited_quota")
+	require.Equal(t, 2, subRepo.createCalls)
 }
 
 func TestBuildNationalDayPromotionCheckoutOldUserRequiresCompletedBalanceOrderBeforeCutoff(t *testing.T) {
