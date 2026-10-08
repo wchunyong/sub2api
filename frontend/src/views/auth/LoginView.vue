@@ -28,7 +28,7 @@
               required
               autofocus
               autocomplete="email"
-              :disabled="authActionDisabled"
+              :disabled="credentialInputDisabled"
               class="input pl-11"
               :class="{ 'input-error': errors.email }"
               :placeholder="t('auth.emailPlaceholder')"
@@ -51,7 +51,7 @@
               :type="showPassword ? 'text' : 'password'"
               required
               autocomplete="current-password"
-              :disabled="authActionDisabled"
+              :disabled="credentialInputDisabled"
               class="input pl-11 pr-11"
               :class="{ 'input-error': errors.password }"
               :placeholder="t('auth.passwordPlaceholder')"
@@ -59,7 +59,7 @@
             <button
               type="button"
               @click="showPassword = !showPassword"
-              :disabled="authActionDisabled"
+              :disabled="credentialInputDisabled"
               class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-dark-300"
             >
               <Icon v-if="showPassword" name="eyeOff" size="md" />
@@ -238,7 +238,6 @@ import TurnstileWidget from '@/components/CaptchaChallenge.vue'
 import { useAuthStore, useAppStore } from '@/stores'
 import {
   buildOAuthLoginStartURL,
-  getPublicSettings,
   isTotp2FARequired,
   isWeChatWebOAuthEnabled,
   startOAuthLogin,
@@ -247,6 +246,7 @@ import {
 import type {
   ActionCaptchaRequestProof,
   LoginAgreementDocument,
+  PublicSettings,
   TotpLoginResponse
 } from '@/types'
 import { extractI18nErrorMessage } from '@/utils/apiError'
@@ -347,6 +347,9 @@ const agreementGateActive = computed(
 const authActionDisabled = computed(
   () => isLoading.value || passkeyLoading.value || !publicSettingsLoaded.value || agreementGateActive.value
 )
+const credentialInputDisabled = computed(
+  () => isLoading.value || passkeyLoading.value || agreementGateActive.value
+)
 
 const showPasskeyLogin = computed(
   () => passkeyEnabled.value && typeof window.PublicKeyCredential !== 'undefined'
@@ -369,6 +372,14 @@ watch(validationToastMessage, (value, previousValue) => {
   }
 })
 
+watch(
+  () => appStore.cachedPublicSettings,
+  (settings) => {
+    if (settings) applyPublicSettings(settings)
+  },
+  { immediate: true }
+)
+
 // ==================== Lifecycle ====================
 
 onMounted(async () => {
@@ -381,37 +392,43 @@ onMounted(async () => {
   }
 
   try {
-    const settings = await getPublicSettings()
-    registrationEnabled.value = settings.registration_enabled === true
-    turnstileEnabled.value = settings.turnstile_enabled
-    turnstileSiteKey.value = settings.turnstile_site_key || ''
-    tencentCaptchaEnabled.value = settings.tencent_captcha_enabled === true
-    tencentCaptchaAppId.value = settings.tencent_captcha_app_id || ''
-    tencentCaptchaRegion.value = settings.tencent_captcha_region || 'cn'
-    aliyunCaptchaEnabled.value = settings.aliyun_captcha_enabled === true
-    aliyunCaptchaSceneId.value = settings.aliyun_captcha_scene_id || ''
-    aliyunCaptchaPrefix.value = settings.aliyun_captcha_prefix || ''
-    aliyunCaptchaRegion.value = settings.aliyun_captcha_region || 'cn'
-    linuxdoOAuthEnabled.value = settings.linuxdo_oauth_enabled
-    dingtalkOAuthEnabled.value = settings.dingtalk_oauth_enabled ?? false
-    wechatOAuthEnabled.value = isWeChatWebOAuthEnabled(settings)
-    backendModeEnabled.value = settings.backend_mode_enabled
-    oidcOAuthEnabled.value = settings.oidc_oauth_enabled
-    oidcOAuthProviderName.value = settings.oidc_oauth_provider_name || 'OIDC'
-    githubOAuthEnabled.value = settings.github_oauth_enabled
-    googleOAuthEnabled.value = settings.google_oauth_enabled
-    backendModeEnabled.value = settings.backend_mode_enabled
-    passwordResetEnabled.value = settings.password_reset_enabled
-    passkeyEnabled.value = settings.passkey_enabled === true
-    applyLoginAgreementSettings(settings)
+    const settings = await appStore.fetchPublicSettings()
+    if (settings) applyPublicSettings(settings)
   } catch (error) {
     console.error('Failed to load public settings:', error)
-    loginAgreementEnabled.value = false
-    agreementAccepted.value = true
+    if (!publicSettingsLoaded.value) {
+      loginAgreementEnabled.value = false
+      agreementAccepted.value = true
+    }
   } finally {
     publicSettingsLoaded.value = true
   }
 })
+
+function applyPublicSettings(settings: PublicSettings): void {
+  registrationEnabled.value = settings.registration_enabled === true
+  turnstileEnabled.value = settings.turnstile_enabled
+  turnstileSiteKey.value = settings.turnstile_site_key || ''
+  tencentCaptchaEnabled.value = settings.tencent_captcha_enabled === true
+  tencentCaptchaAppId.value = settings.tencent_captcha_app_id || ''
+  tencentCaptchaRegion.value = settings.tencent_captcha_region || 'cn'
+  aliyunCaptchaEnabled.value = settings.aliyun_captcha_enabled === true
+  aliyunCaptchaSceneId.value = settings.aliyun_captcha_scene_id || ''
+  aliyunCaptchaPrefix.value = settings.aliyun_captcha_prefix || ''
+  aliyunCaptchaRegion.value = settings.aliyun_captcha_region || 'cn'
+  linuxdoOAuthEnabled.value = settings.linuxdo_oauth_enabled
+  dingtalkOAuthEnabled.value = settings.dingtalk_oauth_enabled ?? false
+  wechatOAuthEnabled.value = isWeChatWebOAuthEnabled(settings)
+  backendModeEnabled.value = settings.backend_mode_enabled
+  oidcOAuthEnabled.value = settings.oidc_oauth_enabled
+  oidcOAuthProviderName.value = settings.oidc_oauth_provider_name || 'OIDC'
+  githubOAuthEnabled.value = settings.github_oauth_enabled
+  googleOAuthEnabled.value = settings.google_oauth_enabled
+  passwordResetEnabled.value = settings.password_reset_enabled
+  passkeyEnabled.value = settings.passkey_enabled === true
+  applyLoginAgreementSettings(settings)
+  publicSettingsLoaded.value = true
+}
 
 // ==================== Login Agreement ====================
 

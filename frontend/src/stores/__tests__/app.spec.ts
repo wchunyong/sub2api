@@ -90,6 +90,10 @@ describe('useAppStore', () => {
     localStorage.clear()
   })
 
+  it('uses the product brand before public settings are available', () => {
+    expect(useAppStore().siteName).toBe('连接AI')
+  })
+
   // --- Toast 消息管理 ---
 
   describe('Toast 消息管理', () => {

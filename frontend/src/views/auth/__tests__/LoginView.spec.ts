@@ -2,8 +2,16 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import LoginView from '@/views/auth/LoginView.vue'
 
-const { getPublicSettingsMock, pushMock } = vi.hoisted(() => ({
+const { getPublicSettingsMock, fetchPublicSettingsMock, appStoreMock, pushMock } = vi.hoisted(() => ({
   getPublicSettingsMock: vi.fn(),
+  fetchPublicSettingsMock: vi.fn(),
+  appStoreMock: {
+    cachedPublicSettings: null as typeof publicSettings | null,
+    fetchPublicSettings: vi.fn(),
+    showError: vi.fn(),
+    showSuccess: vi.fn(),
+    showWarning: vi.fn()
+  },
   pushMock: vi.fn()
 }))
 
@@ -54,11 +62,7 @@ vi.mock('@/stores', () => ({
     loginWithPasskey: vi.fn(),
     login2FA: vi.fn()
   }),
-  useAppStore: () => ({
-    showError: vi.fn(),
-    showSuccess: vi.fn(),
-    showWarning: vi.fn()
-  })
+  useAppStore: () => appStoreMock
 }))
 
 vi.mock('@/api/auth', () => ({
@@ -93,8 +97,12 @@ function mountLogin() {
 describe('LoginView registration entry', () => {
   beforeEach(() => {
     getPublicSettingsMock.mockReset()
+    fetchPublicSettingsMock.mockReset()
     pushMock.mockReset()
+    appStoreMock.cachedPublicSettings = null
+    appStoreMock.fetchPublicSettings = fetchPublicSettingsMock
     getPublicSettingsMock.mockResolvedValue(publicSettings)
+    fetchPublicSettingsMock.mockResolvedValue(publicSettings)
   })
 
   it('shows the registration entry when registration is enabled', async () => {
@@ -105,7 +113,7 @@ describe('LoginView registration entry', () => {
   })
 
   it('hides the registration entry when registration is disabled', async () => {
-    getPublicSettingsMock.mockResolvedValueOnce({
+    fetchPublicSettingsMock.mockResolvedValueOnce({
       ...publicSettings,
       registration_enabled: false
     })
@@ -114,5 +122,31 @@ describe('LoginView registration entry', () => {
     await flushPromises()
 
     expect(wrapper.text()).not.toContain('auth.signUp')
+  })
+
+  it('uses injected settings without waiting for another request', async () => {
+    appStoreMock.cachedPublicSettings = publicSettings
+    getPublicSettingsMock.mockImplementation(() => new Promise(() => undefined))
+    fetchPublicSettingsMock.mockImplementation(() => new Promise(() => undefined))
+
+    const wrapper = mountLogin()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('auth.signUp')
+    expect((wrapper.get('#email').element as HTMLInputElement).disabled).toBe(false)
+    expect((wrapper.get('#password').element as HTMLInputElement).disabled).toBe(false)
+    expect(getPublicSettingsMock).not.toHaveBeenCalled()
+  })
+
+  it('allows typing while public settings are still loading', async () => {
+    fetchPublicSettingsMock.mockImplementation(() => new Promise(() => undefined))
+    getPublicSettingsMock.mockImplementation(() => new Promise(() => undefined))
+
+    const wrapper = mountLogin()
+    await flushPromises()
+
+    expect((wrapper.get('#email').element as HTMLInputElement).disabled).toBe(false)
+    expect((wrapper.get('#password').element as HTMLInputElement).disabled).toBe(false)
+    expect((wrapper.get('button[type="submit"]').element as HTMLButtonElement).disabled).toBe(true)
   })
 })
