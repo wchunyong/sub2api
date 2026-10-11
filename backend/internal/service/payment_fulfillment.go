@@ -46,14 +46,14 @@ func (s *PaymentService) HandlePaymentNotification(ctx context.Context, n *payme
 		// Fallback only for true legacy "sub2_N" DB-ID payloads when the
 		// current out_trade_no lookup genuinely did not find an order.
 		if oid, ok := parseLegacyPaymentOrderID(n.OrderID, err); ok {
-			return s.confirmPayment(ctx, oid, n.TradeNo, n.Amount, pk, n.Metadata)
+			return s.confirmPayment(ctx, oid, n.TradeNo, n.Amount, pk, n.PaidAt, n.Metadata)
 		}
 		if dbent.IsNotFound(err) {
 			return fmt.Errorf("%w: out_trade_no=%s", ErrOrderNotFound, n.OrderID)
 		}
 		return fmt.Errorf("lookup order failed for out_trade_no %s: %w", n.OrderID, err)
 	}
-	return s.confirmPayment(ctx, order.ID, n.TradeNo, n.Amount, pk, n.Metadata)
+	return s.confirmPayment(ctx, order.ID, n.TradeNo, n.Amount, pk, n.PaidAt, n.Metadata)
 }
 
 func parseLegacyPaymentOrderID(orderID string, lookupErr error) (int64, bool) {
@@ -75,7 +75,7 @@ func parseLegacyPaymentOrderID(orderID string, lookupErr error) (int64, bool) {
 	return oid, true
 }
 
-func (s *PaymentService) confirmPayment(ctx context.Context, oid int64, tradeNo string, paid float64, pk string, metadata map[string]string) error {
+func (s *PaymentService) confirmPayment(ctx context.Context, oid int64, tradeNo string, paid float64, pk, providerPaidAt string, metadata map[string]string) error {
 	o, err := s.entClient.PaymentOrder.Get(ctx, oid)
 	if err != nil {
 		slog.Error("order not found", "orderID", oid)
@@ -113,7 +113,7 @@ func (s *PaymentService) confirmPayment(ctx context.Context, oid int64, tradeNo 
 		s.writeAuditLog(ctx, o.ID, "PAYMENT_AMOUNT_MISMATCH", pk, map[string]any{"expected": o.PayAmount, "paid": paid, "tradeNo": tradeNo})
 		return fmt.Errorf("amount mismatch: expected %s, got %s", strconv.FormatFloat(o.PayAmount, 'f', -1, 64), strconv.FormatFloat(paid, 'f', -1, 64))
 	}
-	return s.toPaid(ctx, o, tradeNo, paid, pk)
+	return s.toPaid(ctx, o, tradeNo, paid, pk, providerPaidAt)
 }
 
 func paymentAmountToleranceForCurrency(currency string) float64 {
@@ -147,9 +147,10 @@ func expectedNotificationProviderKey(registry *payment.Registry, orderPaymentTyp
 	return strings.TrimSpace(orderPaymentType)
 }
 
-func (s *PaymentService) toPaid(ctx context.Context, o *dbent.PaymentOrder, tradeNo string, paid float64, pk string) error {
+func (s *PaymentService) toPaid(ctx context.Context, o *dbent.PaymentOrder, tradeNo string, paid float64, pk, providerPaidAt string) error {
 	previousStatus := o.Status
 	now := time.Now()
+	effectivePaidAt := verifiedProviderPaidAt(providerPaidAt, o.CreatedAt, now)
 	grace := now.Add(-paymentGraceMinutes * time.Minute)
 	c, err := s.entClient.PaymentOrder.Update().Where(
 		paymentorder.IDEQ(o.ID),
@@ -161,7 +162,7 @@ func (s *PaymentService) toPaid(ctx context.Context, o *dbent.PaymentOrder, trad
 				paymentorder.UpdatedAtGTE(grace),
 			),
 		),
-	).SetStatus(OrderStatusPaid).SetPayAmount(paid).SetPaymentTradeNo(tradeNo).SetPaidAt(now).ClearFailedAt().ClearFailedReason().Save(ctx)
+	).SetStatus(OrderStatusPaid).SetPayAmount(paid).SetPaymentTradeNo(tradeNo).SetPaidAt(effectivePaidAt).ClearFailedAt().ClearFailedReason().Save(ctx)
 	if err != nil {
 		return fmt.Errorf("update to PAID: %w", err)
 	}
@@ -182,8 +183,24 @@ func (s *PaymentService) toPaid(ctx context.Context, o *dbent.PaymentOrder, trad
 			"reason":          "webhook payment success received after order " + previousStatus,
 		})
 	}
-	s.writeAuditLog(ctx, o.ID, "ORDER_PAID", pk, map[string]any{"tradeNo": tradeNo, "paidAmount": paid})
+	s.writeAuditLog(ctx, o.ID, "ORDER_PAID", pk, map[string]any{"tradeNo": tradeNo, "paidAmount": paid, "paidAt": effectivePaidAt})
 	return s.executeFulfillment(ctx, o.ID)
+}
+
+func verifiedProviderPaidAt(raw string, orderCreatedAt, receivedAt time.Time) time.Time {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return receivedAt
+	}
+	paidAt, err := time.Parse(time.RFC3339Nano, raw)
+	if err != nil {
+		// Alipay reports payment time in Beijing local time without an offset.
+		paidAt, err = time.ParseInLocation("2006-01-02 15:04:05", raw, time.FixedZone("CST", 8*60*60))
+	}
+	if err != nil || paidAt.Before(orderCreatedAt.Add(-2*time.Second)) || paidAt.After(receivedAt.Add(2*time.Second)) {
+		return receivedAt
+	}
+	return paidAt
 }
 
 func (s *PaymentService) alreadyProcessed(ctx context.Context, o *dbent.PaymentOrder) error {
@@ -379,6 +396,9 @@ func (s *PaymentService) doBalance(ctx context.Context, o *dbent.PaymentOrder, l
 		if err := s.applyAffiliateRebateForOrder(ctx, o); err != nil {
 			return err
 		}
+		if err := s.applyTenYuanActivityForOrder(ctx, o); err != nil {
+			return err
+		}
 		// Code already created and redeemed — just mark completed
 		if err := s.markCompleted(ctx, o, lease, "RECHARGE_SUCCESS"); err != nil {
 			return err
@@ -399,6 +419,9 @@ func (s *PaymentService) doBalance(ctx context.Context, o *dbent.PaymentOrder, l
 		return fmt.Errorf("redeem balance: %w", err)
 	}
 	if err := s.applyAffiliateRebateForOrder(ctx, o); err != nil {
+		return err
+	}
+	if err := s.applyTenYuanActivityForOrder(ctx, o); err != nil {
 		return err
 	}
 	if err := s.markCompleted(ctx, o, lease, "RECHARGE_SUCCESS"); err != nil {

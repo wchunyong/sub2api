@@ -328,6 +328,12 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/ten-yuan-seven-days',
+    name: 'TenYuanActivity',
+    component: () => import('@/views/user/TenYuanActivityView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: false, titleKey: 'nav.tenYuanActivity', requiresPayment: true }
+  },
+  {
     path: '/orders',
     name: 'OrderList',
     component: () => import('@/views/user/UserOrdersView.vue'),
@@ -691,6 +697,12 @@ const routes: RouteRecordRaw[] = [
 
 
   // ==================== Payment Admin Routes ====================
+  {
+    path: '/admin/activities',
+    name: 'AdminActivities',
+    component: () => import('@/views/admin/ActivitiesView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'nav.activities', requiresPayment: true }
+  },
   {
     path: '/admin/orders/dashboard',
     name: 'AdminPaymentDashboard',

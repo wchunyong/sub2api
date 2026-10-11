@@ -199,6 +199,8 @@ import { sanitizeUrl } from '@/utils/url'
 import { resolveCustomMenuRoute } from '@/utils/custom-menu-route'
 import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
+import { getTenYuanActivity, type TenYuanActivityState } from '@/api/activities'
+import { activityNavigationVisible } from '@/features/activity/countdown'
 
 interface NavItem {
   path: string
@@ -251,6 +253,24 @@ const mobileOpen = computed(() => appStore.mobileOpen)
 const isAdmin = computed(() => authStore.isAdmin)
 const sidebarNavRef = ref<HTMLElement | null>(null)
 const isDark = ref(document.documentElement.classList.contains('dark'))
+const tenYuanActivity = ref<TenYuanActivityState | null>(null)
+const activityNow = ref(Date.now())
+const activityClockOffset = ref(0)
+let activityRefreshTimer: ReturnType<typeof setInterval> | undefined
+let activityClockTimer: ReturnType<typeof setInterval> | undefined
+const activityNavEnabled = computed(() => activityNavigationVisible(tenYuanActivity.value, activityNow.value + activityClockOffset.value))
+
+async function refreshTenYuanActivity() {
+  if (isAdmin.value || appStore.backendModeEnabled) return
+  try {
+    const before = Date.now()
+    const activity = await getTenYuanActivity()
+    activityClockOffset.value = new Date(activity.server_now).getTime() - (before + Date.now()) / 2
+    tenYuanActivity.value = activity
+  } catch { tenYuanActivity.value = null }
+}
+
+function refreshActivityOnFocus() { void refreshTenYuanActivity() }
 
 const homePath = computed(() => (isAdmin.value ? '/admin/dashboard' : '/dashboard'))
 
@@ -718,6 +738,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     { path: '/available-channels', label: t('nav.availableChannels'), icon: ChannelIcon, hideInSimpleMode: true, featureFlag: flagAvailableChannels },
     { path: '/monitor', label: t('nav.channelStatus'), icon: SignalIcon, featureFlag: flagChannelMonitor },
     { path: '/purchase', label: t('nav.buySubscription'), icon: RechargeSubscriptionIcon, hideInSimpleMode: true, featureFlag: flagPayment },
+    { path: '/ten-yuan-seven-days', label: t('nav.tenYuanActivity'), icon: PriceTagIcon, hideInSimpleMode: true, featureFlag: () => flagPayment() !== false && activityNavEnabled.value },
     { path: '/orders', label: t('nav.myOrders'), icon: OrderListIcon, hideInSimpleMode: true, featureFlag: flagPayment },
     { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true },
     { path: '/affiliate', label: t('nav.affiliate'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagAffiliate },
@@ -767,6 +788,7 @@ const adminNavItems = computed((): NavItem[] => {
     { path: '/admin/ops', label: t('nav.ops'), icon: ChartIcon, featureFlag: flagOpsMonitoring },
     { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true },
     { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon },
+    { path: '/admin/activities', label: t('nav.activities'), icon: PriceTagIcon, featureFlag: flagAdminPayment },
     {
       path: '/admin/channels',
       label: t('nav.channelManagement'),
@@ -943,6 +965,11 @@ watch(
 
 onMounted(() => {
   void refreshBatchImageAccess()
+  void refreshTenYuanActivity()
+  activityClockTimer = setInterval(() => { activityNow.value = Date.now() }, 1000)
+  activityRefreshTimer = setInterval(() => { void refreshTenYuanActivity() }, 30000)
+  window.addEventListener('focus', refreshActivityOnFocus)
+  document.addEventListener('visibilitychange', refreshActivityOnFocus)
   if (isAdmin.value) {
     adminSettingsStore.fetch()
   }
@@ -957,6 +984,10 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  if (activityClockTimer) clearInterval(activityClockTimer)
+  if (activityRefreshTimer) clearInterval(activityRefreshTimer)
+  window.removeEventListener('focus', refreshActivityOnFocus)
+  document.removeEventListener('visibilitychange', refreshActivityOnFocus)
   if (sidebarNavRef.value) {
     appStore.sidebarScrollTop = sidebarNavRef.value.scrollTop
   }

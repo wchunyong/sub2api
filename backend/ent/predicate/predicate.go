@@ -15,6 +15,12 @@ type Account func(*sql.Selector)
 // AccountGroup is the predicate function for accountgroup builders.
 type AccountGroup func(*sql.Selector)
 
+// ActivityClaim is the predicate function for activityclaim builders.
+type ActivityClaim func(*sql.Selector)
+
+// ActivityRun is the predicate function for activityrun builders.
+type ActivityRun func(*sql.Selector)
+
 // Announcement is the predicate function for announcement builders.
 type Announcement func(*sql.Selector)
 

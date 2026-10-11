@@ -10,6 +10,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
+	"github.com/Wei-Shaw/sub2api/ent/activityclaim"
+	"github.com/Wei-Shaw/sub2api/ent/activityrun"
 	"github.com/Wei-Shaw/sub2api/ent/announcement"
 	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
@@ -185,6 +187,60 @@ func (f TraverseAccountGroup) Traverse(ctx context.Context, q ent.Query) error {
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.AccountGroupQuery", q)
+}
+
+// The ActivityClaimFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ActivityClaimFunc func(context.Context, *ent.ActivityClaimQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ActivityClaimFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ActivityClaimQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ActivityClaimQuery", q)
+}
+
+// The TraverseActivityClaim type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseActivityClaim func(context.Context, *ent.ActivityClaimQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseActivityClaim) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseActivityClaim) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ActivityClaimQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ActivityClaimQuery", q)
+}
+
+// The ActivityRunFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ActivityRunFunc func(context.Context, *ent.ActivityRunQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ActivityRunFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ActivityRunQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ActivityRunQuery", q)
+}
+
+// The TraverseActivityRun type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseActivityRun func(context.Context, *ent.ActivityRunQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseActivityRun) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseActivityRun) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ActivityRunQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ActivityRunQuery", q)
 }
 
 // The AnnouncementFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -1168,6 +1224,10 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.AccountQuery, predicate.Account, account.OrderOption]{typ: ent.TypeAccount, tq: q}, nil
 	case *ent.AccountGroupQuery:
 		return &query[*ent.AccountGroupQuery, predicate.AccountGroup, accountgroup.OrderOption]{typ: ent.TypeAccountGroup, tq: q}, nil
+	case *ent.ActivityClaimQuery:
+		return &query[*ent.ActivityClaimQuery, predicate.ActivityClaim, activityclaim.OrderOption]{typ: ent.TypeActivityClaim, tq: q}, nil
+	case *ent.ActivityRunQuery:
+		return &query[*ent.ActivityRunQuery, predicate.ActivityRun, activityrun.OrderOption]{typ: ent.TypeActivityRun, tq: q}, nil
 	case *ent.AnnouncementQuery:
 		return &query[*ent.AnnouncementQuery, predicate.Announcement, announcement.OrderOption]{typ: ent.TypeAnnouncement, tq: q}, nil
 	case *ent.AnnouncementReadQuery:

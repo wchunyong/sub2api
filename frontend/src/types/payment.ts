@@ -67,6 +67,14 @@ export interface NationalDayPromotionCheckout {
   old_user_limited_quota_by_payment_amount: Record<string, number>
 }
 
+export interface TenYuanActivityCheckout {
+  enabled: boolean
+  status: string
+  claimed: boolean
+  ends_at?: string
+  min_recharge: number
+}
+
 /** Response from /payment/limits API */
 export interface MethodLimitsResponse {
   methods: Record<string, MethodLimit>
@@ -99,6 +107,7 @@ export interface CheckoutInfoResponse {
   /** When true, official Alipay mobile orders use precreate plus an Alipay app deep link */
   alipay_mobile_precreate_deep_link?: boolean
   national_day_promotion?: NationalDayPromotionCheckout
+  ten_yuan_activity?: TenYuanActivityCheckout
 }
 
 // ==================== Orders ====================

@@ -17,6 +17,8 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
+	"github.com/Wei-Shaw/sub2api/ent/activityclaim"
+	"github.com/Wei-Shaw/sub2api/ent/activityrun"
 	"github.com/Wei-Shaw/sub2api/ent/announcement"
 	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
@@ -69,6 +71,10 @@ type Client struct {
 	Account *AccountClient
 	// AccountGroup is the client for interacting with the AccountGroup builders.
 	AccountGroup *AccountGroupClient
+	// ActivityClaim is the client for interacting with the ActivityClaim builders.
+	ActivityClaim *ActivityClaimClient
+	// ActivityRun is the client for interacting with the ActivityRun builders.
+	ActivityRun *ActivityRunClient
 	// Announcement is the client for interacting with the Announcement builders.
 	Announcement *AnnouncementClient
 	// AnnouncementRead is the client for interacting with the AnnouncementRead builders.
@@ -155,6 +161,8 @@ func (c *Client) init() {
 	c.APIKey = NewAPIKeyClient(c.config)
 	c.Account = NewAccountClient(c.config)
 	c.AccountGroup = NewAccountGroupClient(c.config)
+	c.ActivityClaim = NewActivityClaimClient(c.config)
+	c.ActivityRun = NewActivityRunClient(c.config)
 	c.Announcement = NewAnnouncementClient(c.config)
 	c.AnnouncementRead = NewAnnouncementReadClient(c.config)
 	c.AuthIdentity = NewAuthIdentityClient(c.config)
@@ -286,6 +294,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		APIKey:                        NewAPIKeyClient(cfg),
 		Account:                       NewAccountClient(cfg),
 		AccountGroup:                  NewAccountGroupClient(cfg),
+		ActivityClaim:                 NewActivityClaimClient(cfg),
+		ActivityRun:                   NewActivityRunClient(cfg),
 		Announcement:                  NewAnnouncementClient(cfg),
 		AnnouncementRead:              NewAnnouncementReadClient(cfg),
 		AuthIdentity:                  NewAuthIdentityClient(cfg),
@@ -344,6 +354,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		APIKey:                        NewAPIKeyClient(cfg),
 		Account:                       NewAccountClient(cfg),
 		AccountGroup:                  NewAccountGroupClient(cfg),
+		ActivityClaim:                 NewActivityClaimClient(cfg),
+		ActivityRun:                   NewActivityRunClient(cfg),
 		Announcement:                  NewAnnouncementClient(cfg),
 		AnnouncementRead:              NewAnnouncementReadClient(cfg),
 		AuthIdentity:                  NewAuthIdentityClient(cfg),
@@ -409,16 +421,16 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.APIKey, c.Account, c.AccountGroup, c.Announcement, c.AnnouncementRead,
-		c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent, c.BatchImageItem,
-		c.BatchImageJob, c.ChannelMonitor, c.ChannelMonitorDailyRollup,
-		c.ChannelMonitorHistory, c.ChannelMonitorRequestTemplate,
-		c.CompositeModelRoute, c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
-		c.IdentityAdoptionDecision, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
-		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.APIKey, c.Account, c.AccountGroup, c.ActivityClaim, c.ActivityRun,
+		c.Announcement, c.AnnouncementRead, c.AuthIdentity, c.AuthIdentityChannel,
+		c.BatchImageEvent, c.BatchImageItem, c.BatchImageJob, c.ChannelMonitor,
+		c.ChannelMonitorDailyRollup, c.ChannelMonitorHistory,
+		c.ChannelMonitorRequestTemplate, c.CompositeModelRoute, c.ErrorPassthroughRule,
+		c.Group, c.IdempotencyRecord, c.IdentityAdoptionDecision, c.PaymentAuditLog,
+		c.PaymentOrder, c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode,
+		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting,
+		c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog,
+		c.User, c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
 		c.UserPlatformQuota, c.UserSubscription,
 	} {
 		n.Use(hooks...)
@@ -429,16 +441,16 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.APIKey, c.Account, c.AccountGroup, c.Announcement, c.AnnouncementRead,
-		c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent, c.BatchImageItem,
-		c.BatchImageJob, c.ChannelMonitor, c.ChannelMonitorDailyRollup,
-		c.ChannelMonitorHistory, c.ChannelMonitorRequestTemplate,
-		c.CompositeModelRoute, c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
-		c.IdentityAdoptionDecision, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
-		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.APIKey, c.Account, c.AccountGroup, c.ActivityClaim, c.ActivityRun,
+		c.Announcement, c.AnnouncementRead, c.AuthIdentity, c.AuthIdentityChannel,
+		c.BatchImageEvent, c.BatchImageItem, c.BatchImageJob, c.ChannelMonitor,
+		c.ChannelMonitorDailyRollup, c.ChannelMonitorHistory,
+		c.ChannelMonitorRequestTemplate, c.CompositeModelRoute, c.ErrorPassthroughRule,
+		c.Group, c.IdempotencyRecord, c.IdentityAdoptionDecision, c.PaymentAuditLog,
+		c.PaymentOrder, c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode,
+		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting,
+		c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog,
+		c.User, c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
 		c.UserPlatformQuota, c.UserSubscription,
 	} {
 		n.Intercept(interceptors...)
@@ -454,6 +466,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Account.mutate(ctx, m)
 	case *AccountGroupMutation:
 		return c.AccountGroup.mutate(ctx, m)
+	case *ActivityClaimMutation:
+		return c.ActivityClaim.mutate(ctx, m)
+	case *ActivityRunMutation:
+		return c.ActivityRun.mutate(ctx, m)
 	case *AnnouncementMutation:
 		return c.Announcement.mutate(ctx, m)
 	case *AnnouncementReadMutation:
@@ -1058,6 +1074,272 @@ func (c *AccountGroupClient) mutate(ctx context.Context, m *AccountGroupMutation
 		return (&AccountGroupDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown AccountGroup mutation op: %q", m.Op())
+	}
+}
+
+// ActivityClaimClient is a client for the ActivityClaim schema.
+type ActivityClaimClient struct {
+	config
+}
+
+// NewActivityClaimClient returns a client for the ActivityClaim from the given config.
+func NewActivityClaimClient(c config) *ActivityClaimClient {
+	return &ActivityClaimClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `activityclaim.Hooks(f(g(h())))`.
+func (c *ActivityClaimClient) Use(hooks ...Hook) {
+	c.hooks.ActivityClaim = append(c.hooks.ActivityClaim, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `activityclaim.Intercept(f(g(h())))`.
+func (c *ActivityClaimClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ActivityClaim = append(c.inters.ActivityClaim, interceptors...)
+}
+
+// Create returns a builder for creating a ActivityClaim entity.
+func (c *ActivityClaimClient) Create() *ActivityClaimCreate {
+	mutation := newActivityClaimMutation(c.config, OpCreate)
+	return &ActivityClaimCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ActivityClaim entities.
+func (c *ActivityClaimClient) CreateBulk(builders ...*ActivityClaimCreate) *ActivityClaimCreateBulk {
+	return &ActivityClaimCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ActivityClaimClient) MapCreateBulk(slice any, setFunc func(*ActivityClaimCreate, int)) *ActivityClaimCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ActivityClaimCreateBulk{err: fmt.Errorf("calling to ActivityClaimClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ActivityClaimCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ActivityClaimCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ActivityClaim.
+func (c *ActivityClaimClient) Update() *ActivityClaimUpdate {
+	mutation := newActivityClaimMutation(c.config, OpUpdate)
+	return &ActivityClaimUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ActivityClaimClient) UpdateOne(_m *ActivityClaim) *ActivityClaimUpdateOne {
+	mutation := newActivityClaimMutation(c.config, OpUpdateOne, withActivityClaim(_m))
+	return &ActivityClaimUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ActivityClaimClient) UpdateOneID(id int64) *ActivityClaimUpdateOne {
+	mutation := newActivityClaimMutation(c.config, OpUpdateOne, withActivityClaimID(id))
+	return &ActivityClaimUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ActivityClaim.
+func (c *ActivityClaimClient) Delete() *ActivityClaimDelete {
+	mutation := newActivityClaimMutation(c.config, OpDelete)
+	return &ActivityClaimDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ActivityClaimClient) DeleteOne(_m *ActivityClaim) *ActivityClaimDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ActivityClaimClient) DeleteOneID(id int64) *ActivityClaimDeleteOne {
+	builder := c.Delete().Where(activityclaim.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ActivityClaimDeleteOne{builder}
+}
+
+// Query returns a query builder for ActivityClaim.
+func (c *ActivityClaimClient) Query() *ActivityClaimQuery {
+	return &ActivityClaimQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeActivityClaim},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ActivityClaim entity by its id.
+func (c *ActivityClaimClient) Get(ctx context.Context, id int64) (*ActivityClaim, error) {
+	return c.Query().Where(activityclaim.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ActivityClaimClient) GetX(ctx context.Context, id int64) *ActivityClaim {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ActivityClaimClient) Hooks() []Hook {
+	return c.hooks.ActivityClaim
+}
+
+// Interceptors returns the client interceptors.
+func (c *ActivityClaimClient) Interceptors() []Interceptor {
+	return c.inters.ActivityClaim
+}
+
+func (c *ActivityClaimClient) mutate(ctx context.Context, m *ActivityClaimMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ActivityClaimCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ActivityClaimUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ActivityClaimUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ActivityClaimDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ActivityClaim mutation op: %q", m.Op())
+	}
+}
+
+// ActivityRunClient is a client for the ActivityRun schema.
+type ActivityRunClient struct {
+	config
+}
+
+// NewActivityRunClient returns a client for the ActivityRun from the given config.
+func NewActivityRunClient(c config) *ActivityRunClient {
+	return &ActivityRunClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `activityrun.Hooks(f(g(h())))`.
+func (c *ActivityRunClient) Use(hooks ...Hook) {
+	c.hooks.ActivityRun = append(c.hooks.ActivityRun, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `activityrun.Intercept(f(g(h())))`.
+func (c *ActivityRunClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ActivityRun = append(c.inters.ActivityRun, interceptors...)
+}
+
+// Create returns a builder for creating a ActivityRun entity.
+func (c *ActivityRunClient) Create() *ActivityRunCreate {
+	mutation := newActivityRunMutation(c.config, OpCreate)
+	return &ActivityRunCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ActivityRun entities.
+func (c *ActivityRunClient) CreateBulk(builders ...*ActivityRunCreate) *ActivityRunCreateBulk {
+	return &ActivityRunCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ActivityRunClient) MapCreateBulk(slice any, setFunc func(*ActivityRunCreate, int)) *ActivityRunCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ActivityRunCreateBulk{err: fmt.Errorf("calling to ActivityRunClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ActivityRunCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ActivityRunCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ActivityRun.
+func (c *ActivityRunClient) Update() *ActivityRunUpdate {
+	mutation := newActivityRunMutation(c.config, OpUpdate)
+	return &ActivityRunUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ActivityRunClient) UpdateOne(_m *ActivityRun) *ActivityRunUpdateOne {
+	mutation := newActivityRunMutation(c.config, OpUpdateOne, withActivityRun(_m))
+	return &ActivityRunUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ActivityRunClient) UpdateOneID(id int64) *ActivityRunUpdateOne {
+	mutation := newActivityRunMutation(c.config, OpUpdateOne, withActivityRunID(id))
+	return &ActivityRunUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ActivityRun.
+func (c *ActivityRunClient) Delete() *ActivityRunDelete {
+	mutation := newActivityRunMutation(c.config, OpDelete)
+	return &ActivityRunDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ActivityRunClient) DeleteOne(_m *ActivityRun) *ActivityRunDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ActivityRunClient) DeleteOneID(id int64) *ActivityRunDeleteOne {
+	builder := c.Delete().Where(activityrun.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ActivityRunDeleteOne{builder}
+}
+
+// Query returns a query builder for ActivityRun.
+func (c *ActivityRunClient) Query() *ActivityRunQuery {
+	return &ActivityRunQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeActivityRun},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ActivityRun entity by its id.
+func (c *ActivityRunClient) Get(ctx context.Context, id int64) (*ActivityRun, error) {
+	return c.Query().Where(activityrun.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ActivityRunClient) GetX(ctx context.Context, id int64) *ActivityRun {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ActivityRunClient) Hooks() []Hook {
+	return c.hooks.ActivityRun
+}
+
+// Interceptors returns the client interceptors.
+func (c *ActivityRunClient) Interceptors() []Interceptor {
+	return c.inters.ActivityRun
+}
+
+func (c *ActivityRunClient) mutate(ctx context.Context, m *ActivityRunMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ActivityRunCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ActivityRunUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ActivityRunUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ActivityRunDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ActivityRun mutation op: %q", m.Op())
 	}
 }
 
@@ -6841,28 +7123,28 @@ func (c *UserSubscriptionClient) mutate(ctx context.Context, m *UserSubscription
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, AuthIdentity,
-		AuthIdentityChannel, BatchImageEvent, BatchImageItem, BatchImageJob,
-		ChannelMonitor, ChannelMonitorDailyRollup, ChannelMonitorHistory,
-		ChannelMonitorRequestTemplate, CompositeModelRoute, ErrorPassthroughRule,
-		Group, IdempotencyRecord, IdentityAdoptionDecision, PaymentAuditLog,
-		PaymentOrder, PaymentProviderInstance, PendingAuthSession, PromoCode,
-		PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting, SubscriptionPlan,
-		TLSFingerprintProfile, UsageCleanupTask, UsageLog, User, UserAllowedGroup,
-		UserAttributeDefinition, UserAttributeValue, UserPlatformQuota,
-		UserSubscription []ent.Hook
+		APIKey, Account, AccountGroup, ActivityClaim, ActivityRun, Announcement,
+		AnnouncementRead, AuthIdentity, AuthIdentityChannel, BatchImageEvent,
+		BatchImageItem, BatchImageJob, ChannelMonitor, ChannelMonitorDailyRollup,
+		ChannelMonitorHistory, ChannelMonitorRequestTemplate, CompositeModelRoute,
+		ErrorPassthroughRule, Group, IdempotencyRecord, IdentityAdoptionDecision,
+		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PendingAuthSession,
+		PromoCode, PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting,
+		SubscriptionPlan, TLSFingerprintProfile, UsageCleanupTask, UsageLog, User,
+		UserAllowedGroup, UserAttributeDefinition, UserAttributeValue,
+		UserPlatformQuota, UserSubscription []ent.Hook
 	}
 	inters struct {
-		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, AuthIdentity,
-		AuthIdentityChannel, BatchImageEvent, BatchImageItem, BatchImageJob,
-		ChannelMonitor, ChannelMonitorDailyRollup, ChannelMonitorHistory,
-		ChannelMonitorRequestTemplate, CompositeModelRoute, ErrorPassthroughRule,
-		Group, IdempotencyRecord, IdentityAdoptionDecision, PaymentAuditLog,
-		PaymentOrder, PaymentProviderInstance, PendingAuthSession, PromoCode,
-		PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting, SubscriptionPlan,
-		TLSFingerprintProfile, UsageCleanupTask, UsageLog, User, UserAllowedGroup,
-		UserAttributeDefinition, UserAttributeValue, UserPlatformQuota,
-		UserSubscription []ent.Interceptor
+		APIKey, Account, AccountGroup, ActivityClaim, ActivityRun, Announcement,
+		AnnouncementRead, AuthIdentity, AuthIdentityChannel, BatchImageEvent,
+		BatchImageItem, BatchImageJob, ChannelMonitor, ChannelMonitorDailyRollup,
+		ChannelMonitorHistory, ChannelMonitorRequestTemplate, CompositeModelRoute,
+		ErrorPassthroughRule, Group, IdempotencyRecord, IdentityAdoptionDecision,
+		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PendingAuthSession,
+		PromoCode, PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting,
+		SubscriptionPlan, TLSFingerprintProfile, UsageCleanupTask, UsageLog, User,
+		UserAllowedGroup, UserAttributeDefinition, UserAttributeValue,
+		UserPlatformQuota, UserSubscription []ent.Interceptor
 	}
 )
 

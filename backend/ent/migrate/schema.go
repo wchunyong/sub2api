@@ -259,6 +259,75 @@ var (
 			},
 		},
 	}
+	// ActivityClaimsColumns holds the columns for the "activity_claims" table.
+	ActivityClaimsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "run_id", Type: field.TypeInt64},
+		{Name: "user_id", Type: field.TypeInt64},
+		{Name: "order_id", Type: field.TypeInt64},
+		{Name: "subscription_id", Type: field.TypeInt64},
+		{Name: "status", Type: field.TypeString, Size: 20, Default: "claimed"},
+		{Name: "claimed_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz", "sqlite3": "DATETIME"}},
+	}
+	// ActivityClaimsTable holds the schema information for the "activity_claims" table.
+	ActivityClaimsTable = &schema.Table{
+		Name:       "activity_claims",
+		Columns:    ActivityClaimsColumns,
+		PrimaryKey: []*schema.Column{ActivityClaimsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "activityclaim_run_id_user_id",
+				Unique:  true,
+				Columns: []*schema.Column{ActivityClaimsColumns[1], ActivityClaimsColumns[2]},
+			},
+			{
+				Name:    "activityclaim_order_id",
+				Unique:  true,
+				Columns: []*schema.Column{ActivityClaimsColumns[3]},
+			},
+			{
+				Name:    "activityclaim_user_id",
+				Unique:  false,
+				Columns: []*schema.Column{ActivityClaimsColumns[2]},
+			},
+		},
+	}
+	// ActivityRunsColumns holds the columns for the "activity_runs" table.
+	ActivityRunsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "code", Type: field.TypeString, Size: 64},
+		{Name: "current_marker", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "group_id", Type: field.TypeInt64},
+		{Name: "starts_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz", "sqlite3": "DATETIME"}},
+		{Name: "ends_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz", "sqlite3": "DATETIME"}},
+		{Name: "disabled_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz", "sqlite3": "DATETIME"}},
+		{Name: "created_by", Type: field.TypeInt64},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz", "sqlite3": "DATETIME"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz", "sqlite3": "DATETIME"}},
+	}
+	// ActivityRunsTable holds the schema information for the "activity_runs" table.
+	ActivityRunsTable = &schema.Table{
+		Name:       "activity_runs",
+		Columns:    ActivityRunsColumns,
+		PrimaryKey: []*schema.Column{ActivityRunsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "activityrun_current_marker",
+				Unique:  true,
+				Columns: []*schema.Column{ActivityRunsColumns[2]},
+			},
+			{
+				Name:    "activityrun_code_starts_at",
+				Unique:  false,
+				Columns: []*schema.Column{ActivityRunsColumns[1], ActivityRunsColumns[4]},
+			},
+			{
+				Name:    "activityrun_ends_at",
+				Unique:  false,
+				Columns: []*schema.Column{ActivityRunsColumns[5]},
+			},
+		},
+	}
 	// AnnouncementsColumns holds the columns for the "announcements" table.
 	AnnouncementsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt64, Increment: true},
@@ -2093,6 +2162,8 @@ var (
 		APIKeysTable,
 		AccountsTable,
 		AccountGroupsTable,
+		ActivityClaimsTable,
+		ActivityRunsTable,
 		AnnouncementsTable,
 		AnnouncementReadsTable,
 		AuthIdentitiesTable,
@@ -2147,6 +2218,12 @@ func init() {
 	AccountGroupsTable.ForeignKeys[1].RefTable = GroupsTable
 	AccountGroupsTable.Annotation = &entsql.Annotation{
 		Table: "account_groups",
+	}
+	ActivityClaimsTable.Annotation = &entsql.Annotation{
+		Table: "activity_claims",
+	}
+	ActivityRunsTable.Annotation = &entsql.Annotation{
+		Table: "activity_runs",
 	}
 	AnnouncementsTable.Annotation = &entsql.Annotation{
 		Table: "announcements",

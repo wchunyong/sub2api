@@ -326,6 +326,7 @@ func (a *Alipay) VerifyNotification(ctx context.Context, rawBody string, _ map[s
 		OrderID:  notification.OutTradeNo,
 		Amount:   amount,
 		Status:   status,
+		PaidAt:   notification.GmtPayment,
 		RawData:  rawBody,
 		Metadata: metadata,
 	}, nil

@@ -1,4 +1,16 @@
 export default {
+  tenYuanActivity: {
+    kicker: 'Limited benefit', title: 'Ten Yuan Seven Days',
+    description: 'A single recharge of at least ¥10 unlocks the daily free quota for this round.',
+    start: 'Starts', end: 'Ends', startsIn: 'Starts in', endsIn: 'Ends in',
+    unavailable: 'No campaign is currently available.', closed: 'This round is closed to new claims.', closedClaimed: 'This round is closed. Your claimed benefit remains until the original end time.', ended: 'This round has ended.', claimed: 'You have unlocked this round. The benefit expires at the original end time.',
+    scheduled: 'The campaign is coming soon. Recharge at least ¥10 in one payment after it starts.',
+    active: 'The campaign is active. Recharge at least ¥10 in one payment to unlock it.', recharge: 'Recharge now', checkoutHint: 'This recharge qualifies for Ten Yuan Seven Days',
+    benefitLabel: 'Daily benefit', day: 'day', benefit: 'Up to {amount} USD of free quota per day, subject to group rules.', configuredBenefit: 'Per group settings', benefitVaries: 'The daily benefit follows the selected group settings.',
+    unlockLabel: 'Unlock condition', threshold: 'At least ¥{amount} in one recharge', once: 'One unlock per user per round. Further recharges do not reset used quota.',
+    details: 'Campaign details', fixedEnd: 'All claims expire at the round end. Early closure stops only new claims.',
+    partialDays: 'Daily quota resets at midnight Beijing time. The round lasts exactly 7×24 hours, so its first and last calendar days may be partial.'
+  },
 
   // Subscription Progress (Header component)
   subscriptionProgress: {

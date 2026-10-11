@@ -457,6 +457,17 @@ describe('PaymentView recharge-only user checkout', () => {
     expect(wrapper.get('[data-test="national-day-old-user-quota"]').exists()).toBe(true)
     expect(translate).toHaveBeenCalledWith('payment.nationalDayOldUserLimitedQuota', { amount: '20' })
   })
+
+  it('shows the ten yuan unlock hint only for an active unclaimed qualifying recharge', async () => {
+    const wrapper = await mountRechargePage({ checkout: { ten_yuan_activity: { enabled: true, status: 'active', claimed: false, min_recharge: 10 } } })
+    const amountInput = wrapper.findComponent(AmountInput)
+    await amountInput.vm.$emit('update:modelValue', 10)
+    await flushPromises()
+    expect(wrapper.find('[data-test="ten-yuan-activity-hint"]').exists()).toBe(true)
+    await amountInput.vm.$emit('update:modelValue', 0)
+    await flushPromises()
+    expect(wrapper.find('[data-test="ten-yuan-activity-hint"]').exists()).toBe(false)
+  })
 })
 
 describe('PaymentView help text', () => {

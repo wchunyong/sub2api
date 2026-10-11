@@ -45,6 +45,7 @@ func RegisterPaymentRoutes(
 	{
 		authenticated.GET("/config", paymentHandler.GetPaymentConfig)
 		authenticated.GET("/checkout-info", paymentHandler.GetCheckoutInfo)
+		authenticated.GET("/activities/ten-yuan-seven-days", paymentHandler.GetTenYuanActivity)
 		authenticated.GET("/plans", paymentHandler.GetPlans)
 		authenticated.GET("/limits", paymentHandler.GetLimits)
 
@@ -96,6 +97,9 @@ func RegisterPaymentRoutes(
 	{
 		// Dashboard
 		adminGroup.GET("/dashboard", adminPaymentHandler.GetDashboard)
+		adminGroup.GET("/activities/ten-yuan-seven-days", adminPaymentHandler.GetTenYuanActivity)
+		adminGroup.PUT("/activities/ten-yuan-seven-days", adminPaymentHandler.ScheduleTenYuanActivity)
+		adminGroup.POST("/activities/ten-yuan-seven-days/close", adminPaymentHandler.CloseTenYuanActivity)
 
 		// Config
 		adminGroup.GET("/config", adminPaymentHandler.GetConfig)

@@ -14,6 +14,7 @@
 
 - Each round starts at a Beijing time selected to the second and ends exactly 168 hours later.
 - Eligibility is one completed balance recharge order with PaymentOrder.Amount at least 10 during the round; use PaidAt, with inclusive start and exclusive end.
+- Populate PaidAt from a verified provider payment timestamp when supplied by the callback or query; otherwise use the server receipt time. This fallback was confirmed during implementation for providers without a trustworthy payment timestamp.
 - One claim per user per round. Repeat payments do not reset usage or extend expiry. Prior activity-owned expired subscriptions may be renewed for the next round.
 - Closing early stops qualification for payments after DisabledAt; payments before DisabledAt may settle before the original end. Existing grants expire at the original end.
 - A callback handled after the original end completes the order without an expired grant and records a skip reason.

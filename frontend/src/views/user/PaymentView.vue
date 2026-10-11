@@ -106,6 +106,9 @@
                     {{ t('payment.nationalDayOldUserLimitedQuota', { amount: nationalDayOldUserLimitedQuota.toFixed(0) }) }}
                   </span>
                 </div>
+                <p v-if="tenYuanActivityEligible" data-test="ten-yuan-activity-hint" class="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                  {{ t('tenYuanActivity.checkoutHint') }}
+                </p>
               </div>
             </div>
             <button :class="['btn w-full py-3 text-base font-medium', paymentButtonClass]" :disabled="!canSubmit || submitting" @click="handleSubmitRecharge">
@@ -579,6 +582,10 @@ const subscriptionUsdToCnyRate = computed(() => {
   return Number.isFinite(rate) && rate > 0 ? rate : 0
 })
 const nationalDayPromotionActive = computed(() => checkout.value.national_day_promotion?.active === true)
+const tenYuanActivityEligible = computed(() => {
+  const activity = checkout.value.ten_yuan_activity
+  return activity?.enabled === true && activity.status === 'active' && !activity.claimed && validAmount.value >= (activity.min_recharge ?? 10)
+})
 const nationalDayPromotionCreditedAmount = computed(() => {
   if (!nationalDayPromotionActive.value) return null
   return lookupNationalDayPromotionAmount(

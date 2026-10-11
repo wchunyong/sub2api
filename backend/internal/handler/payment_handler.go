@@ -148,6 +148,11 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
+	tenYuanActivity, err := h.paymentService.GetTenYuanActivityForUser(ctx, subject.UserID, time.Now())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 
 	response.Success(c, checkoutInfoResponse{
 		Methods:                       limitsResp.Methods,
@@ -167,6 +172,7 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 		AlipayForceQRCode:             cfg.AlipayForceQRCode,
 		AlipayMobilePrecreateDeepLink: alipayMobilePrecreateDeepLink,
 		NationalDayPromotion:          nationalDayPromotion,
+		TenYuanActivity:              tenYuanActivity,
 	})
 }
 
@@ -188,6 +194,7 @@ type checkoutInfoResponse struct {
 	AlipayForceQRCode             bool                                  `json:"alipay_force_qrcode"`
 	AlipayMobilePrecreateDeepLink bool                                  `json:"alipay_mobile_precreate_deep_link"`
 	NationalDayPromotion          *service.NationalDayPromotionCheckout `json:"national_day_promotion,omitempty"`
+	TenYuanActivity              *service.TenYuanActivityUserState      `json:"ten_yuan_activity,omitempty"`
 }
 
 type checkoutPlan struct {

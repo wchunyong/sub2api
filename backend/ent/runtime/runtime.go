@@ -7,6 +7,8 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
+	"github.com/Wei-Shaw/sub2api/ent/activityclaim"
+	"github.com/Wei-Shaw/sub2api/ent/activityrun"
 	"github.com/Wei-Shaw/sub2api/ent/announcement"
 	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
@@ -266,6 +268,38 @@ func init() {
 	accountgroupDescCreatedAt := accountgroupFields[3].Descriptor()
 	// accountgroup.DefaultCreatedAt holds the default value on creation for the created_at field.
 	accountgroup.DefaultCreatedAt = accountgroupDescCreatedAt.Default.(func() time.Time)
+	activityclaimFields := schema.ActivityClaim{}.Fields()
+	_ = activityclaimFields
+	// activityclaimDescStatus is the schema descriptor for status field.
+	activityclaimDescStatus := activityclaimFields[4].Descriptor()
+	// activityclaim.DefaultStatus holds the default value on creation for the status field.
+	activityclaim.DefaultStatus = activityclaimDescStatus.Default.(string)
+	// activityclaim.StatusValidator is a validator for the "status" field. It is called by the builders before save.
+	activityclaim.StatusValidator = activityclaimDescStatus.Validators[0].(func(string) error)
+	// activityclaimDescClaimedAt is the schema descriptor for claimed_at field.
+	activityclaimDescClaimedAt := activityclaimFields[5].Descriptor()
+	// activityclaim.DefaultClaimedAt holds the default value on creation for the claimed_at field.
+	activityclaim.DefaultClaimedAt = activityclaimDescClaimedAt.Default.(func() time.Time)
+	activityrunFields := schema.ActivityRun{}.Fields()
+	_ = activityrunFields
+	// activityrunDescCode is the schema descriptor for code field.
+	activityrunDescCode := activityrunFields[0].Descriptor()
+	// activityrun.CodeValidator is a validator for the "code" field. It is called by the builders before save.
+	activityrun.CodeValidator = activityrunDescCode.Validators[0].(func(string) error)
+	// activityrunDescCurrentMarker is the schema descriptor for current_marker field.
+	activityrunDescCurrentMarker := activityrunFields[1].Descriptor()
+	// activityrun.CurrentMarkerValidator is a validator for the "current_marker" field. It is called by the builders before save.
+	activityrun.CurrentMarkerValidator = activityrunDescCurrentMarker.Validators[0].(func(string) error)
+	// activityrunDescCreatedAt is the schema descriptor for created_at field.
+	activityrunDescCreatedAt := activityrunFields[7].Descriptor()
+	// activityrun.DefaultCreatedAt holds the default value on creation for the created_at field.
+	activityrun.DefaultCreatedAt = activityrunDescCreatedAt.Default.(func() time.Time)
+	// activityrunDescUpdatedAt is the schema descriptor for updated_at field.
+	activityrunDescUpdatedAt := activityrunFields[8].Descriptor()
+	// activityrun.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	activityrun.DefaultUpdatedAt = activityrunDescUpdatedAt.Default.(func() time.Time)
+	// activityrun.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	activityrun.UpdateDefaultUpdatedAt = activityrunDescUpdatedAt.UpdateDefault.(func() time.Time)
 	announcementFields := schema.Announcement{}.Fields()
 	_ = announcementFields
 	// announcementDescTitle is the schema descriptor for title field.

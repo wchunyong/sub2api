@@ -1,4 +1,16 @@
 export default {
+  tenYuanActivity: {
+    kicker: '限时福利', title: '十元七天乐',
+    description: '单笔充值满 10 元，解锁本轮每日免费额度。',
+    start: '开始', end: '结束', startsIn: '距离开始', endsIn: '距离结束',
+    unavailable: '当前没有开放的活动。', closed: '本轮活动已关闭，停止新用户解锁。', closedClaimed: '本轮活动已关闭，你已领取的福利保留到原结束时间。', ended: '本轮活动已结束。', claimed: '你已解锁本轮福利，额度将在活动原结束时间到期。',
+    scheduled: '活动即将开始，开始后单笔充值满 10 元即可解锁。',
+    active: '活动进行中，单笔充值满 10 元即可解锁。', recharge: '去充值', checkoutHint: '本笔充值可解锁十元七天乐',
+    benefitLabel: '每日福利', day: '天', benefit: '每天最多享 {amount} USD 免费额度，按分组规则使用。', configuredBenefit: '按分组规则发放', benefitVaries: '每日可用额度以活动分组设置为准。',
+    unlockLabel: '解锁条件', threshold: '单笔充值满 {amount} 元', once: '每轮每位用户限解锁一次，多次充值不会重置已使用额度。',
+    details: '活动说明', fixedEnd: '所有已领取福利统一在本轮结束时间到期；提前关闭活动只停止新领取。',
+    partialDays: '每日额度在北京时间 0 点刷新。活动持续精确 7×24 小时，首尾日期可能只有部分时段。'
+  },
 
   // Subscription Progress (Header component)
   subscriptionProgress: {

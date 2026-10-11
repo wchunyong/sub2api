@@ -177,6 +177,8 @@ export default {
     profile: '个人资料',
     users: '用户管理',
     groups: '分组管理',
+    activities: '活动',
+    tenYuanActivity: '十元七天乐',
     channels: '渠道管理',
     availableChannels: '可用渠道',
     modelPlaza: '模型广场',

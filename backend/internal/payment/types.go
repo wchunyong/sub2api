@@ -173,6 +173,7 @@ type PaymentNotification struct {
 	OrderID  string
 	Amount   float64
 	Status   string // "success" or "failed"
+	PaidAt   string // Verified provider payment time when available; otherwise empty.
 	RawData  string // Raw notification body for audit
 	Metadata map[string]string
 }

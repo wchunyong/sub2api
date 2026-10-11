@@ -177,6 +177,8 @@ export default {
     profile: 'Profile',
     users: 'Users',
     groups: 'Groups',
+    activities: 'Campaigns',
+    tenYuanActivity: 'Ten Yuan Seven Days',
     channels: 'Channels',
     availableChannels: 'Available Channels',
     modelPlaza: 'Model Plaza',
