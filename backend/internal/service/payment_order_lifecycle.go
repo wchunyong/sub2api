@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	entsql "entgo.io/ent/dialect/sql"
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
@@ -26,6 +27,7 @@ const (
 	rateLimitModeFixed         = "fixed"
 	checkPaidResultAlreadyPaid = "already_paid"
 	checkPaidResultCancelled   = "cancelled"
+	checkPaidResultUnverified  = "unverified"
 
 	pendingPaymentReconcileLimit = 20
 )
@@ -123,8 +125,16 @@ func (s *PaymentService) AdminCancelOrder(ctx context.Context, orderID int64) (s
 
 func (s *PaymentService) cancelCore(ctx context.Context, o *dbent.PaymentOrder, fs, op, ad string) (string, error) {
 	if o.PaymentTradeNo != "" || o.PaymentType != "" {
-		if s.checkPaid(ctx, o) == checkPaidResultAlreadyPaid {
+		paymentResult := s.checkPaid(ctx, o)
+		if paymentResult == checkPaidResultAlreadyPaid {
 			return checkPaidResultAlreadyPaid, nil
+		}
+		if fs == OrderStatusExpired && paymentResult == checkPaidResultUnverified {
+			slog.Warn("skipping order expiry because upstream payment status is unverified", "orderID", o.ID)
+			if _, err := s.entClient.PaymentOrder.Update().Where(paymentorder.IDEQ(o.ID), paymentorder.StatusEQ(OrderStatusPending)).SetUpdatedAt(time.Now()).Save(ctx); err != nil {
+				return "", fmt.Errorf("schedule payment status recheck: %w", err)
+			}
+			return "", nil
 		}
 	}
 	c, err := s.entClient.PaymentOrder.Update().Where(paymentorder.IDEQ(o.ID), paymentorder.StatusEQ(OrderStatusPending)).SetStatus(fs).Save(ctx)
@@ -152,18 +162,24 @@ func (s *PaymentService) reconcilePaid(ctx context.Context, o *dbent.PaymentOrde
 func (s *PaymentService) checkPaidWithOptions(ctx context.Context, o *dbent.PaymentOrder, opts checkPaidOptions) string {
 	prov, err := s.getOrderProvider(ctx, o)
 	if err != nil {
-		return ""
+		slog.Warn("load order provider for payment check failed", "orderID", o.ID, "error", err)
+		return checkPaidResultUnverified
 	}
 	queryRef := paymentOrderQueryReference(o, prov)
 	if queryRef == "" {
-		return ""
+		slog.Warn("payment check has no order reference", "orderID", o.ID)
+		return checkPaidResultUnverified
 	}
 	finishProviderCall := servertiming.ObserveDependency(ctx, "payment")
 	resp, err := prov.QueryOrder(ctx, queryRef)
 	finishProviderCall()
 	if err != nil {
 		slog.Warn("query upstream failed", "orderID", o.ID, "error", err)
-		return ""
+		return checkPaidResultUnverified
+	}
+	if resp == nil {
+		slog.Warn("query upstream returned no order response", "orderID", o.ID)
+		return checkPaidResultUnverified
 	}
 	if resp.Status == payment.ProviderStatusPaid {
 		if !isValidProviderAmount(resp.Amount) {
@@ -176,7 +192,7 @@ func (s *PaymentService) checkPaidWithOptions(ctx context.Context, o *dbent.Paym
 			slog.Warn("query upstream returned invalid paid amount", "orderID", o.ID, "queryRef", queryRef, "paid", resp.Amount)
 			retriedResp, retryOK := requeryPaidOrderOnce(ctx, prov, queryRef)
 			if !retryOK {
-				return ""
+				return checkPaidResultUnverified
 			}
 			resp = retriedResp
 		}
@@ -378,7 +394,17 @@ func normalizeOrderLookupOutTradeNo(raw string) (string, error) {
 
 func (s *PaymentService) ExpireTimedOutOrders(ctx context.Context) (int, error) {
 	now := time.Now()
-	orders, err := s.entClient.PaymentOrder.Query().Where(paymentorder.StatusEQ(OrderStatusPending), paymentorder.ExpiresAtLTE(now)).All(ctx)
+	orders, err := s.entClient.PaymentOrder.Query().Where(
+		paymentorder.StatusEQ(OrderStatusPending),
+		paymentorder.ExpiresAtLTE(now),
+		paymentorder.CreatedAtGTE(now.Add(-7*24*time.Hour)),
+		paymentorder.Or(
+			paymentorder.UpdatedAtLTE(now.Add(-5*time.Minute)),
+			func(sel *entsql.Selector) {
+				sel.Where(entsql.ColumnsLTE(sel.C(paymentorder.FieldUpdatedAt), sel.C(paymentorder.FieldExpiresAt)))
+			},
+		),
+	).Order(dbent.Asc(paymentorder.FieldExpiresAt)).Limit(100).All(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("query expired: %w", err)
 	}
@@ -386,7 +412,10 @@ func (s *PaymentService) ExpireTimedOutOrders(ctx context.Context) (int, error) 
 	for _, o := range orders {
 		// Check upstream payment status before expiring — the user may have
 		// paid just before timeout and the webhook hasn't arrived yet.
-		outcome, _ := s.cancelCore(ctx, o, OrderStatusExpired, "system", "order expired")
+		outcome, err := s.cancelCore(ctx, o, OrderStatusExpired, "system", "order expired")
+		if err != nil {
+			return n, fmt.Errorf("expire order %d: %w", o.ID, err)
+		}
 		if outcome == checkPaidResultAlreadyPaid {
 			slog.Info("order was paid during expiry", "orderID", o.ID)
 			continue

@@ -5,6 +5,8 @@ package service
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -27,6 +29,7 @@ type paymentOrderLifecycleQueryProvider struct {
 	cancelCalls       int
 	responses         []*payment.QueryOrderResponse
 	resp              *payment.QueryOrderResponse
+	queryErr          error
 }
 
 type paymentOrderLifecycleRedeemRepo struct {
@@ -59,6 +62,9 @@ func (p *paymentOrderLifecycleQueryProvider) CreatePayment(context.Context, paym
 func (p *paymentOrderLifecycleQueryProvider) QueryOrder(_ context.Context, tradeNo string) (*payment.QueryOrderResponse, error) {
 	p.lastQueryTradeNo = tradeNo
 	p.queryCalls++
+	if p.queryErr != nil {
+		return nil, p.queryErr
+	}
 	if len(p.responses) > 0 {
 		resp := p.responses[0]
 		if len(p.responses) > 1 {
@@ -67,6 +73,78 @@ func (p *paymentOrderLifecycleQueryProvider) QueryOrder(_ context.Context, trade
 		return resp, nil
 	}
 	return p.resp, nil
+}
+
+func TestExpireTimedOutOrdersKeepsPendingWhenProviderQueryFails(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentOrderLifecycleTestClient(t)
+	user, err := client.User.Create().SetEmail("expiry-query-failed@example.com").SetPasswordHash("hash").SetUsername("expiry-query-failed").Save(ctx)
+	require.NoError(t, err)
+	order, err := client.PaymentOrder.Create().
+		SetUserID(user.ID).SetUserEmail(user.Email).SetUserName(user.Username).
+		SetAmount(10).SetPayAmount(10).SetFeeRate(0).
+		SetRechargeCode("EXPIRY-QUERY-FAILED").SetOutTradeNo("sub2_expiry_query_failed").
+		SetPaymentType(payment.TypeAlipay).SetPaymentTradeNo("").SetOrderType(payment.OrderTypeBalance).
+		SetStatus(OrderStatusPending).SetExpiresAt(time.Now().Add(-time.Minute)).SetUpdatedAt(time.Now().Add(-2 * time.Minute)).
+		SetClientIP("127.0.0.1").SetSrcHost("api.example.com").Save(ctx)
+	require.NoError(t, err)
+	provider := &paymentOrderLifecycleQueryProvider{queryErr: errors.New("provider unavailable")}
+	registry := payment.NewRegistry()
+	registry.Register(provider)
+	svc := &PaymentService{entClient: client, registry: registry, providersLoaded: true}
+
+	expired, err := svc.ExpireTimedOutOrders(ctx)
+	require.NoError(t, err)
+	require.Zero(t, expired)
+	require.Equal(t, 1, provider.queryCalls)
+	_, err = svc.ExpireTimedOutOrders(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, provider.queryCalls, "unverified orders should wait before another provider query")
+	reloaded, err := client.PaymentOrder.Get(ctx, order.ID)
+	require.NoError(t, err)
+	require.Equal(t, OrderStatusPending, reloaded.Status)
+}
+
+func TestPendingLimitDoesNotCountOverdueUnverifiedOrders(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentOrderLifecycleTestClient(t)
+	user, err := client.User.Create().SetEmail("pending-limit@example.com").SetPasswordHash("hash").SetUsername("pending-limit").Save(ctx)
+	require.NoError(t, err)
+	_, err = client.PaymentOrder.Create().
+		SetUserID(user.ID).SetUserEmail(user.Email).SetUserName(user.Username).
+		SetAmount(10).SetPayAmount(10).SetFeeRate(0).
+		SetRechargeCode("EXPIRED-PENDING").SetOutTradeNo("sub2_expired_pending").
+		SetPaymentType(payment.TypeAlipay).SetPaymentTradeNo("").SetOrderType(payment.OrderTypeBalance).
+		SetStatus(OrderStatusPending).SetExpiresAt(time.Now().Add(-time.Minute)).
+		SetClientIP("127.0.0.1").SetSrcHost("api.example.com").Save(ctx)
+	require.NoError(t, err)
+	tx, err := client.Tx(ctx)
+	require.NoError(t, err)
+	defer func() { _ = tx.Rollback() }()
+	svc := &PaymentService{entClient: client}
+	require.NoError(t, svc.checkPendingLimit(ctx, tx, user.ID, 1))
+}
+
+func TestPendingLimitCapsRecentOverdueUnverifiedOrders(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentOrderLifecycleTestClient(t)
+	user, err := client.User.Create().SetEmail("pending-ceiling@example.com").SetPasswordHash("hash").SetUsername("pending-ceiling").Save(ctx)
+	require.NoError(t, err)
+	for i := 0; i < 4; i++ {
+		_, err = client.PaymentOrder.Create().
+			SetUserID(user.ID).SetUserEmail(user.Email).SetUserName(user.Username).
+			SetAmount(10).SetPayAmount(10).SetFeeRate(0).
+			SetRechargeCode(fmt.Sprintf("EXPIRED-%d", i)).SetOutTradeNo(fmt.Sprintf("sub2_expired_%d", i)).
+			SetPaymentType(payment.TypeAlipay).SetPaymentTradeNo("").SetOrderType(payment.OrderTypeBalance).
+			SetStatus(OrderStatusPending).SetExpiresAt(time.Now().Add(-time.Minute)).
+			SetClientIP("127.0.0.1").SetSrcHost("api.example.com").Save(ctx)
+		require.NoError(t, err)
+	}
+	tx, err := client.Tx(ctx)
+	require.NoError(t, err)
+	defer func() { _ = tx.Rollback() }()
+	svc := &PaymentService{entClient: client}
+	require.Error(t, svc.checkPendingLimit(ctx, tx, user.ID, 1))
 }
 
 func (p *paymentOrderLifecycleQueryProvider) VerifyNotification(context.Context, string, map[string]string) (*payment.PaymentNotification, error) {

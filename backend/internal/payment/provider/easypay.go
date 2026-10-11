@@ -301,13 +301,28 @@ func (e *EasyPay) upstreamPaymentType(paymentType string) string {
 }
 
 func (e *EasyPay) QueryOrder(ctx context.Context, tradeNo string) (*payment.QueryOrderResponse, error) {
-	params := map[string]string{
-		"act": "order", "pid": e.config["pid"],
-		"key": e.config["pkey"], "out_trade_no": tradeNo,
+	params := url.Values{
+		"act":          {"order"},
+		"pid":          {e.config["pid"]},
+		"key":          {e.config["pkey"]},
+		"out_trade_no": {tradeNo},
 	}
-	body, err := e.post(ctx, e.apiBase()+"/api.php", params)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, e.apiBase()+"/api.php?"+params.Encode(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("easypay query: %w", err)
+		return nil, fmt.Errorf("easypay query request failed")
+	}
+	client := e.httpClient
+	if client == nil {
+		client = &http.Client{Timeout: easypayHTTPTimeout}
+	}
+	httpResp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("easypay query transport failed")
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+	body, err := io.ReadAll(io.LimitReader(httpResp.Body, maxEasypayResponseSize))
+	if err != nil {
+		return nil, fmt.Errorf("easypay read query: %w", err)
 	}
 	type easyPayQueryData struct {
 		TradeStatus *string `json:"trade_status"`
@@ -326,6 +341,12 @@ func (e *EasyPay) QueryOrder(ctx context.Context, tradeNo string) (*payment.Quer
 	}
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return nil, fmt.Errorf("easypay parse query: %w", err)
+	}
+	if resp.Code != 1 {
+		return nil, fmt.Errorf("easypay query returned code %d", resp.Code)
+	}
+	if resp.TradeStatus == nil && resp.Data.TradeStatus == nil && resp.Status == nil && resp.Data.Status == nil {
+		return nil, fmt.Errorf("easypay query response has no payment status")
 	}
 	status := payment.ProviderStatusPending
 	if resp.TradeStatus != nil {

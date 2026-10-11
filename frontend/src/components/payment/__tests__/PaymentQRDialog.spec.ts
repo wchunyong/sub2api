@@ -102,4 +102,54 @@ describe('PaymentQRDialog currency display', () => {
     expect(wrapper.text()).toContain('$100.00')
     expect(wrapper.text()).toContain('¥108.00')
   })
+
+  it('shows fulfillment failure separately from order expiry', async () => {
+    pollOrderStatus.mockResolvedValue({ ...paidOrder, status: 'FAILED' })
+    const wrapper = mount(PaymentQRDialog, {
+      props: {
+        show: false,
+        orderId: 42,
+        qrCode: '',
+        expiresAt: '2099-01-01T10:30:00Z',
+        paymentType: 'alipay',
+      },
+      global: {
+        stubs: {
+          BaseDialog: {
+            props: ['show'],
+            template: '<div v-if="show"><slot /><slot name="footer" /></div>',
+          },
+          Icon: true,
+        },
+      },
+    })
+
+    await wrapper.setProps({ show: true })
+    await vi.advanceTimersByTimeAsync(3000)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('payment.qr.failed')
+    expect(wrapper.text()).not.toContain('payment.qr.expired')
+  })
+
+  it('keeps checking a pending order after the local payment window ends', async () => {
+    pollOrderStatus.mockResolvedValue({ ...paidOrder, status: 'PENDING' })
+    const wrapper = mount(PaymentQRDialog, {
+      props: { show: false, orderId: 42, qrCode: '', expiresAt: '2020-01-01T00:00:00Z', paymentType: 'alipay' },
+      global: {
+        stubs: {
+          BaseDialog: { props: ['show'], template: '<div v-if="show"><slot /><slot name="footer" /></div>' },
+          Icon: true,
+        },
+      },
+    })
+
+    await wrapper.setProps({ show: true })
+    await vi.advanceTimersByTimeAsync(3000)
+    await flushPromises()
+
+    expect(pollOrderStatus).toHaveBeenCalledWith(42)
+    expect(wrapper.text()).toContain('payment.qr.checking')
+    expect(wrapper.text()).not.toContain('payment.qr.expired')
+  })
 })

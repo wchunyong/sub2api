@@ -263,13 +263,24 @@ func (s *PaymentService) checkPendingLimit(ctx context.Context, tx *dbent.Tx, us
 	if max <= 0 {
 		max = defaultMaxPendingOrders
 	}
-	c, err := tx.PaymentOrder.Query().Where(paymentorder.UserIDEQ(userID), paymentorder.StatusEQ(OrderStatusPending)).Count(ctx)
+	now := time.Now()
+	c, err := tx.PaymentOrder.Query().Where(paymentorder.UserIDEQ(userID), paymentorder.StatusEQ(OrderStatusPending), paymentorder.ExpiresAtGT(now)).Count(ctx)
 	if err != nil {
 		return fmt.Errorf("count pending orders: %w", err)
 	}
 	if c >= max {
 		return infraerrors.TooManyRequests("TOO_MANY_PENDING", "too_many_pending").
 			WithMetadata(map[string]string{"max": strconv.Itoa(max)})
+	}
+	// Keep a separate 24-hour ceiling for orders that cannot be verified after
+	// timeout. This lets affected users retry without allowing indefinite growth.
+	recent, err := tx.PaymentOrder.Query().Where(paymentorder.UserIDEQ(userID), paymentorder.StatusEQ(OrderStatusPending), paymentorder.CreatedAtGTE(now.Add(-24*time.Hour))).Count(ctx)
+	if err != nil {
+		return fmt.Errorf("count recent pending orders: %w", err)
+	}
+	if recent >= max*4 {
+		return infraerrors.TooManyRequests("TOO_MANY_PENDING", "too_many_pending").
+			WithMetadata(map[string]string{"max": strconv.Itoa(max * 4)})
 	}
 	return nil
 }

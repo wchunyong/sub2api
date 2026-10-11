@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/payment"
@@ -20,6 +21,7 @@ func TestEasyPayQueryOrderStatusMapping(t *testing.T) {
 		wantStatus  string
 		wantTradeNo string
 		wantAmount  float64
+		wantErr     bool
 	}{
 		{
 			name:        "top level trade success is paid",
@@ -64,16 +66,19 @@ func TestEasyPayQueryOrderStatusMapping(t *testing.T) {
 			wantAmount:  3.21,
 		},
 		{
-			name:        "query failure with missing status is pending",
-			body:        `{"code":0,"msg":"订单不存在"}`,
-			wantStatus:  payment.ProviderStatusPending,
-			wantTradeNo: orderID,
+			name:    "query failure is not a confirmed unpaid order",
+			body:    `{"code":0,"msg":"订单不存在"}`,
+			wantErr: true,
 		},
 		{
-			name:        "missing fields are pending",
-			body:        `{}`,
-			wantStatus:  payment.ProviderStatusPending,
-			wantTradeNo: orderID,
+			name:    "missing response status is an error",
+			body:    `{}`,
+			wantErr: true,
+		},
+		{
+			name:    "successful response without payment status is an error",
+			body:    `{"code":1,"money":"3.21"}`,
+			wantErr: true,
 		},
 	}
 
@@ -84,8 +89,8 @@ func TestEasyPayQueryOrderStatusMapping(t *testing.T) {
 
 			var gotForm url.Values
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.Method != http.MethodPost {
-					t.Errorf("method = %q, want %q", r.Method, http.MethodPost)
+				if r.Method != http.MethodGet {
+					t.Errorf("method = %q, want %q", r.Method, http.MethodGet)
 				}
 				if r.URL.Path != "/api.php" {
 					t.Errorf("path = %q, want /api.php", r.URL.Path)
@@ -93,8 +98,8 @@ func TestEasyPayQueryOrderStatusMapping(t *testing.T) {
 				if err := r.ParseForm(); err != nil {
 					t.Errorf("ParseForm: %v", err)
 				}
-				gotForm = make(url.Values, len(r.PostForm))
-				for key, values := range r.PostForm {
+				gotForm = make(url.Values, len(r.URL.Query()))
+				for key, values := range r.URL.Query() {
 					gotForm[key] = append([]string(nil), values...)
 				}
 				w.Header().Set("Content-Type", "application/json")
@@ -104,6 +109,12 @@ func TestEasyPayQueryOrderStatusMapping(t *testing.T) {
 
 			provider := newTestEasyPay(t, server.URL)
 			resp, err := provider.QueryOrder(context.Background(), orderID)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("QueryOrder returned %+v, want error", resp)
+				}
+				return
+			}
 			if err != nil {
 				t.Fatalf("QueryOrder returned error: %v", err)
 			}
@@ -127,5 +138,19 @@ func TestEasyPayQueryOrderStatusMapping(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestEasyPayQueryOrderTransportErrorDoesNotExposeMerchantKey(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	provider := newTestEasyPay(t, server.URL)
+	server.Close()
+
+	_, err := provider.QueryOrder(context.Background(), "order-123")
+	if err == nil {
+		t.Fatal("QueryOrder should fail when the provider is unavailable")
+	}
+	if strings.Contains(err.Error(), "pkey-1") {
+		t.Fatalf("transport error exposes the merchant key: %v", err)
 	}
 }

@@ -1,7 +1,15 @@
 <template>
   <BaseDialog :show="show" :title="dialogTitle" width="narrow" @close="handleClose">
     <!-- QR Code + Polling State -->
-    <div v-if="!success" class="flex flex-col items-center space-y-4">
+    <div v-if="failed" class="flex flex-col items-center space-y-4 py-4 text-center">
+      <p class="text-lg font-bold text-gray-900 dark:text-white">{{ t('payment.qr.failed') }}</p>
+      <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('payment.qr.failedDesc') }}</p>
+    </div>
+    <div v-else-if="verificationPending" class="flex flex-col items-center space-y-4 py-4 text-center">
+      <p class="text-lg font-bold text-gray-900 dark:text-white">{{ t('payment.qr.checking') }}</p>
+      <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('payment.qr.checkingDesc') }}</p>
+    </div>
+    <div v-else-if="!success" class="flex flex-col items-center space-y-4">
       <!-- QR Code mode -->
       <template v-if="qrUrl">
         <div class="rounded-2xl bg-white p-4 shadow-sm dark:bg-dark-800">
@@ -56,13 +64,13 @@
     </div>
     <template #footer>
       <div class="flex justify-end gap-3">
-        <button v-if="!success && !expired" class="btn btn-secondary" :disabled="cancelling" @click="handleCancel">
+        <button v-if="!success && !expired && !failed && !verificationPending" class="btn btn-secondary" :disabled="cancelling" @click="handleCancel">
           {{ cancelling ? t('common.processing') : t('payment.qr.cancelOrder') }}
         </button>
         <button v-if="success" class="btn btn-primary" @click="handleDone">
           {{ t('common.confirm') }}
         </button>
-        <button v-if="expired" class="btn btn-primary" @click="handleClose">
+        <button v-if="expired || failed || verificationPending" class="btn btn-primary" @click="handleClose">
           {{ t('payment.result.backToRecharge') }}
         </button>
       </div>
@@ -109,6 +117,8 @@ const qrCanvas = ref<HTMLCanvasElement | null>(null)
 const qrUrl = ref('')
 const remainingSeconds = ref(0)
 const expired = ref(false)
+const failed = ref(false)
+const verificationPending = ref(false)
 const cancelling = ref(false)
 const success = ref(false)
 const paidOrder = ref<PaymentOrder | null>(null)
@@ -127,6 +137,8 @@ const isWxpay = computed(() => isBuiltInWxpayMethod(props.paymentType))
 
 const dialogTitle = computed(() => {
   if (success.value) return t('payment.result.success')
+  if (failed.value) return t('payment.qr.failed')
+  if (verificationPending.value) return t('payment.qr.checking')
   if (!qrUrl.value) return t('payment.qr.payInNewWindow')
   if (isAlipay.value) return t('payment.qr.scanAlipay')
   if (isWxpay.value) return t('payment.qr.scanWxpay')
@@ -202,11 +214,17 @@ async function pollStatus() {
   order = await tryRecoverPendingOrder(order)
   if (order.status === 'COMPLETED' || order.status === 'PAID') {
     cleanup()
+    verificationPending.value = false
     paidOrder.value = order
     success.value = true
     emit('success')
-  } else if (order.status === 'EXPIRED' || order.status === 'CANCELLED' || order.status === 'FAILED') {
+  } else if (order.status === 'FAILED') {
     cleanup()
+    verificationPending.value = false
+    failed.value = true
+  } else if (order.status === 'EXPIRED' || order.status === 'CANCELLED') {
+    cleanup()
+    verificationPending.value = false
     expired.value = true
   }
 }
@@ -235,14 +253,15 @@ async function tryRecoverPendingOrder(order: PaymentOrder): Promise<PaymentOrder
 function startCountdown(seconds: number) {
   remainingSeconds.value = Math.max(0, seconds)
   if (remainingSeconds.value <= 0) {
-    expired.value = true
+    verificationPending.value = true
     return
   }
   countdownTimer = setInterval(() => {
     remainingSeconds.value--
     if (remainingSeconds.value <= 0) {
-      expired.value = true
-      cleanup()
+      remainingSeconds.value = 0
+      verificationPending.value = true
+      if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null }
     }
   }, 1000)
 }
@@ -281,6 +300,8 @@ function init() {
   success.value = false
   paidOrder.value = null
   expired.value = false
+  failed.value = false
+  verificationPending.value = false
   cancelling.value = false
   qrUrl.value = props.qrCode
   verifyAttempts = 0

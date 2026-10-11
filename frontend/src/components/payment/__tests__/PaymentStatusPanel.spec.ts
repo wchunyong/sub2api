@@ -73,6 +73,44 @@ describe('PaymentStatusPanel', () => {
     vi.useRealTimers()
   })
 
+  it('shows a fulfillment failure separately from an expired payment', async () => {
+    pollOrderStatus.mockResolvedValue(orderFactory('FAILED'))
+    const wrapper = mount(PaymentStatusPanel, {
+      props: {
+        orderId: 42,
+        qrCode: 'https://pay.example.com/qr/42',
+        expiresAt: '2099-01-01T12:30:00Z',
+        paymentType: 'alipay',
+        orderType: 'balance',
+      },
+      global: { stubs: { Icon: true } },
+    })
+
+    await vi.advanceTimersByTimeAsync(3000)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('payment.qr.failed')
+    expect(wrapper.text()).not.toContain('payment.qr.expired')
+    expect(wrapper.emitted('settled')?.[0]).toEqual(['failed'])
+  })
+
+  it('keeps checking the server after the local payment window ends', async () => {
+    pollOrderStatus.mockResolvedValue(orderFactory('PENDING'))
+    verifyOrder.mockResolvedValue({ data: orderFactory('PENDING') })
+    const wrapper = mount(PaymentStatusPanel, {
+      props: { orderId: 42, qrCode: '', expiresAt: '2020-01-01T00:00:00Z', paymentType: 'alipay' },
+      global: { stubs: { Icon: true } },
+    })
+
+    await vi.advanceTimersByTimeAsync(3000)
+    await flushPromises()
+
+    expect(pollOrderStatus).toHaveBeenCalledWith(42)
+    expect(wrapper.text()).toContain('payment.qr.checking')
+    expect(wrapper.text()).not.toContain('payment.qr.expired')
+    expect(wrapper.emitted('settled')).toBeUndefined()
+  })
+
   it('treats RECHARGING as a successful terminal state', async () => {
     pollOrderStatus.mockResolvedValue(orderFactory('RECHARGING'))
 

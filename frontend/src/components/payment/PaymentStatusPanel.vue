@@ -56,7 +56,18 @@
       </div>
     </template>
 
-    <!-- Expired / Failed -->
+    <!-- Fulfillment failed -->
+    <template v-else-if="outcome === 'failed'">
+      <div class="card p-6">
+        <div class="flex flex-col items-center space-y-4 py-4 text-center">
+          <p class="text-lg font-bold text-gray-900 dark:text-white">{{ t('payment.qr.failed') }}</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('payment.qr.failedDesc') }}</p>
+          <button class="btn btn-primary" @click="handleDone">{{ t('common.confirm') }}</button>
+        </div>
+      </div>
+    </template>
+
+    <!-- Expired -->
     <template v-else-if="outcome === 'expired'">
       <div class="card p-6">
         <div class="flex flex-col items-center space-y-4 py-4">
@@ -73,6 +84,14 @@
     </template>
 
     <!-- ═══ Active States: QR or Popup waiting ═══ -->
+
+    <!-- Payment window ended, awaiting authoritative server status -->
+    <template v-else-if="paymentWindowEnded">
+      <div class="card p-6 text-center">
+        <p class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('payment.qr.checking') }}</p>
+        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('payment.qr.checkingDesc') }}</p>
+      </div>
+    </template>
 
     <!-- Mobile Alipay app handoff. The QR fallback stays hidden until launch timeout. -->
     <template v-else-if="isMobileAlipayDeepLink">
@@ -257,7 +276,7 @@ const props = defineProps<{
   mobileAlipayDeepLink?: boolean
 }>()
 
-type PaymentOutcome = 'success' | 'cancelled' | 'expired'
+type PaymentOutcome = 'success' | 'cancelled' | 'expired' | 'failed'
 
 const emit = defineEmits<{ done: []; success: []; settled: [outcome: PaymentOutcome] }>()
 
@@ -269,6 +288,7 @@ const appStore = useAppStore()
 const qrCanvas = ref<HTMLCanvasElement | null>(null)
 const qrUrl = ref('')
 const remainingSeconds = ref(0)
+const paymentWindowEnded = ref(false)
 const cancelling = ref(false)
 const paidOrder = ref<PaymentOrder | null>(null)
 const deepLinkState = ref<AlipayDeepLinkState>('idle')
@@ -284,7 +304,7 @@ const localeCode = computed(() => {
   return undefined
 })
 
-// Terminal outcome: null = still active, 'success' | 'cancelled' | 'expired'
+// Terminal outcome: null = still active
 const outcome = ref<PaymentOutcome | null>(null)
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -439,7 +459,10 @@ async function pollStatus() {
     } else if (order.status === 'CANCELLED') {
       cleanup()
       setOutcome('cancelled')
-    } else if (order.status === 'EXPIRED' || order.status === 'FAILED') {
+    } else if (order.status === 'FAILED') {
+      cleanup()
+      setOutcome('failed')
+    } else if (order.status === 'EXPIRED') {
       cleanup()
       setOutcome('expired')
     }
@@ -450,10 +473,14 @@ async function pollStatus() {
 
 function startCountdown(seconds: number) {
   remainingSeconds.value = Math.max(0, seconds)
-  if (remainingSeconds.value <= 0) { setOutcome('expired'); return }
+  if (remainingSeconds.value <= 0) { paymentWindowEnded.value = true; return }
   countdownTimer = setInterval(() => {
     remainingSeconds.value--
-    if (remainingSeconds.value <= 0) { setOutcome('expired'); cleanup() }
+    if (remainingSeconds.value <= 0) {
+      remainingSeconds.value = 0
+      paymentWindowEnded.value = true
+      if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null }
+    }
   }, 1000)
 }
 

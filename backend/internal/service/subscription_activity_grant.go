@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -28,7 +29,7 @@ func (s *SubscriptionService) assignTenYuanActivityUntilInTx(ctx context.Context
 	}
 	note := fmt.Sprintf("%s%d", tenYuanActivityNotePrefix, runID)
 	existing, err := s.userSubRepo.GetByUserIDAndGroupID(ctx, userID, groupID)
-	if err != nil && err != ErrSubscriptionNotFound {
+	if err != nil && !errors.Is(err, ErrSubscriptionNotFound) {
 		return nil, err
 	}
 	if existing == nil {
@@ -54,7 +55,7 @@ func (s *SubscriptionService) assignTenYuanActivityUntilInTx(ctx context.Context
 		}
 		return existing, nil
 	}
-	if !tenYuanActivityOwned(existing.Notes) || existing.ExpiresAt.After(now) {
+	if existing.Status == SubscriptionStatusSuspended || existing.ExpiresAt.After(now) {
 		return nil, ErrSubscriptionAssignConflict
 	}
 	renewed := renewedSubscriptionTerm(existing, note, now, expiresAt)
@@ -67,15 +68,6 @@ func (s *SubscriptionService) assignTenYuanActivityUntilInTx(ctx context.Context
 func tenYuanActivityNoteMatches(notes, marker string) bool {
 	for _, line := range strings.Split(notes, "\n") {
 		if strings.TrimSpace(line) == marker {
-			return true
-		}
-	}
-	return false
-}
-
-func tenYuanActivityOwned(notes string) bool {
-	for _, line := range strings.Split(notes, "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), tenYuanActivityNotePrefix) {
 			return true
 		}
 	}
