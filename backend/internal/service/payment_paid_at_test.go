@@ -32,9 +32,15 @@ func TestVerifiedProviderPaidAtFallsBackWhenTimestampUnavailableOrInvalid(t *tes
 	created := time.Date(2026, 10, 11, 8, 0, 0, 0, time.UTC)
 	received := created.Add(time.Hour)
 	paid := created.Add(10 * time.Minute)
-	require.True(t, paid.Equal(verifiedProviderPaidAt("2026-10-11 16:10:00", created, received)))
-	require.True(t, paid.Equal(verifiedProviderPaidAt(paid.Format(time.RFC3339), created, received)))
+	got, trusted := verifiedProviderPaidAt("2026-10-11 16:10:00", created, received)
+	require.True(t, trusted)
+	require.True(t, paid.Equal(got))
+	got, trusted = verifiedProviderPaidAt(paid.Format(time.RFC3339), created, received)
+	require.True(t, trusted)
+	require.True(t, paid.Equal(got))
 	for _, raw := range []string{"", "invalid", created.Add(-time.Hour).Format(time.RFC3339), received.Add(time.Hour).Format(time.RFC3339)} {
-		require.True(t, received.Equal(verifiedProviderPaidAt(raw, created, received)), raw)
+		got, trusted = verifiedProviderPaidAt(raw, created, received)
+		require.False(t, trusted, raw)
+		require.True(t, received.Equal(got), raw)
 	}
 }

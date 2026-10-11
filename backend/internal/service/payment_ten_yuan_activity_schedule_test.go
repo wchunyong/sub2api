@@ -13,6 +13,7 @@ import (
 	entsql "entgo.io/ent/dialect/sql"
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/enttest"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/stretchr/testify/require"
 	_ "modernc.org/sqlite"
 )
@@ -102,4 +103,22 @@ func TestTenYuanScheduleConcurrent(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, state.Current)
 	require.Len(t, state.Recent, 1)
+}
+
+type pagedTenYuanDefaultRepo struct{ groupRepoNoop }
+
+func (pagedTenYuanDefaultRepo) ListWithFilters(_ context.Context, params pagination.PaginationParams, _, _, _ string, _ *bool) ([]Group, *pagination.PaginationResult, error) {
+	if params.Page == 1 {
+		groups := make([]Group, 100)
+		for i := range groups {
+			groups[i] = Group{ID: int64(i + 1), Name: "相似活动", Status: StatusActive, SubscriptionType: SubscriptionTypeSubscription}
+		}
+		return groups, &pagination.PaginationResult{Total: 101}, nil
+	}
+	return []Group{{ID: 101, Name: tenYuanActivityGroupName, Status: StatusActive, SubscriptionType: SubscriptionTypeSubscription}}, &pagination.PaginationResult{Total: 101}, nil
+}
+
+func TestTenYuanDefaultGroupChecksLaterSearchPages(t *testing.T) {
+	svc := &PaymentService{groupRepo: pagedTenYuanDefaultRepo{}}
+	require.Equal(t, int64(101), svc.tenYuanDefaultGroup(context.Background()))
 }

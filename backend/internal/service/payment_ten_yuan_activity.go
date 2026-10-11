@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
@@ -112,17 +113,21 @@ func (s *PaymentService) tenYuanDefaultGroup(ctx context.Context) int64 {
 	if s == nil || s.groupRepo == nil {
 		return 0
 	}
-	groups, _, err := s.groupRepo.ListWithFilters(ctx, pagination.PaginationParams{Page: 1, PageSize: 100}, "", "", tenYuanActivityGroupName, nil)
-	if err != nil {
-		return 0
-	}
-	for i := range groups {
-		group := &groups[i]
-		if group.Name == tenYuanActivityGroupName && group.IsActive() && group.IsSubscriptionType() {
-			return group.ID
+	for page := 1; ; page++ {
+		groups, result, err := s.groupRepo.ListWithFilters(ctx, pagination.PaginationParams{Page: page, PageSize: 100}, "", "", tenYuanActivityGroupName, nil)
+		if err != nil {
+			return 0
+		}
+		for i := range groups {
+			group := &groups[i]
+			if group.Name == tenYuanActivityGroupName && group.IsActive() && group.IsSubscriptionType() {
+				return group.ID
+			}
+		}
+		if result == nil || int64(page*100) >= result.Total || len(groups) == 0 {
+			return 0
 		}
 	}
-	return 0
 }
 
 func (s *PaymentService) GetTenYuanActivityAdmin(ctx context.Context, now time.Time) (*TenYuanActivityAdminState, error) {
@@ -225,10 +230,58 @@ func (s *PaymentService) CloseTenYuanActivity(ctx context.Context, runID int64, 
 	return err
 }
 
+// Expired orders normally have only a short webhook recovery window. A
+// verified payment during this activity can arrive later, so allow recovery
+// until the round ends when the payment preceded the activity close.
+func (s *PaymentService) tenYuanExpiredOrderRecoveryEligible(ctx context.Context, order *dbent.PaymentOrder, paidAt, now time.Time, trustedPaidAt bool) (bool, error) {
+	if !trustedPaidAt || order == nil || order.Status != OrderStatusExpired || order.OrderType != payment.OrderTypeBalance || order.Amount < 10 {
+		return false, nil
+	}
+	run, err := s.entClient.ActivityRun.Query().Where(
+		activityrun.CodeEQ(tenYuanActivityCode),
+		activityrun.StartsAtLTE(paidAt),
+		activityrun.EndsAtGT(paidAt),
+	).Order(dbent.Desc(activityrun.FieldStartsAt)).First(ctx)
+	if dbent.IsNotFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if !now.Before(run.EndsAt) || run.DisabledAt != nil && !paidAt.Before(*run.DisabledAt) {
+		return false, nil
+	}
+	return true, nil
+}
+
 // applyTenYuanActivityForOrder runs before marking a balance order completed.
 // The claim and subscription change share a transaction, so a failed grant can
 // be retried through the existing paid-order fulfillment path.
 func (s *PaymentService) applyTenYuanActivityForOrder(ctx context.Context, order *dbent.PaymentOrder) error {
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		err = s.applyTenYuanActivityForOrderOnce(ctx, order)
+		if err == nil || !tenYuanTransientTxError(err) || attempt == 2 {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Duration(attempt+1) * 25 * time.Millisecond):
+		}
+	}
+	return err
+}
+
+func tenYuanTransientTxError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "database is locked") || strings.Contains(message, "database table is locked") || strings.Contains(message, "database is deadlocked") || strings.Contains(message, "deadlock detected") || strings.Contains(message, "serialization failure")
+}
+
+func (s *PaymentService) applyTenYuanActivityForOrderOnce(ctx context.Context, order *dbent.PaymentOrder) error {
 	if s == nil || s.entClient == nil || order == nil || order.OrderType != payment.OrderTypeBalance || order.Amount < 10 || order.PaidAt == nil {
 		return nil
 	}
@@ -287,12 +340,18 @@ func (s *PaymentService) applyTenYuanActivityForOrder(ctx context.Context, order
 	sub, err := s.subscriptionSvc.assignTenYuanActivityUntilInTx(txCtx, order.UserID, run.GroupID, run.ID, run.EndsAt)
 	if err != nil {
 		_ = tx.Rollback()
+		if claimed, resolveErr := s.tenYuanResolveConcurrentClaim(ctx, run.ID, order.UserID, order.ID, run.GroupID); claimed {
+			return resolveErr
+		}
 		s.writeAuditLog(ctx, order.ID, "TEN_YUAN_ACTIVITY_GRANT_FAILED", "system", map[string]any{"run_id": run.ID, "reason": err.Error()})
 		return err
 	}
 	_, err = tx.ActivityClaim.Create().SetRunID(run.ID).SetUserID(order.UserID).SetOrderID(order.ID).SetSubscriptionID(sub.ID).SetClaimedAt(now).Save(txCtx)
 	if err != nil {
 		_ = tx.Rollback()
+		if claimed, resolveErr := s.tenYuanResolveConcurrentClaim(ctx, run.ID, order.UserID, order.ID, run.GroupID); claimed {
+			return resolveErr
+		}
 		s.writeAuditLog(ctx, order.ID, "TEN_YUAN_ACTIVITY_GRANT_FAILED", "system", map[string]any{"run_id": run.ID, "reason": err.Error()})
 		return err
 	}
@@ -302,4 +361,24 @@ func (s *PaymentService) applyTenYuanActivityForOrder(ctx context.Context, order
 	}
 	s.writeAuditLog(ctx, order.ID, "TEN_YUAN_ACTIVITY_GRANTED", "system", map[string]any{"run_id": run.ID, "subscription_id": sub.ID, "ends_at": run.EndsAt})
 	return s.subscriptionSvc.invalidateSubscriptionCaches(order.UserID, run.GroupID)
+}
+
+func (s *PaymentService) tenYuanResolveConcurrentClaim(ctx context.Context, runID, userID, orderID, groupID int64) (bool, error) {
+	for attempt := 0; attempt < 4; attempt++ {
+		claimed, err := s.entClient.ActivityClaim.Query().Where(activityclaim.RunIDEQ(runID), activityclaim.UserIDEQ(userID)).Exist(ctx)
+		if err == nil && claimed {
+			if !s.hasAuditLog(ctx, orderID, "TEN_YUAN_ACTIVITY_ALREADY_CLAIMED") {
+				s.writeAuditLog(ctx, orderID, "TEN_YUAN_ACTIVITY_ALREADY_CLAIMED", "system", map[string]any{"run_id": runID})
+			}
+			return true, s.subscriptionSvc.invalidateSubscriptionCaches(userID, groupID)
+		}
+		if attempt < 3 {
+			select {
+			case <-ctx.Done():
+				return false, ctx.Err()
+			case <-time.After(20 * time.Millisecond):
+			}
+		}
+	}
+	return false, nil
 }

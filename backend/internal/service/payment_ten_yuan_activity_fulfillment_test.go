@@ -184,13 +184,9 @@ func TestTenYuanConcurrentClaim(t *testing.T) {
 	}
 	wg.Wait()
 	close(results)
-	success := 0
 	for result := range results {
-		if result == nil {
-			success++
-		}
+		require.NoError(t, result)
 	}
-	require.GreaterOrEqual(t, success, 1)
 	claims, err := client.ActivityClaim.Query().Count(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 1, claims)

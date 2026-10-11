@@ -150,17 +150,22 @@ func expectedNotificationProviderKey(registry *payment.Registry, orderPaymentTyp
 func (s *PaymentService) toPaid(ctx context.Context, o *dbent.PaymentOrder, tradeNo string, paid float64, pk, providerPaidAt string) error {
 	previousStatus := o.Status
 	now := time.Now()
-	effectivePaidAt := verifiedProviderPaidAt(providerPaidAt, o.CreatedAt, now)
+	effectivePaidAt, trustedPaidAt := verifiedProviderPaidAt(providerPaidAt, o.CreatedAt, now)
 	grace := now.Add(-paymentGraceMinutes * time.Minute)
+	activityRecovery, err := s.tenYuanExpiredOrderRecoveryEligible(ctx, o, effectivePaidAt, now, trustedPaidAt)
+	if err != nil {
+		return err
+	}
+	expiredAllowed := paymentorder.And(paymentorder.StatusEQ(OrderStatusExpired), paymentorder.UpdatedAtGTE(grace))
+	if activityRecovery {
+		expiredAllowed = paymentorder.StatusEQ(OrderStatusExpired)
+	}
 	c, err := s.entClient.PaymentOrder.Update().Where(
 		paymentorder.IDEQ(o.ID),
 		paymentorder.Or(
 			paymentorder.StatusEQ(OrderStatusPending),
 			paymentorder.StatusEQ(OrderStatusCancelled),
-			paymentorder.And(
-				paymentorder.StatusEQ(OrderStatusExpired),
-				paymentorder.UpdatedAtGTE(grace),
-			),
+			expiredAllowed,
 		),
 	).SetStatus(OrderStatusPaid).SetPayAmount(paid).SetPaymentTradeNo(tradeNo).SetPaidAt(effectivePaidAt).ClearFailedAt().ClearFailedReason().Save(ctx)
 	if err != nil {
@@ -187,10 +192,10 @@ func (s *PaymentService) toPaid(ctx context.Context, o *dbent.PaymentOrder, trad
 	return s.executeFulfillment(ctx, o.ID)
 }
 
-func verifiedProviderPaidAt(raw string, orderCreatedAt, receivedAt time.Time) time.Time {
+func verifiedProviderPaidAt(raw string, orderCreatedAt, receivedAt time.Time) (time.Time, bool) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return receivedAt
+		return receivedAt, false
 	}
 	paidAt, err := time.Parse(time.RFC3339Nano, raw)
 	if err != nil {
@@ -198,9 +203,9 @@ func verifiedProviderPaidAt(raw string, orderCreatedAt, receivedAt time.Time) ti
 		paidAt, err = time.ParseInLocation("2006-01-02 15:04:05", raw, time.FixedZone("CST", 8*60*60))
 	}
 	if err != nil || paidAt.Before(orderCreatedAt.Add(-2*time.Second)) || paidAt.After(receivedAt.Add(2*time.Second)) {
-		return receivedAt
+		return receivedAt, false
 	}
-	return paidAt
+	return paidAt, true
 }
 
 func (s *PaymentService) alreadyProcessed(ctx context.Context, o *dbent.PaymentOrder) error {
