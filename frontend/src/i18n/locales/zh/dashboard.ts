@@ -709,6 +709,22 @@ export default {
   modelPlaza: {
     title: '模型广场',
     description: '按分组浏览可用模型与价格',
+    hero: {
+      eyebrow: 'MODEL PLAZA · 模型广场',
+      title: '好模型，好价格。',
+      subtitle: '按平台与分组浏览模型，原价、3 折计划价及本站实付价一眼看清。',
+      models: '展示模型',
+      groups: '价格分组',
+      unit: '按卡片标示单位',
+      promoLabel: '国内模型当前活动价',
+      discount: '3 折',
+      promoNote: '已接入的国内模型所在 {count} 个分组当前展示倍率均为 0.3；高峰或阶梯规则可能影响实际扣费，OpenAI 按后台倍率展示',
+      plannedPromoLabel: '国内模型 3 折计划价',
+      plannedPromoNote: '国内模型 3 折优惠价，原价与活动价一眼看清；已接入模型按对应分组价格计费',
+      priceLabel: '清晰透明的价格',
+      transparent: '实时价格',
+      priceNote: '根据当前分组倍率展示实付价'
+    },
     loading: '加载中...',
     empty: '暂无可展示的分组',
     loadFailed: '加载模型广场失败',
@@ -726,11 +742,28 @@ export default {
       exclusive: '专属分组',
       subscription: '订阅'
     },
+    card: {
+      discount: '{value} 折',
+      multiplier: '{value}× 倍率',
+      tokenUnit: 'USD / 1M Token',
+      originalPrice: '原价 {price}',
+      currentPrice: '本站价格',
+      plannedPrice: '3 折计划价',
+      cacheRead: '缓存读取',
+      cacheWrite: '缓存写入',
+      groupCount: '共 {count} 款模型',
+      modelCount: '{count} 款模型',
+      pricingNote: '卡片原价为渠道单价，本站价按实际生效倍率计算',
+      detailHint: '仅展示基础档，长上下文或分时价格以实际计费规则为准'
+    },
+    domestic: {
+      groupName: '国内模型 · {name}'
+    },
     detail: {
       noModels: '该分组暂未配置模型',
       noPricing: '未配置定价',
       peakNote: '高峰时段 {window} 计费倍率 ×{multiplier}',
-      longContextDisabledNote: '该分组未启用长上下文阶梯计费，超阈值请求仍按基础档计费，官方阶梯仅供参考'
+      longContextDisabledNote: '该分组未启用长上下文阶梯计费，超阈值请求仍按基础档计费'
     },
     table: {
       model: '模型',
