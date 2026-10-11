@@ -269,6 +269,7 @@ func TestApplyNationalDayPromotionAssignsDailyAndOldUserSubscriptions(t *testing
 	}
 	subRepo := newSubscriptionUserSubRepoStub()
 	subscriptionSvc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	subscriptionSvc.now = func() time.Time { return now }
 	svc := &PaymentService{entClient: client, userRepo: userRepo, groupRepo: groupRepo, subscriptionSvc: subscriptionSvc}
 
 	require.NoError(t, svc.applyNationalDayPromotionForOrder(ctx, order))

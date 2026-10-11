@@ -53,14 +53,6 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	if s.notificationEmailService != nil {
 		s.notificationEmailService.RememberRecipientLocale(ctx, req.UserID, user.Email, req.Locale)
 	}
-	orderAmount := req.Amount
-	limitAmount := req.Amount
-	if plan != nil {
-		orderAmount = plan.Price
-		limitAmount = plan.Price
-	} else if req.OrderType == payment.OrderTypeBalance {
-		orderAmount = calculateBalanceOrderAmount(req.Amount, cfg.BalanceRechargeMultiplier, time.Now())
-	}
 	feeRate := cfg.RechargeFeeRate
 	methodCurrency := payment.DefaultPaymentCurrency
 	if s.configService != nil {
@@ -68,6 +60,15 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 		if err != nil {
 			return nil, err
 		}
+	}
+	orderAmount := req.Amount
+	limitAmount := req.Amount
+	bonusAmount := 0.0
+	if plan != nil {
+		orderAmount = plan.Price
+		limitAmount = plan.Price
+	} else if req.OrderType == payment.OrderTypeBalance {
+		orderAmount, limitAmount, bonusAmount = calculateBalanceRechargeOrderAmounts(cfg, req.Amount, methodCurrency, time.Now())
 	}
 	payAmountStr, payAmount, err := calculateCreateOrderPayAmountForOrderType(limitAmount, feeRate, methodCurrency, req.OrderType, cfg.SubscriptionUSDToCNYRate)
 	if err != nil {
@@ -100,7 +101,7 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	if oauthResp != nil {
 		return oauthResp, nil
 	}
-	order, err := s.createOrderInTx(ctx, req, user, plan, cfg, orderAmount, limitAmount, feeRate, payAmount, sel)
+	order, err := s.createOrderInTx(ctx, req, user, plan, cfg, orderAmount, limitAmount, feeRate, payAmount, bonusAmount, sel)
 	if err != nil {
 		return nil, err
 	}
@@ -112,6 +113,24 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 		return nil, err
 	}
 	return resp, nil
+}
+
+func calculateBalanceRechargeOrderAmounts(cfg *PaymentConfig, paymentAmount float64, currency string, now time.Time) (orderAmount, payBase, bonusAmount float64) {
+	if nationalDayPromotionActiveAt(now) {
+		// 活动到账奖励按订单金额计算，活动期间不叠加常规固定档位和阶梯赠额。
+		return calculateBalanceOrderAmount(paymentAmount, cfg.BalanceRechargeMultiplier, now), paymentAmount, 0
+	}
+	// 阈值按支付金额命中。赠金模式增加到账，折扣模式减少实付基数。
+	quote := quoteRechargeBonus(cfg, paymentAmount, currency)
+	// 推广返利只计入实付对应的额度，固定档位和阶梯优惠都属于免费额度。
+	paidCredit := decimal.NewFromFloat(quote.PayBase).
+		Mul(decimal.NewFromFloat(normalizeBalanceRechargeMultiplier(cfg.BalanceRechargeMultiplier))).
+		Round(2)
+	freeCredit := decimal.NewFromFloat(quote.Credited).Sub(paidCredit).Round(2)
+	if freeCredit.IsPositive() {
+		bonusAmount = freeCredit.InexactFloat64()
+	}
+	return quote.Credited, quote.PayBase, bonusAmount
 }
 
 func (s *PaymentService) validateOrderInput(ctx context.Context, req CreateOrderRequest, cfg *PaymentConfig) (*dbent.SubscriptionPlan, error) {
@@ -149,7 +168,7 @@ func (s *PaymentService) validateSubOrder(ctx context.Context, req CreateOrderRe
 	return plan, nil
 }
 
-func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderRequest, user *User, plan *dbent.SubscriptionPlan, cfg *PaymentConfig, orderAmount, limitAmount, feeRate, payAmount float64, sel *payment.InstanceSelection) (*dbent.PaymentOrder, error) {
+func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderRequest, user *User, plan *dbent.SubscriptionPlan, cfg *PaymentConfig, orderAmount, limitAmount, feeRate, payAmount, bonusAmount float64, sel *payment.InstanceSelection) (*dbent.PaymentOrder, error) {
 	tx, err := s.entClient.Tx(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("begin transaction: %w", err)
@@ -185,6 +204,7 @@ func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderReq
 		SetAmount(orderAmount).
 		SetPayAmount(payAmount).
 		SetFeeRate(feeRate).
+		SetBonusAmount(bonusAmount).
 		SetRechargeCode("").
 		SetOutTradeNo(outTradeNo).
 		SetPaymentType(req.PaymentType).
@@ -471,6 +491,7 @@ func (s *PaymentService) invokeProvider(ctx context.Context, order *dbent.Paymen
 	s.writeAuditLog(ctx, order.ID, "ORDER_CREATED", fmt.Sprintf("user:%d", req.UserID), map[string]any{
 		"paymentAmount":  req.Amount,
 		"creditedAmount": order.Amount,
+		"bonusAmount":    order.BonusAmount,
 		"payAmount":      order.PayAmount,
 		"paymentType":    req.PaymentType,
 		"orderType":      req.OrderType,
@@ -735,6 +756,7 @@ func buildCreateOrderResponse(order *dbent.PaymentOrder, req CreateOrderRequest,
 		Amount:       order.Amount,
 		PayAmount:    payAmount,
 		FeeRate:      order.FeeRate,
+		BonusAmount:  order.BonusAmount,
 		Status:       OrderStatusPending,
 		ResultType:   resultType,
 		PaymentType:  req.PaymentType,

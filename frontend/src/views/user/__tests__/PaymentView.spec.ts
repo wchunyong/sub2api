@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import PaymentView from '../PaymentView.vue'
 import { PAYMENT_RECOVERY_STORAGE_KEY } from '@/components/payment/paymentFlow'
@@ -369,9 +369,28 @@ describe('PaymentView recharge-only user checkout', () => {
     expect(wrapper.text()).toContain('payment.rechargeBonusPreview')
   })
 
+  it('combines fixed recharge credit with configured bonus tiers', async () => {
+    const wrapper = await mountRechargePage({
+      checkout: {
+        recharge_bonus_tiers: [{ min_amount: 200, bonus_percent: 20 }],
+        recharge_bonus_mode: 'bonus',
+      },
+    })
+
+    const amountInput = wrapper.findComponent(AmountInput)
+    await amountInput.vm.$emit('update:modelValue', 200)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('$252.00')
+    expect(amountInput.props('creditForAmount')(200, 1)).toBe(210)
+  })
+
   it('shows the national day total credited amount when the promotion is active', async () => {
     const wrapper = await mountRechargePage({
       checkout: {
+        recharge_bonus_tiers: [{ min_amount: 100, bonus_percent: 20 }],
+        recharge_bonus_mode: 'discount',
+        recharge_bonus_notice: 'Tier bonus',
         national_day_promotion: {
           active: true,
           is_old_user: false,
@@ -408,6 +427,10 @@ describe('PaymentView recharge-only user checkout', () => {
     expect(text).toContain('payment.nationalDayPromotionIncluded')
     expect(text).toContain('payment.nationalDayDailyBenefitBadge')
     expect(text).not.toContain('payment.nationalDayOldUserLimitedQuota')
+    expect(text).not.toContain('Tier bonus')
+    expect(text).not.toContain('payment.rechargeBonus.amountLabelWithPercent')
+    expect(wrapper.find('[data-testid="recharge-discount-row"]').exists()).toBe(false)
+    expect(amountInput.props('bonusTiers')).toEqual([])
   })
 
   it('shows old-user limited quota on national day recharge preview', async () => {
