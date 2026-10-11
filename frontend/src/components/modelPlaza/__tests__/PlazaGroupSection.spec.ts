@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import PlazaGroupSection from '../PlazaGroupSection.vue'
-import PlazaModelPricingTable from '../PlazaModelPricingTable.vue'
+import PlazaModelCard from '../PlazaModelCard.vue'
+import GroupBadge from '@/components/common/GroupBadge.vue'
 import type { ModelPlazaGroup, PlazaModel } from '@/api/modelPlaza'
 
 vi.mock('vue-i18n', async () => {
@@ -83,7 +84,7 @@ function mountSection(g: ModelPlazaGroup) {
       stubs: {
         GroupBadge: true,
         Icon: true,
-        PlazaModelPricingTable: true
+        PlazaModelCard: true
       }
     }
   })
@@ -92,12 +93,19 @@ function mountSection(g: ModelPlazaGroup) {
 const NOTE = 'modelPlaza.detail.longContextDisabledNote'
 
 describe('PlazaGroupSection 长上下文说明', () => {
-  it('passes video-specific rates to the pricing table', () => {
-    const wrapper = mountSection(group({ video_rate_independent: true, video_rate_multiplier: 0 }))
-    expect(wrapper.findComponent(PlazaModelPricingTable).props()).toMatchObject({
-      videoRateIndependent: true,
-      videoRateMultiplier: 0
-    })
+  it('places the group badge beside the platform model count without a separate header', () => {
+    const wrapper = mountSection(group({ name: 'ChatGPT Plus' }))
+    expect(wrapper.find('header').exists()).toBe(false)
+    expect(wrapper.findComponent(GroupBadge).element.parentElement)
+      .toBe(wrapper.find('h2').element.parentElement)
+    wrapper.unmount()
+  })
+
+  it('renders model cards without the expandable pricing table', () => {
+    const wrapper = mountSection(group({ rate_multiplier: 0.3 }))
+    expect(wrapper.findAllComponents(PlazaModelCard)).toHaveLength(1)
+    expect(wrapper.findComponent(PlazaModelCard).props('rateMultiplier')).toBe(0.3)
+    expect(wrapper.find('details').exists()).toBe(false)
     wrapper.unmount()
   })
   it('分组关闭阶梯且组内有官方阶梯模型时显示说明', () => {
@@ -125,8 +133,8 @@ describe('PlazaGroupSection 长上下文说明', () => {
   })
 })
 
-describe('PlazaGroupSection 高峰配置传递', () => {
-  it('分组启用高峰时把窗口描述与倍率传给价格表', () => {
+describe('PlazaGroupSection 高峰提示', () => {
+  it('分组启用高峰时显示提示', () => {
     const wrapper = mountSection(
       group({
         subscription_type: 'subscription',
@@ -136,14 +144,11 @@ describe('PlazaGroupSection 高峰配置传递', () => {
         peak_rate_multiplier: 1.5
       })
     )
-    const table = wrapper.findComponent(PlazaModelPricingTable)
-    // appStore mock 无 server_utc_offset,窗口描述不带时区标注
-    expect(table.props('peakWindow')).toBe('14:00-18:00 ×1.5')
-    expect(table.props('peakRateMultiplier')).toBe(1.5)
+    expect(wrapper.text()).toContain('modelPlaza.detail.peakNote')
   })
 
-  it('分组未启用高峰时窗口描述为空串', () => {
+  it('分组未启用高峰时不显示提示', () => {
     const wrapper = mountSection(group())
-    expect(wrapper.findComponent(PlazaModelPricingTable).props('peakWindow')).toBe('')
+    expect(wrapper.text()).not.toContain('modelPlaza.detail.peakNote')
   })
 })

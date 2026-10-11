@@ -1,12 +1,14 @@
 <template>
-  <section
-    class="overflow-hidden rounded-2xl border bg-white shadow-card dark:bg-dark-800/50"
-    :class="[platformBorderStrongClass(group.platform)]"
-  >
-    <!-- 分组头部:名称/平台/倍率徽章/专属/订阅徽章 + 描述 -->
-    <header class="border-b border-gray-100 px-5 py-4 dark:border-dark-700/60">
-      <div class="flex flex-wrap items-center gap-2">
+  <section class="space-y-5" :data-group-id="group.id">
+    <div v-for="(family, index) in modelFamilies" :key="family.platform" class="space-y-3">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-200 dark:bg-dark-800 dark:ring-dark-700">
+          <PlatformIcon :platform="family.platform as GroupPlatform" size="sm" />
+        </span>
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ platformLabel(family.platform) }}</h2>
+        <span class="text-xs text-gray-400 dark:text-dark-500">{{ t('modelPlaza.card.modelCount', { count: family.models.length }) }}</span>
         <GroupBadge
+          v-if="index === 0"
           :name="group.name"
           :platform="group.platform as GroupPlatform"
           :subscription-type="(group.subscription_type || 'standard') as SubscriptionType"
@@ -19,57 +21,45 @@
           always-show-rate
         />
         <span
-          v-if="group.is_exclusive"
+          v-if="index === 0 && group.is_exclusive"
           class="inline-flex items-center gap-1 rounded-md bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-600 dark:bg-purple-900/20 dark:text-purple-400"
         >
           <Icon name="shield" size="xs" class="h-3 w-3" />
           {{ t('modelPlaza.badges.exclusive') }}
         </span>
         <span
-          v-if="group.subscription_type === 'subscription'"
+          v-if="index === 0 && group.subscription_type === 'subscription'"
           class="inline-flex items-center rounded-md bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-600 dark:bg-violet-900/20 dark:text-violet-400"
         >
           {{ t('modelPlaza.badges.subscription') }}
         </span>
+        <span class="ml-2 h-px min-w-8 flex-1 bg-gray-200 dark:bg-dark-700"></span>
       </div>
-      <p v-if="group.description" class="mt-2 text-sm text-gray-500 dark:text-dark-400">
-        {{ group.description }}
-      </p>
-      <p
-        v-if="peakNote"
-        class="mt-1.5 inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400"
-      >
+      <p v-if="index === 0 && group.description" class="text-sm text-gray-500 dark:text-dark-400">{{ group.description }}</p>
+      <p v-if="index === 0 && peakNote" class="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
         <Icon name="clock" size="xs" class="h-3 w-3" />
         {{ peakNote }}
       </p>
-      <p
-        v-if="longContextNote"
-        class="mt-1.5 flex items-center gap-1 text-xs text-gray-500 dark:text-dark-400"
-      >
+      <p v-if="index === 0 && longContextNote" class="flex items-center gap-1 text-xs text-gray-500 dark:text-dark-400">
         <Icon name="infoCircle" size="xs" class="h-3 w-3" />
         {{ longContextNote }}
       </p>
-    </header>
-
-    <!-- 模型价格表:整行(含 hover 底色/分区底色)顶到卡片边缘,左右留白由表格首列/末列的 padding 提供 -->
-    <div>
-      <PlazaModelPricingTable
-        v-if="group.models.length > 0"
-        :models="group.models"
-        :platform="group.platform"
-        :rate-multiplier="group.rate_multiplier"
-        :user-rate-multiplier="group.user_rate_multiplier ?? null"
-        :image-rate-independent="group.image_rate_independent"
-        :image-rate-multiplier="group.image_rate_multiplier"
-        :video-rate-independent="group.video_rate_independent"
-        :video-rate-multiplier="group.video_rate_multiplier"
-        :peak-window="peakWindow"
-        :peak-rate-multiplier="group.peak_rate_multiplier"
-      />
-      <p v-else class="px-5 py-4 text-center text-sm text-gray-400 dark:text-dark-500">
-        {{ t('modelPlaza.detail.noModels') }}
-      </p>
+      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <PlazaModelCard
+          v-for="model in family.models"
+          :key="`${model.platform}:${model.name}`"
+          :model="model"
+          :rate-multiplier="group.rate_multiplier"
+          :user-rate-multiplier="group.user_rate_multiplier ?? null"
+          :image-rate-independent="group.image_rate_independent"
+          :image-rate-multiplier="group.image_rate_multiplier"
+          :video-rate-independent="group.video_rate_independent"
+          :video-rate-multiplier="group.video_rate_multiplier"
+        />
+      </div>
     </div>
+
+    <p v-if="group.models.length === 0" class="rounded-2xl border border-dashed border-gray-200 px-5 py-6 text-center text-sm text-gray-400 dark:border-dark-700 dark:text-dark-500">{{ t('modelPlaza.detail.noModels') }}</p>
   </section>
 </template>
 
@@ -78,10 +68,11 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import GroupBadge from '@/components/common/GroupBadge.vue'
-import PlazaModelPricingTable from './PlazaModelPricingTable.vue'
-import type { ModelPlazaGroup } from '@/api/modelPlaza'
+import PlatformIcon from '@/components/common/PlatformIcon.vue'
+import PlazaModelCard from './PlazaModelCard.vue'
+import type { ModelPlazaGroup, PlazaModel } from '@/api/modelPlaza'
 import type { GroupPlatform, SubscriptionType } from '@/types'
-import { platformBorderStrongClass } from '@/utils/platformColors'
+import { platformLabel } from '@/utils/platformColors'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 import { useAppStore } from '@/stores/app'
 
@@ -91,6 +82,15 @@ const props = defineProps<{
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const modelFamilies = computed(() => {
+  const families = new Map<string, PlazaModel[]>()
+  for (const model of props.group.models) {
+    const platform = model.platform || props.group.platform
+    if (!families.has(platform)) families.set(platform, [])
+    families.get(platform)!.push(model)
+  }
+  return [...families].map(([platform, models]) => ({ platform, models }))
+})
 
 /** 高峰窗口描述(含倍率与服务器时区标注);分组未启用高峰为空串。 */
 const peakWindow = computed(() => {
