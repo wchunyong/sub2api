@@ -384,6 +384,11 @@ func validatePaymentRedeemCode(o *dbent.PaymentOrder, code *RedeemCode) error {
 }
 
 func (s *PaymentService) doBalance(ctx context.Context, o *dbent.PaymentOrder, lease *paymentFulfillmentLease) error {
+	var err error
+	o, err = s.prepareNewUserRechargeBonus(ctx, o, lease)
+	if err != nil {
+		return err
+	}
 	// Idempotency: check if redeem code already exists (from a previous partial run)
 	existing, lookupErr := s.redeemService.GetByCode(ctx, o.RechargeCode)
 	action, err := resolveRedeemAction(existing, lookupErr)

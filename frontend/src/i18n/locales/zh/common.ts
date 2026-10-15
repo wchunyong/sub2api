@@ -179,6 +179,7 @@ export default {
     groups: '分组管理',
     activities: '活动',
     tenYuanActivity: '十元七天乐',
+    newUserBenefits: '新用户权益',
     channels: '渠道管理',
     availableChannels: '可用渠道',
     modelPlaza: '模型广场',
@@ -252,6 +253,7 @@ export default {
       USER_NOT_ACTIVE: '账号已被禁用',
     },
     registrationFailed: '注册失败，请重试。',
+    deviceRegistrationLimit: '设备注册抵达上限，请稍后重试或联系管理员。',
     emailDomainRegistrationLimit:
       '该邮箱域名无法注册新账户。请使用主流邮箱注册；如需使用企业邮箱，请联系客服添加域名白名单。',
     emailSuffixNotAllowed: '该邮箱域名不在允许注册范围内。',

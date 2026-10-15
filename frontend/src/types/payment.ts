@@ -108,6 +108,7 @@ export interface CheckoutInfoResponse {
   alipay_mobile_precreate_deep_link?: boolean
   national_day_promotion?: NationalDayPromotionCheckout
   ten_yuan_activity?: TenYuanActivityCheckout
+  new_user_recharge_available?: boolean
 }
 
 // ==================== Orders ====================

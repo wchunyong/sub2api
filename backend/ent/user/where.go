@@ -135,6 +135,21 @@ func SignupSource(v string) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldSignupSource, v))
 }
 
+// SignupIPHash applies equality check predicate on the "signup_ip_hash" field. It's identical to SignupIPHashEQ.
+func SignupIPHash(v string) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldSignupIPHash, v))
+}
+
+// SignupDeviceHash applies equality check predicate on the "signup_device_hash" field. It's identical to SignupDeviceHashEQ.
+func SignupDeviceHash(v string) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldSignupDeviceHash, v))
+}
+
+// WelcomeRechargeOrderID applies equality check predicate on the "welcome_recharge_order_id" field. It's identical to WelcomeRechargeOrderIDEQ.
+func WelcomeRechargeOrderID(v int64) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldWelcomeRechargeOrderID, v))
+}
+
 // LastLoginAt applies equality check predicate on the "last_login_at" field. It's identical to LastLoginAtEQ.
 func LastLoginAt(v time.Time) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldLastLoginAt, v))
@@ -1018,6 +1033,186 @@ func SignupSourceEqualFold(v string) predicate.User {
 // SignupSourceContainsFold applies the ContainsFold predicate on the "signup_source" field.
 func SignupSourceContainsFold(v string) predicate.User {
 	return predicate.User(sql.FieldContainsFold(FieldSignupSource, v))
+}
+
+// SignupIPHashEQ applies the EQ predicate on the "signup_ip_hash" field.
+func SignupIPHashEQ(v string) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldSignupIPHash, v))
+}
+
+// SignupIPHashNEQ applies the NEQ predicate on the "signup_ip_hash" field.
+func SignupIPHashNEQ(v string) predicate.User {
+	return predicate.User(sql.FieldNEQ(FieldSignupIPHash, v))
+}
+
+// SignupIPHashIn applies the In predicate on the "signup_ip_hash" field.
+func SignupIPHashIn(vs ...string) predicate.User {
+	return predicate.User(sql.FieldIn(FieldSignupIPHash, vs...))
+}
+
+// SignupIPHashNotIn applies the NotIn predicate on the "signup_ip_hash" field.
+func SignupIPHashNotIn(vs ...string) predicate.User {
+	return predicate.User(sql.FieldNotIn(FieldSignupIPHash, vs...))
+}
+
+// SignupIPHashGT applies the GT predicate on the "signup_ip_hash" field.
+func SignupIPHashGT(v string) predicate.User {
+	return predicate.User(sql.FieldGT(FieldSignupIPHash, v))
+}
+
+// SignupIPHashGTE applies the GTE predicate on the "signup_ip_hash" field.
+func SignupIPHashGTE(v string) predicate.User {
+	return predicate.User(sql.FieldGTE(FieldSignupIPHash, v))
+}
+
+// SignupIPHashLT applies the LT predicate on the "signup_ip_hash" field.
+func SignupIPHashLT(v string) predicate.User {
+	return predicate.User(sql.FieldLT(FieldSignupIPHash, v))
+}
+
+// SignupIPHashLTE applies the LTE predicate on the "signup_ip_hash" field.
+func SignupIPHashLTE(v string) predicate.User {
+	return predicate.User(sql.FieldLTE(FieldSignupIPHash, v))
+}
+
+// SignupIPHashContains applies the Contains predicate on the "signup_ip_hash" field.
+func SignupIPHashContains(v string) predicate.User {
+	return predicate.User(sql.FieldContains(FieldSignupIPHash, v))
+}
+
+// SignupIPHashHasPrefix applies the HasPrefix predicate on the "signup_ip_hash" field.
+func SignupIPHashHasPrefix(v string) predicate.User {
+	return predicate.User(sql.FieldHasPrefix(FieldSignupIPHash, v))
+}
+
+// SignupIPHashHasSuffix applies the HasSuffix predicate on the "signup_ip_hash" field.
+func SignupIPHashHasSuffix(v string) predicate.User {
+	return predicate.User(sql.FieldHasSuffix(FieldSignupIPHash, v))
+}
+
+// SignupIPHashEqualFold applies the EqualFold predicate on the "signup_ip_hash" field.
+func SignupIPHashEqualFold(v string) predicate.User {
+	return predicate.User(sql.FieldEqualFold(FieldSignupIPHash, v))
+}
+
+// SignupIPHashContainsFold applies the ContainsFold predicate on the "signup_ip_hash" field.
+func SignupIPHashContainsFold(v string) predicate.User {
+	return predicate.User(sql.FieldContainsFold(FieldSignupIPHash, v))
+}
+
+// SignupDeviceHashEQ applies the EQ predicate on the "signup_device_hash" field.
+func SignupDeviceHashEQ(v string) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldSignupDeviceHash, v))
+}
+
+// SignupDeviceHashNEQ applies the NEQ predicate on the "signup_device_hash" field.
+func SignupDeviceHashNEQ(v string) predicate.User {
+	return predicate.User(sql.FieldNEQ(FieldSignupDeviceHash, v))
+}
+
+// SignupDeviceHashIn applies the In predicate on the "signup_device_hash" field.
+func SignupDeviceHashIn(vs ...string) predicate.User {
+	return predicate.User(sql.FieldIn(FieldSignupDeviceHash, vs...))
+}
+
+// SignupDeviceHashNotIn applies the NotIn predicate on the "signup_device_hash" field.
+func SignupDeviceHashNotIn(vs ...string) predicate.User {
+	return predicate.User(sql.FieldNotIn(FieldSignupDeviceHash, vs...))
+}
+
+// SignupDeviceHashGT applies the GT predicate on the "signup_device_hash" field.
+func SignupDeviceHashGT(v string) predicate.User {
+	return predicate.User(sql.FieldGT(FieldSignupDeviceHash, v))
+}
+
+// SignupDeviceHashGTE applies the GTE predicate on the "signup_device_hash" field.
+func SignupDeviceHashGTE(v string) predicate.User {
+	return predicate.User(sql.FieldGTE(FieldSignupDeviceHash, v))
+}
+
+// SignupDeviceHashLT applies the LT predicate on the "signup_device_hash" field.
+func SignupDeviceHashLT(v string) predicate.User {
+	return predicate.User(sql.FieldLT(FieldSignupDeviceHash, v))
+}
+
+// SignupDeviceHashLTE applies the LTE predicate on the "signup_device_hash" field.
+func SignupDeviceHashLTE(v string) predicate.User {
+	return predicate.User(sql.FieldLTE(FieldSignupDeviceHash, v))
+}
+
+// SignupDeviceHashContains applies the Contains predicate on the "signup_device_hash" field.
+func SignupDeviceHashContains(v string) predicate.User {
+	return predicate.User(sql.FieldContains(FieldSignupDeviceHash, v))
+}
+
+// SignupDeviceHashHasPrefix applies the HasPrefix predicate on the "signup_device_hash" field.
+func SignupDeviceHashHasPrefix(v string) predicate.User {
+	return predicate.User(sql.FieldHasPrefix(FieldSignupDeviceHash, v))
+}
+
+// SignupDeviceHashHasSuffix applies the HasSuffix predicate on the "signup_device_hash" field.
+func SignupDeviceHashHasSuffix(v string) predicate.User {
+	return predicate.User(sql.FieldHasSuffix(FieldSignupDeviceHash, v))
+}
+
+// SignupDeviceHashEqualFold applies the EqualFold predicate on the "signup_device_hash" field.
+func SignupDeviceHashEqualFold(v string) predicate.User {
+	return predicate.User(sql.FieldEqualFold(FieldSignupDeviceHash, v))
+}
+
+// SignupDeviceHashContainsFold applies the ContainsFold predicate on the "signup_device_hash" field.
+func SignupDeviceHashContainsFold(v string) predicate.User {
+	return predicate.User(sql.FieldContainsFold(FieldSignupDeviceHash, v))
+}
+
+// WelcomeRechargeOrderIDEQ applies the EQ predicate on the "welcome_recharge_order_id" field.
+func WelcomeRechargeOrderIDEQ(v int64) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldWelcomeRechargeOrderID, v))
+}
+
+// WelcomeRechargeOrderIDNEQ applies the NEQ predicate on the "welcome_recharge_order_id" field.
+func WelcomeRechargeOrderIDNEQ(v int64) predicate.User {
+	return predicate.User(sql.FieldNEQ(FieldWelcomeRechargeOrderID, v))
+}
+
+// WelcomeRechargeOrderIDIn applies the In predicate on the "welcome_recharge_order_id" field.
+func WelcomeRechargeOrderIDIn(vs ...int64) predicate.User {
+	return predicate.User(sql.FieldIn(FieldWelcomeRechargeOrderID, vs...))
+}
+
+// WelcomeRechargeOrderIDNotIn applies the NotIn predicate on the "welcome_recharge_order_id" field.
+func WelcomeRechargeOrderIDNotIn(vs ...int64) predicate.User {
+	return predicate.User(sql.FieldNotIn(FieldWelcomeRechargeOrderID, vs...))
+}
+
+// WelcomeRechargeOrderIDGT applies the GT predicate on the "welcome_recharge_order_id" field.
+func WelcomeRechargeOrderIDGT(v int64) predicate.User {
+	return predicate.User(sql.FieldGT(FieldWelcomeRechargeOrderID, v))
+}
+
+// WelcomeRechargeOrderIDGTE applies the GTE predicate on the "welcome_recharge_order_id" field.
+func WelcomeRechargeOrderIDGTE(v int64) predicate.User {
+	return predicate.User(sql.FieldGTE(FieldWelcomeRechargeOrderID, v))
+}
+
+// WelcomeRechargeOrderIDLT applies the LT predicate on the "welcome_recharge_order_id" field.
+func WelcomeRechargeOrderIDLT(v int64) predicate.User {
+	return predicate.User(sql.FieldLT(FieldWelcomeRechargeOrderID, v))
+}
+
+// WelcomeRechargeOrderIDLTE applies the LTE predicate on the "welcome_recharge_order_id" field.
+func WelcomeRechargeOrderIDLTE(v int64) predicate.User {
+	return predicate.User(sql.FieldLTE(FieldWelcomeRechargeOrderID, v))
+}
+
+// WelcomeRechargeOrderIDIsNil applies the IsNil predicate on the "welcome_recharge_order_id" field.
+func WelcomeRechargeOrderIDIsNil() predicate.User {
+	return predicate.User(sql.FieldIsNull(FieldWelcomeRechargeOrderID))
+}
+
+// WelcomeRechargeOrderIDNotNil applies the NotNil predicate on the "welcome_recharge_order_id" field.
+func WelcomeRechargeOrderIDNotNil() predicate.User {
+	return predicate.User(sql.FieldNotNull(FieldWelcomeRechargeOrderID))
 }
 
 // LastLoginAtEQ applies the EQ predicate on the "last_login_at" field.

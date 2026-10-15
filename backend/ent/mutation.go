@@ -50536,6 +50536,10 @@ type UserMutation struct {
 	totp_enabled                  *bool
 	totp_enabled_at               *time.Time
 	signup_source                 *string
+	signup_ip_hash                *string
+	signup_device_hash            *string
+	welcome_recharge_order_id     *int64
+	addwelcome_recharge_order_id  *int64
 	last_login_at                 *time.Time
 	last_active_at                *time.Time
 	restrict_public_groups        *bool
@@ -51364,6 +51368,148 @@ func (m *UserMutation) OldSignupSource(ctx context.Context) (v string, err error
 // ResetSignupSource resets all changes to the "signup_source" field.
 func (m *UserMutation) ResetSignupSource() {
 	m.signup_source = nil
+}
+
+// SetSignupIPHash sets the "signup_ip_hash" field.
+func (m *UserMutation) SetSignupIPHash(s string) {
+	m.signup_ip_hash = &s
+}
+
+// SignupIPHash returns the value of the "signup_ip_hash" field in the mutation.
+func (m *UserMutation) SignupIPHash() (r string, exists bool) {
+	v := m.signup_ip_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSignupIPHash returns the old "signup_ip_hash" field's value of the User entity.
+// If the User object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserMutation) OldSignupIPHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSignupIPHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSignupIPHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSignupIPHash: %w", err)
+	}
+	return oldValue.SignupIPHash, nil
+}
+
+// ResetSignupIPHash resets all changes to the "signup_ip_hash" field.
+func (m *UserMutation) ResetSignupIPHash() {
+	m.signup_ip_hash = nil
+}
+
+// SetSignupDeviceHash sets the "signup_device_hash" field.
+func (m *UserMutation) SetSignupDeviceHash(s string) {
+	m.signup_device_hash = &s
+}
+
+// SignupDeviceHash returns the value of the "signup_device_hash" field in the mutation.
+func (m *UserMutation) SignupDeviceHash() (r string, exists bool) {
+	v := m.signup_device_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSignupDeviceHash returns the old "signup_device_hash" field's value of the User entity.
+// If the User object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserMutation) OldSignupDeviceHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSignupDeviceHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSignupDeviceHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSignupDeviceHash: %w", err)
+	}
+	return oldValue.SignupDeviceHash, nil
+}
+
+// ResetSignupDeviceHash resets all changes to the "signup_device_hash" field.
+func (m *UserMutation) ResetSignupDeviceHash() {
+	m.signup_device_hash = nil
+}
+
+// SetWelcomeRechargeOrderID sets the "welcome_recharge_order_id" field.
+func (m *UserMutation) SetWelcomeRechargeOrderID(i int64) {
+	m.welcome_recharge_order_id = &i
+	m.addwelcome_recharge_order_id = nil
+}
+
+// WelcomeRechargeOrderID returns the value of the "welcome_recharge_order_id" field in the mutation.
+func (m *UserMutation) WelcomeRechargeOrderID() (r int64, exists bool) {
+	v := m.welcome_recharge_order_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWelcomeRechargeOrderID returns the old "welcome_recharge_order_id" field's value of the User entity.
+// If the User object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserMutation) OldWelcomeRechargeOrderID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWelcomeRechargeOrderID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWelcomeRechargeOrderID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWelcomeRechargeOrderID: %w", err)
+	}
+	return oldValue.WelcomeRechargeOrderID, nil
+}
+
+// AddWelcomeRechargeOrderID adds i to the "welcome_recharge_order_id" field.
+func (m *UserMutation) AddWelcomeRechargeOrderID(i int64) {
+	if m.addwelcome_recharge_order_id != nil {
+		*m.addwelcome_recharge_order_id += i
+	} else {
+		m.addwelcome_recharge_order_id = &i
+	}
+}
+
+// AddedWelcomeRechargeOrderID returns the value that was added to the "welcome_recharge_order_id" field in this mutation.
+func (m *UserMutation) AddedWelcomeRechargeOrderID() (r int64, exists bool) {
+	v := m.addwelcome_recharge_order_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearWelcomeRechargeOrderID clears the value of the "welcome_recharge_order_id" field.
+func (m *UserMutation) ClearWelcomeRechargeOrderID() {
+	m.welcome_recharge_order_id = nil
+	m.addwelcome_recharge_order_id = nil
+	m.clearedFields[user.FieldWelcomeRechargeOrderID] = struct{}{}
+}
+
+// WelcomeRechargeOrderIDCleared returns if the "welcome_recharge_order_id" field was cleared in this mutation.
+func (m *UserMutation) WelcomeRechargeOrderIDCleared() bool {
+	_, ok := m.clearedFields[user.FieldWelcomeRechargeOrderID]
+	return ok
+}
+
+// ResetWelcomeRechargeOrderID resets all changes to the "welcome_recharge_order_id" field.
+func (m *UserMutation) ResetWelcomeRechargeOrderID() {
+	m.welcome_recharge_order_id = nil
+	m.addwelcome_recharge_order_id = nil
+	delete(m.clearedFields, user.FieldWelcomeRechargeOrderID)
 }
 
 // SetLastLoginAt sets the "last_login_at" field.
@@ -52526,7 +52672,7 @@ func (m *UserMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserMutation) Fields() []string {
-	fields := make([]string, 0, 25)
+	fields := make([]string, 0, 28)
 	if m.created_at != nil {
 		fields = append(fields, user.FieldCreatedAt)
 	}
@@ -52574,6 +52720,15 @@ func (m *UserMutation) Fields() []string {
 	}
 	if m.signup_source != nil {
 		fields = append(fields, user.FieldSignupSource)
+	}
+	if m.signup_ip_hash != nil {
+		fields = append(fields, user.FieldSignupIPHash)
+	}
+	if m.signup_device_hash != nil {
+		fields = append(fields, user.FieldSignupDeviceHash)
+	}
+	if m.welcome_recharge_order_id != nil {
+		fields = append(fields, user.FieldWelcomeRechargeOrderID)
 	}
 	if m.last_login_at != nil {
 		fields = append(fields, user.FieldLastLoginAt)
@@ -52642,6 +52797,12 @@ func (m *UserMutation) Field(name string) (ent.Value, bool) {
 		return m.TotpEnabledAt()
 	case user.FieldSignupSource:
 		return m.SignupSource()
+	case user.FieldSignupIPHash:
+		return m.SignupIPHash()
+	case user.FieldSignupDeviceHash:
+		return m.SignupDeviceHash()
+	case user.FieldWelcomeRechargeOrderID:
+		return m.WelcomeRechargeOrderID()
 	case user.FieldLastLoginAt:
 		return m.LastLoginAt()
 	case user.FieldLastActiveAt:
@@ -52701,6 +52862,12 @@ func (m *UserMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldTotpEnabledAt(ctx)
 	case user.FieldSignupSource:
 		return m.OldSignupSource(ctx)
+	case user.FieldSignupIPHash:
+		return m.OldSignupIPHash(ctx)
+	case user.FieldSignupDeviceHash:
+		return m.OldSignupDeviceHash(ctx)
+	case user.FieldWelcomeRechargeOrderID:
+		return m.OldWelcomeRechargeOrderID(ctx)
 	case user.FieldLastLoginAt:
 		return m.OldLastLoginAt(ctx)
 	case user.FieldLastActiveAt:
@@ -52840,6 +53007,27 @@ func (m *UserMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetSignupSource(v)
 		return nil
+	case user.FieldSignupIPHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSignupIPHash(v)
+		return nil
+	case user.FieldSignupDeviceHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSignupDeviceHash(v)
+		return nil
+	case user.FieldWelcomeRechargeOrderID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWelcomeRechargeOrderID(v)
+		return nil
 	case user.FieldLastLoginAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -52920,6 +53108,9 @@ func (m *UserMutation) AddedFields() []string {
 	if m.addconcurrency != nil {
 		fields = append(fields, user.FieldConcurrency)
 	}
+	if m.addwelcome_recharge_order_id != nil {
+		fields = append(fields, user.FieldWelcomeRechargeOrderID)
+	}
 	if m.addbalance_notify_threshold != nil {
 		fields = append(fields, user.FieldBalanceNotifyThreshold)
 	}
@@ -52943,6 +53134,8 @@ func (m *UserMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedFrozenBalance()
 	case user.FieldConcurrency:
 		return m.AddedConcurrency()
+	case user.FieldWelcomeRechargeOrderID:
+		return m.AddedWelcomeRechargeOrderID()
 	case user.FieldBalanceNotifyThreshold:
 		return m.AddedBalanceNotifyThreshold()
 	case user.FieldTotalRecharged:
@@ -52978,6 +53171,13 @@ func (m *UserMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddConcurrency(v)
+		return nil
+	case user.FieldWelcomeRechargeOrderID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddWelcomeRechargeOrderID(v)
 		return nil
 	case user.FieldBalanceNotifyThreshold:
 		v, ok := value.(float64)
@@ -53017,6 +53217,9 @@ func (m *UserMutation) ClearedFields() []string {
 	if m.FieldCleared(user.FieldTotpEnabledAt) {
 		fields = append(fields, user.FieldTotpEnabledAt)
 	}
+	if m.FieldCleared(user.FieldWelcomeRechargeOrderID) {
+		fields = append(fields, user.FieldWelcomeRechargeOrderID)
+	}
 	if m.FieldCleared(user.FieldLastLoginAt) {
 		fields = append(fields, user.FieldLastLoginAt)
 	}
@@ -53048,6 +53251,9 @@ func (m *UserMutation) ClearField(name string) error {
 		return nil
 	case user.FieldTotpEnabledAt:
 		m.ClearTotpEnabledAt()
+		return nil
+	case user.FieldWelcomeRechargeOrderID:
+		m.ClearWelcomeRechargeOrderID()
 		return nil
 	case user.FieldLastLoginAt:
 		m.ClearLastLoginAt()
@@ -53113,6 +53319,15 @@ func (m *UserMutation) ResetField(name string) error {
 		return nil
 	case user.FieldSignupSource:
 		m.ResetSignupSource()
+		return nil
+	case user.FieldSignupIPHash:
+		m.ResetSignupIPHash()
+		return nil
+	case user.FieldSignupDeviceHash:
+		m.ResetSignupDeviceHash()
+		return nil
+	case user.FieldWelcomeRechargeOrderID:
+		m.ResetWelcomeRechargeOrderID()
 		return nil
 	case user.FieldLastLoginAt:
 		m.ResetLastLoginAt()
