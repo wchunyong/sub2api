@@ -134,14 +134,26 @@
             :key="item.path"
             :to="item.path"
             class="sidebar-link mb-1"
-            :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
+            :class="{
+              'sidebar-link-active': isActive(item.path),
+              'sidebar-link-collapsed': sidebarCollapsed,
+              'sidebar-promo-welcome': item.promoTone === 'welcome',
+              'sidebar-promo-activity': item.promoTone === 'activity'
+            }"
             :title="sidebarCollapsed ? item.label : undefined"
+            :aria-label="item.promoTone ? item.label : undefined"
             :data-tour="item.path === '/keys' ? 'sidebar-my-keys' : undefined"
             @click="handleMenuItemClick(item.path)"
           >
             <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
-            <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
-            <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ item.label }}</span>
+            <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" :class="{ 'sidebar-promo-icon': item.promoTone }" />
+            <span v-if="item.promoTone" class="sidebar-label sidebar-promo-viewport" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" aria-hidden="true">
+              <span class="sidebar-promo-track">
+                <span class="sidebar-promo-copy">{{ item.label }} · {{ item.promoText }}</span>
+                <span class="sidebar-promo-copy">{{ item.label }} · {{ item.promoText }}</span>
+              </span>
+            </span>
+            <span v-else class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ item.label }}</span>
           </router-link>
         </div>
       </template>
@@ -202,12 +214,16 @@ import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
 import { getTenYuanActivity, type TenYuanActivityState } from '@/api/activities'
 import { activityNavigationVisible } from '@/features/activity/countdown'
 import { isNewUserBenefitActive } from '@/features/newUserBenefits/eligibility'
+import { insertCampaignsAfterCanvas } from './sidebarCampaignOrder'
 
 interface NavItem {
   path: string
   label: string
   icon: unknown
   iconSvg?: string
+  page_slug?: string
+  promoTone?: 'welcome' | 'activity'
+  promoText?: string
   hideInSimpleMode?: boolean
   children?: NavItem[]
   /**
@@ -714,6 +730,7 @@ const flagChannelMonitor = makeSidebarFlag(FeatureFlags.channelMonitor)
 const flagPayment = makeSidebarFlag(FeatureFlags.payment)
 const flagAvailableChannels = makeSidebarFlag(FeatureFlags.availableChannels)
 const flagSubscription = makeSidebarFlag(FeatureFlags.subscription)
+const flagModelPlaza = makeSidebarFlag(FeatureFlags.modelPlaza)
 
 const flagAffiliate = makeSidebarFlag(FeatureFlags.affiliate)
 const flagRiskControl = makeSidebarFlag(FeatureFlags.riskControl)
@@ -725,11 +742,11 @@ const flagBatchImageAccess = () => canUseBatchImage.value
 // buildSelfNavItems 构造用户自己的导航项（用户端主菜单和管理员的"我的账户"子菜单共享这组声明）。
 // withDashboard=true 时包含仪表盘（用户端），false 时不含（管理员的个人区已经有独立仪表盘入口）。
 //
-// 条目顺序：密钥 → 用量 → 可用渠道 → 渠道状态 → 充值 → 兑换/资料。
-// 可用渠道紧挨渠道状态之上，让用户"先看自己能用什么、再看对应状态"。
+// 模型广场位于用户仪表盘上方；活动入口跟在自定义的无限画布菜单后面。
 function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   const items: NavItem[] = []
   if (withDashboard) {
+    items.push({ path: '/model-plaza?embedded=1', label: t('nav.modelPlaza'), icon: GlobeIcon, featureFlag: flagModelPlaza })
     items.push({ path: '/dashboard', label: t('nav.dashboard'), icon: DashboardIcon })
   }
   items.push(
@@ -739,20 +756,24 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     { path: '/available-channels', label: t('nav.availableChannels'), icon: ChannelIcon, hideInSimpleMode: true, featureFlag: flagAvailableChannels },
     { path: '/monitor', label: t('nav.channelStatus'), icon: SignalIcon, featureFlag: flagChannelMonitor },
     { path: '/purchase', label: t('nav.buySubscription'), icon: RechargeSubscriptionIcon, hideInSimpleMode: true, featureFlag: flagPayment },
-    { path: '/new-user-benefits', label: t('nav.newUserBenefits'), icon: GiftIcon, featureFlag: () => authStore.user?.role === 'user' && isNewUserBenefitActive(authStore.user?.created_at, activityNow.value) },
-    { path: '/ten-yuan-seven-days', label: t('nav.tenYuanActivity'), icon: PriceTagIcon, hideInSimpleMode: true, featureFlag: () => flagPayment() !== false && activityNavEnabled.value },
     { path: '/orders', label: t('nav.myOrders'), icon: OrderListIcon, hideInSimpleMode: true, featureFlag: flagPayment },
     { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true },
     { path: '/affiliate', label: t('nav.affiliate'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagAffiliate },
     { path: '/profile', label: t('nav.profile'), icon: UserIcon },
-    ...customMenuItemsForUser.value.map((item): NavItem => ({
-      path: resolveCustomMenuRoute(item, window.location.origin) ?? `/custom/${item.id}`,
-      label: item.label,
-      icon: null,
-      iconSvg: item.icon_svg,
-    })),
   )
-  return items
+  const customItems = customMenuItemsForUser.value.map((item): NavItem => ({
+    path: resolveCustomMenuRoute(item, window.location.origin) ?? `/custom/${item.id}`,
+    label: item.label,
+    icon: null,
+    iconSvg: item.icon_svg,
+    page_slug: item.page_slug,
+  }))
+  if (!withDashboard) return [...items, ...customItems]
+  const campaigns: NavItem[] = [
+    { path: '/new-user-benefits', label: t('nav.newUserBenefits'), icon: GiftIcon, promoTone: 'welcome', promoText: t('nav.newUserBenefitsTicker'), featureFlag: () => authStore.user?.role === 'user' && isNewUserBenefitActive(authStore.user?.created_at, activityNow.value) },
+    { path: '/ten-yuan-seven-days', label: t('nav.tenYuanActivity'), icon: PriceTagIcon, promoTone: 'activity', promoText: t('nav.tenYuanActivityTicker'), hideInSimpleMode: true, featureFlag: () => flagPayment() !== false && activityNavEnabled.value },
+  ]
+  return insertCampaignsAfterCanvas(items, customItems, campaigns)
 }
 
 // finalizeNav 合并三重过滤：featureFlag 过滤 + simple 模式过滤。
@@ -906,7 +927,8 @@ function handleMenuItemClick(itemPath: string) {
 }
 
 function isActive(path: string): boolean {
-  return route.path === path || route.path.startsWith(path + '/')
+  const pathname = path.split('?')[0]
+  return route.path === pathname || route.path.startsWith(pathname + '/')
 }
 
 function isGroupActive(item: NavItem): boolean {
@@ -1111,6 +1133,87 @@ onBeforeUnmount(() => {
   opacity: 0;
   transform: translateX(-4px);
   pointer-events: none;
+}
+
+.sidebar-promo-viewport {
+  flex: 1 1 auto;
+}
+
+.sidebar-promo-track {
+  display: flex;
+  width: max-content;
+  animation: sidebar-promo-scroll 11s linear infinite;
+}
+
+.sidebar-promo-copy {
+  flex: 0 0 auto;
+  padding-right: 2rem;
+}
+
+.sidebar-promo-welcome:not(.sidebar-link-active) {
+  color: #15803d;
+  background: linear-gradient(100deg, #ecfdf3, #dcfce7, #ecfdf3);
+  background-size: 200% 100%;
+  animation: sidebar-promo-sheen 7s ease-in-out infinite;
+}
+
+.sidebar-promo-activity:not(.sidebar-link-active) {
+  color: #b45309;
+  background: linear-gradient(100deg, #fffbeb, #fef3c7, #fffbeb);
+  background-size: 200% 100%;
+  animation: sidebar-promo-sheen 7s ease-in-out infinite;
+}
+
+:global(.dark) .sidebar-promo-welcome:not(.sidebar-link-active) {
+  color: #86efac;
+  background: linear-gradient(100deg, #052e1b, #14532d, #052e1b);
+  background-size: 200% 100%;
+}
+
+:global(.dark) .sidebar-promo-activity:not(.sidebar-link-active) {
+  color: #fcd34d;
+  background: linear-gradient(100deg, #451a03, #78350f, #451a03);
+  background-size: 200% 100%;
+}
+
+.sidebar-promo-icon {
+  animation: sidebar-promo-icon-pulse 3.5s ease-in-out infinite;
+}
+
+.sidebar-promo-welcome:hover,
+.sidebar-promo-activity:hover,
+.sidebar-promo-welcome:focus-visible,
+.sidebar-promo-activity:focus-visible,
+.sidebar-promo-welcome:hover .sidebar-promo-track,
+.sidebar-promo-activity:hover .sidebar-promo-track,
+.sidebar-promo-welcome:focus-visible .sidebar-promo-track,
+.sidebar-promo-activity:focus-visible .sidebar-promo-track,
+.sidebar-promo-welcome:hover .sidebar-promo-icon,
+.sidebar-promo-activity:hover .sidebar-promo-icon,
+.sidebar-promo-welcome:focus-visible .sidebar-promo-icon,
+.sidebar-promo-activity:focus-visible .sidebar-promo-icon {
+  animation-play-state: paused;
+}
+
+@keyframes sidebar-promo-scroll {
+  to { transform: translateX(-50%); }
+}
+
+@keyframes sidebar-promo-sheen {
+  50% { background-position: 100% 0; }
+}
+
+@keyframes sidebar-promo-icon-pulse {
+  50% { transform: scale(1.12); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-promo-welcome,
+  .sidebar-promo-activity,
+  .sidebar-promo-track,
+  .sidebar-promo-icon {
+    animation: none !important;
+  }
 }
 
 /* Custom SVG icon in sidebar: constrain size without overriding uploaded SVG colors */

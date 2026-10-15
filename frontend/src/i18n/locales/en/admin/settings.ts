@@ -64,7 +64,7 @@ export default {
           title: 'Model Plaza',
           description: 'A public page showcasing available models and pricing by group. Disabled by default.',
           enabled: 'Enable Model Plaza',
-          enabledHint: 'When enabled, an entry appears in the header and the page is reachable at /model-plaza.',
+          enabledHint: 'When enabled, links appear in the home header and user sidebar; the page is also reachable at /model-plaza.',
           requireAuth: 'Require sign-in to access',
           requireAuthHint: 'When on, anonymous visitors are redirected to the login page; when off, the page is public and anonymous visitors only see non-exclusive groups.',
           priceDescription: 'Pricing notes (Markdown)',
