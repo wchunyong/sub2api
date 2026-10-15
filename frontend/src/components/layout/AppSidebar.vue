@@ -201,6 +201,7 @@ import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
 import { getTenYuanActivity, type TenYuanActivityState } from '@/api/activities'
 import { activityNavigationVisible } from '@/features/activity/countdown'
+import { isNewUserBenefitActive } from '@/features/newUserBenefits/eligibility'
 
 interface NavItem {
   path: string
@@ -738,6 +739,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     { path: '/available-channels', label: t('nav.availableChannels'), icon: ChannelIcon, hideInSimpleMode: true, featureFlag: flagAvailableChannels },
     { path: '/monitor', label: t('nav.channelStatus'), icon: SignalIcon, featureFlag: flagChannelMonitor },
     { path: '/purchase', label: t('nav.buySubscription'), icon: RechargeSubscriptionIcon, hideInSimpleMode: true, featureFlag: flagPayment },
+    { path: '/new-user-benefits', label: t('nav.newUserBenefits'), icon: GiftIcon, featureFlag: () => authStore.user?.role === 'user' && isNewUserBenefitActive(authStore.user?.created_at, activityNow.value) },
     { path: '/ten-yuan-seven-days', label: t('nav.tenYuanActivity'), icon: PriceTagIcon, hideInSimpleMode: true, featureFlag: () => flagPayment() !== false && activityNavEnabled.value },
     { path: '/orders', label: t('nav.myOrders'), icon: OrderListIcon, hideInSimpleMode: true, featureFlag: flagPayment },
     { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true },

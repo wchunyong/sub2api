@@ -49,6 +49,12 @@ type User struct {
 	TotpEnabledAt *time.Time `json:"totp_enabled_at,omitempty"`
 	// SignupSource holds the value of the "signup_source" field.
 	SignupSource string `json:"signup_source,omitempty"`
+	// SignupIPHash holds the value of the "signup_ip_hash" field.
+	SignupIPHash string `json:"signup_ip_hash,omitempty"`
+	// SignupDeviceHash holds the value of the "signup_device_hash" field.
+	SignupDeviceHash string `json:"signup_device_hash,omitempty"`
+	// WelcomeRechargeOrderID holds the value of the "welcome_recharge_order_id" field.
+	WelcomeRechargeOrderID *int64 `json:"welcome_recharge_order_id,omitempty"`
 	// LastLoginAt holds the value of the "last_login_at" field.
 	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
 	// LastActiveAt holds the value of the "last_active_at" field.
@@ -243,9 +249,9 @@ func (*User) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case user.FieldBalance, user.FieldFrozenBalance, user.FieldBalanceNotifyThreshold, user.FieldTotalRecharged:
 			values[i] = new(sql.NullFloat64)
-		case user.FieldID, user.FieldConcurrency, user.FieldRpmLimit:
+		case user.FieldID, user.FieldConcurrency, user.FieldWelcomeRechargeOrderID, user.FieldRpmLimit:
 			values[i] = new(sql.NullInt64)
-		case user.FieldEmail, user.FieldPasswordHash, user.FieldRole, user.FieldStatus, user.FieldUsername, user.FieldNotes, user.FieldTotpSecretEncrypted, user.FieldSignupSource, user.FieldBalanceNotifyThresholdType, user.FieldBalanceNotifyExtraEmails:
+		case user.FieldEmail, user.FieldPasswordHash, user.FieldRole, user.FieldStatus, user.FieldUsername, user.FieldNotes, user.FieldTotpSecretEncrypted, user.FieldSignupSource, user.FieldSignupIPHash, user.FieldSignupDeviceHash, user.FieldBalanceNotifyThresholdType, user.FieldBalanceNotifyExtraEmails:
 			values[i] = new(sql.NullString)
 		case user.FieldCreatedAt, user.FieldUpdatedAt, user.FieldDeletedAt, user.FieldTotpEnabledAt, user.FieldLastLoginAt, user.FieldLastActiveAt:
 			values[i] = new(sql.NullTime)
@@ -368,6 +374,25 @@ func (_m *User) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field signup_source", values[i])
 			} else if value.Valid {
 				_m.SignupSource = value.String
+			}
+		case user.FieldSignupIPHash:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field signup_ip_hash", values[i])
+			} else if value.Valid {
+				_m.SignupIPHash = value.String
+			}
+		case user.FieldSignupDeviceHash:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field signup_device_hash", values[i])
+			} else if value.Valid {
+				_m.SignupDeviceHash = value.String
+			}
+		case user.FieldWelcomeRechargeOrderID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field welcome_recharge_order_id", values[i])
+			} else if value.Valid {
+				_m.WelcomeRechargeOrderID = new(int64)
+				*_m.WelcomeRechargeOrderID = value.Int64
 			}
 		case user.FieldLastLoginAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -585,6 +610,17 @@ func (_m *User) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("signup_source=")
 	builder.WriteString(_m.SignupSource)
+	builder.WriteString(", ")
+	builder.WriteString("signup_ip_hash=")
+	builder.WriteString(_m.SignupIPHash)
+	builder.WriteString(", ")
+	builder.WriteString("signup_device_hash=")
+	builder.WriteString(_m.SignupDeviceHash)
+	builder.WriteString(", ")
+	if v := _m.WelcomeRechargeOrderID; v != nil {
+		builder.WriteString("welcome_recharge_order_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	if v := _m.LastLoginAt; v != nil {
 		builder.WriteString("last_login_at=")

@@ -468,6 +468,17 @@ describe('PaymentView recharge-only user checkout', () => {
     await flushPromises()
     expect(wrapper.find('[data-test="ten-yuan-activity-hint"]').exists()).toBe(false)
   })
+
+  it('shows the new user first recharge offer only at ten or more', async () => {
+    const wrapper = await mountRechargePage({ checkout: { new_user_recharge_available: true } })
+    const amountInput = wrapper.findComponent(AmountInput)
+    await amountInput.vm.$emit('update:modelValue', 10)
+    await flushPromises()
+    expect(wrapper.find('[data-test="new-user-benefit-hint"]').exists()).toBe(true)
+    await amountInput.vm.$emit('update:modelValue', 0)
+    await flushPromises()
+    expect(wrapper.find('[data-test="new-user-benefit-hint"]').exists()).toBe(false)
+  })
 })
 
 describe('PaymentView help text', () => {

@@ -334,6 +334,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresAdmin: false, titleKey: 'nav.tenYuanActivity', requiresPayment: true }
   },
   {
+    path: '/new-user-benefits',
+    name: 'NewUserBenefits',
+    component: () => import('@/views/user/NewUserBenefitsView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: false, titleKey: 'nav.newUserBenefits' }
+  },
+  {
     path: '/orders',
     name: 'OrderList',
     component: () => import('@/views/user/UserOrdersView.vue'),

@@ -19,6 +19,22 @@ func seedUserForAliasTest(t *testing.T, repo *userRepository, email string) {
 	}))
 }
 
+func TestUserRepositoryLimitsDailyRegistrationsByIPAndDevice(t *testing.T) {
+	repo, client := newUserEntRepo(t)
+	register := func(email, ip, device string) error {
+		ctx := service.WithRegistrationOrigin(context.Background(), ip, device)
+		return repo.CreateWithEmailAliasGuard(ctx, &service.User{
+			Email: email, PasswordHash: "hash", Role: service.RoleUser, Status: service.StatusActive,
+		})
+	}
+	require.NoError(t, register("first@example.com", "203.0.113.10", "device-a"))
+	require.NoError(t, register("second@example.com", "203.0.113.10", "device-b"))
+	require.ErrorIs(t, register("third@example.com", "203.0.113.10", "device-c"), service.ErrDeviceRegistrationLimit)
+	require.NoError(t, register("fourth@example.com", "203.0.113.11", "device-a"))
+	require.ErrorIs(t, register("fifth@example.com", "203.0.113.12", "device-a"), service.ErrDeviceRegistrationLimit)
+	require.Equal(t, 3, client.User.Query().CountX(context.Background()))
+}
+
 func TestUserRepositoryExistsByEmailAlias(t *testing.T) {
 	cases := []struct {
 		name   string

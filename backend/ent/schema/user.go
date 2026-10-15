@@ -87,6 +87,9 @@ func (User) Fields() []ent.Field {
 				}
 			}).
 			Default("email"),
+		field.String("signup_ip_hash").MaxLen(64).Default(""),
+		field.String("signup_device_hash").MaxLen(64).Default(""),
+		field.Int64("welcome_recharge_order_id").Optional().Nillable(),
 		field.Time("last_login_at").
 			Optional().
 			Nillable().

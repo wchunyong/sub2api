@@ -5,6 +5,7 @@ package runtime
 import (
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/ent/schema"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
 	"github.com/Wei-Shaw/sub2api/ent/activityclaim"
@@ -34,7 +35,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/promocodeusage"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
-	"github.com/Wei-Shaw/sub2api/ent/schema"
 	"github.com/Wei-Shaw/sub2api/ent/securitysecret"
 	"github.com/Wei-Shaw/sub2api/ent/setting"
 	"github.com/Wei-Shaw/sub2api/ent/subscriptionplan"
@@ -2291,28 +2291,40 @@ func init() {
 	user.DefaultSignupSource = userDescSignupSource.Default.(string)
 	// user.SignupSourceValidator is a validator for the "signup_source" field. It is called by the builders before save.
 	user.SignupSourceValidator = userDescSignupSource.Validators[0].(func(string) error)
+	// userDescSignupIPHash is the schema descriptor for signup_ip_hash field.
+	userDescSignupIPHash := userFields[13].Descriptor()
+	// user.DefaultSignupIPHash holds the default value on creation for the signup_ip_hash field.
+	user.DefaultSignupIPHash = userDescSignupIPHash.Default.(string)
+	// user.SignupIPHashValidator is a validator for the "signup_ip_hash" field. It is called by the builders before save.
+	user.SignupIPHashValidator = userDescSignupIPHash.Validators[0].(func(string) error)
+	// userDescSignupDeviceHash is the schema descriptor for signup_device_hash field.
+	userDescSignupDeviceHash := userFields[14].Descriptor()
+	// user.DefaultSignupDeviceHash holds the default value on creation for the signup_device_hash field.
+	user.DefaultSignupDeviceHash = userDescSignupDeviceHash.Default.(string)
+	// user.SignupDeviceHashValidator is a validator for the "signup_device_hash" field. It is called by the builders before save.
+	user.SignupDeviceHashValidator = userDescSignupDeviceHash.Validators[0].(func(string) error)
 	// userDescRestrictPublicGroups is the schema descriptor for restrict_public_groups field.
-	userDescRestrictPublicGroups := userFields[15].Descriptor()
+	userDescRestrictPublicGroups := userFields[18].Descriptor()
 	// user.DefaultRestrictPublicGroups holds the default value on creation for the restrict_public_groups field.
 	user.DefaultRestrictPublicGroups = userDescRestrictPublicGroups.Default.(bool)
 	// userDescBalanceNotifyEnabled is the schema descriptor for balance_notify_enabled field.
-	userDescBalanceNotifyEnabled := userFields[16].Descriptor()
+	userDescBalanceNotifyEnabled := userFields[19].Descriptor()
 	// user.DefaultBalanceNotifyEnabled holds the default value on creation for the balance_notify_enabled field.
 	user.DefaultBalanceNotifyEnabled = userDescBalanceNotifyEnabled.Default.(bool)
 	// userDescBalanceNotifyThresholdType is the schema descriptor for balance_notify_threshold_type field.
-	userDescBalanceNotifyThresholdType := userFields[17].Descriptor()
+	userDescBalanceNotifyThresholdType := userFields[20].Descriptor()
 	// user.DefaultBalanceNotifyThresholdType holds the default value on creation for the balance_notify_threshold_type field.
 	user.DefaultBalanceNotifyThresholdType = userDescBalanceNotifyThresholdType.Default.(string)
 	// userDescBalanceNotifyExtraEmails is the schema descriptor for balance_notify_extra_emails field.
-	userDescBalanceNotifyExtraEmails := userFields[19].Descriptor()
+	userDescBalanceNotifyExtraEmails := userFields[22].Descriptor()
 	// user.DefaultBalanceNotifyExtraEmails holds the default value on creation for the balance_notify_extra_emails field.
 	user.DefaultBalanceNotifyExtraEmails = userDescBalanceNotifyExtraEmails.Default.(string)
 	// userDescTotalRecharged is the schema descriptor for total_recharged field.
-	userDescTotalRecharged := userFields[20].Descriptor()
+	userDescTotalRecharged := userFields[23].Descriptor()
 	// user.DefaultTotalRecharged holds the default value on creation for the total_recharged field.
 	user.DefaultTotalRecharged = userDescTotalRecharged.Default.(float64)
 	// userDescRpmLimit is the schema descriptor for rpm_limit field.
-	userDescRpmLimit := userFields[21].Descriptor()
+	userDescRpmLimit := userFields[24].Descriptor()
 	// user.DefaultRpmLimit holds the default value on creation for the rpm_limit field.
 	user.DefaultRpmLimit = userDescRpmLimit.Default.(int)
 	userallowedgroupFields := schema.UserAllowedGroup{}.Fields()

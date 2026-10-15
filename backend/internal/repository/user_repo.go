@@ -105,6 +105,13 @@ func (r *userRepository) create(ctx context.Context, userIn *service.User, guard
 	if domainLimit != "" {
 		lockKeys = append(lockKeys, registrationEmailDomainLockKey(domainLimit))
 	}
+	origin, originPresent := service.RegistrationOriginFromContext(ctx)
+	if originPresent {
+		if origin.IPHash == "" || origin.DeviceHash == "" {
+			return service.ErrDeviceRegistrationLimit
+		}
+		lockKeys = append(lockKeys, "users:signup-ip:"+origin.IPHash, "users:signup-device:"+origin.DeviceHash)
+	}
 	releaseEmailLock, err := lockRepositoryScopedKeys(
 		txCtx,
 		txClient,
@@ -115,6 +122,23 @@ func (r *userRepository) create(ctx context.Context, userIn *service.User, guard
 		return err
 	}
 	defer releaseEmailLock()
+	if originPresent {
+		beijing := time.FixedZone("Asia/Shanghai", 8*60*60)
+		now := time.Now().In(beijing)
+		since := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, beijing)
+		for _, predicate := range []predicate.User{
+			dbuser.SignupIPHashEQ(origin.IPHash),
+			dbuser.SignupDeviceHashEQ(origin.DeviceHash),
+		} {
+			count, err := txClient.User.Query().Where(dbuser.CreatedAtGTE(since), predicate).Count(mixins.SkipSoftDelete(txCtx))
+			if err != nil {
+				return err
+			}
+			if count >= 2 {
+				return service.ErrDeviceRegistrationLimit
+			}
+		}
+	}
 
 	if domainLimit != "" {
 		count, err := countUsersByEmailDomainWithClient(txCtx, txClient, domainLimit)
@@ -150,6 +174,8 @@ func (r *userRepository) create(ctx context.Context, userIn *service.User, guard
 		SetConcurrency(userIn.Concurrency).
 		SetStatus(userIn.Status).
 		SetSignupSource(userSignupSourceOrDefault(userIn.SignupSource)).
+		SetSignupIPHash(origin.IPHash).
+		SetSignupDeviceHash(origin.DeviceHash).
 		SetNillableLastLoginAt(userIn.LastLoginAt).
 		SetNillableLastActiveAt(userIn.LastActiveAt).
 		SetRpmLimit(userIn.RPMLimit).

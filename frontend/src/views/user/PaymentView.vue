@@ -109,6 +109,9 @@
                 <p v-if="tenYuanActivityEligible" data-test="ten-yuan-activity-hint" class="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
                   {{ t('tenYuanActivity.checkoutHint') }}
                 </p>
+                <p v-if="checkout.new_user_recharge_available && validAmount >= 10" data-test="new-user-benefit-hint" class="rounded-lg bg-green-50 px-3 py-2 text-xs font-semibold text-green-800 dark:bg-green-950/40 dark:text-green-200">
+                  {{ t('newUserBenefits.checkoutHint') }}
+                </p>
               </div>
             </div>
             <button :class="['btn w-full py-3 text-base font-medium', paymentButtonClass]" :disabled="!canSubmit || submitting" @click="handleSubmitRecharge">
@@ -535,6 +538,7 @@ const checkout = ref<CheckoutInfoResponse>({
   methods: {}, global_min: 0, global_max: 0,
   plans: [], balance_disabled: false, balance_recharge_multiplier: 1, subscription_usd_to_cny_rate: 0, recharge_fee_rate: 0, help_text: '', help_image_url: '', stripe_publishable_key: '',
   recharge_bonus_tiers: [], recharge_bonus_mode: 'bonus', recharge_bonus_notice: '',
+  new_user_recharge_available: false,
 })
 
 const rechargePaymentAmounts = [10, 20, 50, 100, 200, 400, 800]

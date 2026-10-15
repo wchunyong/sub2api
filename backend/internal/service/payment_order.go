@@ -190,6 +190,12 @@ func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderReq
 		return nil, err
 	}
 	providerSnapshot := buildPaymentOrderProviderSnapshot(sel, req)
+	if req.OrderType == payment.OrderTypeBalance && newUserRechargeCandidate(user.CreatedAt, time.Now(), req.Amount) {
+		if providerSnapshot == nil {
+			providerSnapshot = map[string]any{}
+		}
+		providerSnapshot[newUserRechargeCandidateKey] = true
+	}
 	selectedInstanceID := ""
 	selectedProviderKey := ""
 	if sel != nil {

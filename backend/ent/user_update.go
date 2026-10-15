@@ -281,6 +281,61 @@ func (_u *UserUpdate) SetNillableSignupSource(v *string) *UserUpdate {
 	return _u
 }
 
+// SetSignupIPHash sets the "signup_ip_hash" field.
+func (_u *UserUpdate) SetSignupIPHash(v string) *UserUpdate {
+	_u.mutation.SetSignupIPHash(v)
+	return _u
+}
+
+// SetNillableSignupIPHash sets the "signup_ip_hash" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableSignupIPHash(v *string) *UserUpdate {
+	if v != nil {
+		_u.SetSignupIPHash(*v)
+	}
+	return _u
+}
+
+// SetSignupDeviceHash sets the "signup_device_hash" field.
+func (_u *UserUpdate) SetSignupDeviceHash(v string) *UserUpdate {
+	_u.mutation.SetSignupDeviceHash(v)
+	return _u
+}
+
+// SetNillableSignupDeviceHash sets the "signup_device_hash" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableSignupDeviceHash(v *string) *UserUpdate {
+	if v != nil {
+		_u.SetSignupDeviceHash(*v)
+	}
+	return _u
+}
+
+// SetWelcomeRechargeOrderID sets the "welcome_recharge_order_id" field.
+func (_u *UserUpdate) SetWelcomeRechargeOrderID(v int64) *UserUpdate {
+	_u.mutation.ResetWelcomeRechargeOrderID()
+	_u.mutation.SetWelcomeRechargeOrderID(v)
+	return _u
+}
+
+// SetNillableWelcomeRechargeOrderID sets the "welcome_recharge_order_id" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableWelcomeRechargeOrderID(v *int64) *UserUpdate {
+	if v != nil {
+		_u.SetWelcomeRechargeOrderID(*v)
+	}
+	return _u
+}
+
+// AddWelcomeRechargeOrderID adds value to the "welcome_recharge_order_id" field.
+func (_u *UserUpdate) AddWelcomeRechargeOrderID(v int64) *UserUpdate {
+	_u.mutation.AddWelcomeRechargeOrderID(v)
+	return _u
+}
+
+// ClearWelcomeRechargeOrderID clears the value of the "welcome_recharge_order_id" field.
+func (_u *UserUpdate) ClearWelcomeRechargeOrderID() *UserUpdate {
+	_u.mutation.ClearWelcomeRechargeOrderID()
+	return _u
+}
+
 // SetLastLoginAt sets the "last_login_at" field.
 func (_u *UserUpdate) SetLastLoginAt(v time.Time) *UserUpdate {
 	_u.mutation.SetLastLoginAt(v)
@@ -993,6 +1048,16 @@ func (_u *UserUpdate) check() error {
 			return &ValidationError{Name: "signup_source", err: fmt.Errorf(`ent: validator failed for field "User.signup_source": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SignupIPHash(); ok {
+		if err := user.SignupIPHashValidator(v); err != nil {
+			return &ValidationError{Name: "signup_ip_hash", err: fmt.Errorf(`ent: validator failed for field "User.signup_ip_hash": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SignupDeviceHash(); ok {
+		if err := user.SignupDeviceHashValidator(v); err != nil {
+			return &ValidationError{Name: "signup_device_hash", err: fmt.Errorf(`ent: validator failed for field "User.signup_device_hash": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -1070,6 +1135,21 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.SignupSource(); ok {
 		_spec.SetField(user.FieldSignupSource, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.SignupIPHash(); ok {
+		_spec.SetField(user.FieldSignupIPHash, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.SignupDeviceHash(); ok {
+		_spec.SetField(user.FieldSignupDeviceHash, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.WelcomeRechargeOrderID(); ok {
+		_spec.SetField(user.FieldWelcomeRechargeOrderID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedWelcomeRechargeOrderID(); ok {
+		_spec.AddField(user.FieldWelcomeRechargeOrderID, field.TypeInt64, value)
+	}
+	if _u.mutation.WelcomeRechargeOrderIDCleared() {
+		_spec.ClearField(user.FieldWelcomeRechargeOrderID, field.TypeInt64)
 	}
 	if value, ok := _u.mutation.LastLoginAt(); ok {
 		_spec.SetField(user.FieldLastLoginAt, field.TypeTime, value)
@@ -1974,6 +2054,61 @@ func (_u *UserUpdateOne) SetNillableSignupSource(v *string) *UserUpdateOne {
 	return _u
 }
 
+// SetSignupIPHash sets the "signup_ip_hash" field.
+func (_u *UserUpdateOne) SetSignupIPHash(v string) *UserUpdateOne {
+	_u.mutation.SetSignupIPHash(v)
+	return _u
+}
+
+// SetNillableSignupIPHash sets the "signup_ip_hash" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableSignupIPHash(v *string) *UserUpdateOne {
+	if v != nil {
+		_u.SetSignupIPHash(*v)
+	}
+	return _u
+}
+
+// SetSignupDeviceHash sets the "signup_device_hash" field.
+func (_u *UserUpdateOne) SetSignupDeviceHash(v string) *UserUpdateOne {
+	_u.mutation.SetSignupDeviceHash(v)
+	return _u
+}
+
+// SetNillableSignupDeviceHash sets the "signup_device_hash" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableSignupDeviceHash(v *string) *UserUpdateOne {
+	if v != nil {
+		_u.SetSignupDeviceHash(*v)
+	}
+	return _u
+}
+
+// SetWelcomeRechargeOrderID sets the "welcome_recharge_order_id" field.
+func (_u *UserUpdateOne) SetWelcomeRechargeOrderID(v int64) *UserUpdateOne {
+	_u.mutation.ResetWelcomeRechargeOrderID()
+	_u.mutation.SetWelcomeRechargeOrderID(v)
+	return _u
+}
+
+// SetNillableWelcomeRechargeOrderID sets the "welcome_recharge_order_id" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableWelcomeRechargeOrderID(v *int64) *UserUpdateOne {
+	if v != nil {
+		_u.SetWelcomeRechargeOrderID(*v)
+	}
+	return _u
+}
+
+// AddWelcomeRechargeOrderID adds value to the "welcome_recharge_order_id" field.
+func (_u *UserUpdateOne) AddWelcomeRechargeOrderID(v int64) *UserUpdateOne {
+	_u.mutation.AddWelcomeRechargeOrderID(v)
+	return _u
+}
+
+// ClearWelcomeRechargeOrderID clears the value of the "welcome_recharge_order_id" field.
+func (_u *UserUpdateOne) ClearWelcomeRechargeOrderID() *UserUpdateOne {
+	_u.mutation.ClearWelcomeRechargeOrderID()
+	return _u
+}
+
 // SetLastLoginAt sets the "last_login_at" field.
 func (_u *UserUpdateOne) SetLastLoginAt(v time.Time) *UserUpdateOne {
 	_u.mutation.SetLastLoginAt(v)
@@ -2699,6 +2834,16 @@ func (_u *UserUpdateOne) check() error {
 			return &ValidationError{Name: "signup_source", err: fmt.Errorf(`ent: validator failed for field "User.signup_source": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SignupIPHash(); ok {
+		if err := user.SignupIPHashValidator(v); err != nil {
+			return &ValidationError{Name: "signup_ip_hash", err: fmt.Errorf(`ent: validator failed for field "User.signup_ip_hash": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SignupDeviceHash(); ok {
+		if err := user.SignupDeviceHashValidator(v); err != nil {
+			return &ValidationError{Name: "signup_device_hash", err: fmt.Errorf(`ent: validator failed for field "User.signup_device_hash": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -2793,6 +2938,21 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 	}
 	if value, ok := _u.mutation.SignupSource(); ok {
 		_spec.SetField(user.FieldSignupSource, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.SignupIPHash(); ok {
+		_spec.SetField(user.FieldSignupIPHash, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.SignupDeviceHash(); ok {
+		_spec.SetField(user.FieldSignupDeviceHash, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.WelcomeRechargeOrderID(); ok {
+		_spec.SetField(user.FieldWelcomeRechargeOrderID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedWelcomeRechargeOrderID(); ok {
+		_spec.AddField(user.FieldWelcomeRechargeOrderID, field.TypeInt64, value)
+	}
+	if _u.mutation.WelcomeRechargeOrderIDCleared() {
+		_spec.ClearField(user.FieldWelcomeRechargeOrderID, field.TypeInt64)
 	}
 	if value, ok := _u.mutation.LastLoginAt(); ok {
 		_spec.SetField(user.FieldLastLoginAt, field.TypeTime, value)

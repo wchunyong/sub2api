@@ -242,6 +242,48 @@ func (_c *UserCreate) SetNillableSignupSource(v *string) *UserCreate {
 	return _c
 }
 
+// SetSignupIPHash sets the "signup_ip_hash" field.
+func (_c *UserCreate) SetSignupIPHash(v string) *UserCreate {
+	_c.mutation.SetSignupIPHash(v)
+	return _c
+}
+
+// SetNillableSignupIPHash sets the "signup_ip_hash" field if the given value is not nil.
+func (_c *UserCreate) SetNillableSignupIPHash(v *string) *UserCreate {
+	if v != nil {
+		_c.SetSignupIPHash(*v)
+	}
+	return _c
+}
+
+// SetSignupDeviceHash sets the "signup_device_hash" field.
+func (_c *UserCreate) SetSignupDeviceHash(v string) *UserCreate {
+	_c.mutation.SetSignupDeviceHash(v)
+	return _c
+}
+
+// SetNillableSignupDeviceHash sets the "signup_device_hash" field if the given value is not nil.
+func (_c *UserCreate) SetNillableSignupDeviceHash(v *string) *UserCreate {
+	if v != nil {
+		_c.SetSignupDeviceHash(*v)
+	}
+	return _c
+}
+
+// SetWelcomeRechargeOrderID sets the "welcome_recharge_order_id" field.
+func (_c *UserCreate) SetWelcomeRechargeOrderID(v int64) *UserCreate {
+	_c.mutation.SetWelcomeRechargeOrderID(v)
+	return _c
+}
+
+// SetNillableWelcomeRechargeOrderID sets the "welcome_recharge_order_id" field if the given value is not nil.
+func (_c *UserCreate) SetNillableWelcomeRechargeOrderID(v *int64) *UserCreate {
+	if v != nil {
+		_c.SetWelcomeRechargeOrderID(*v)
+	}
+	return _c
+}
+
 // SetLastLoginAt sets the "last_login_at" field.
 func (_c *UserCreate) SetLastLoginAt(v time.Time) *UserCreate {
 	_c.mutation.SetLastLoginAt(v)
@@ -650,6 +692,14 @@ func (_c *UserCreate) defaults() error {
 		v := user.DefaultSignupSource
 		_c.mutation.SetSignupSource(v)
 	}
+	if _, ok := _c.mutation.SignupIPHash(); !ok {
+		v := user.DefaultSignupIPHash
+		_c.mutation.SetSignupIPHash(v)
+	}
+	if _, ok := _c.mutation.SignupDeviceHash(); !ok {
+		v := user.DefaultSignupDeviceHash
+		_c.mutation.SetSignupDeviceHash(v)
+	}
 	if _, ok := _c.mutation.RestrictPublicGroups(); !ok {
 		v := user.DefaultRestrictPublicGroups
 		_c.mutation.SetRestrictPublicGroups(v)
@@ -746,6 +796,22 @@ func (_c *UserCreate) check() error {
 	if v, ok := _c.mutation.SignupSource(); ok {
 		if err := user.SignupSourceValidator(v); err != nil {
 			return &ValidationError{Name: "signup_source", err: fmt.Errorf(`ent: validator failed for field "User.signup_source": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.SignupIPHash(); !ok {
+		return &ValidationError{Name: "signup_ip_hash", err: errors.New(`ent: missing required field "User.signup_ip_hash"`)}
+	}
+	if v, ok := _c.mutation.SignupIPHash(); ok {
+		if err := user.SignupIPHashValidator(v); err != nil {
+			return &ValidationError{Name: "signup_ip_hash", err: fmt.Errorf(`ent: validator failed for field "User.signup_ip_hash": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.SignupDeviceHash(); !ok {
+		return &ValidationError{Name: "signup_device_hash", err: errors.New(`ent: missing required field "User.signup_device_hash"`)}
+	}
+	if v, ok := _c.mutation.SignupDeviceHash(); ok {
+		if err := user.SignupDeviceHashValidator(v); err != nil {
+			return &ValidationError{Name: "signup_device_hash", err: fmt.Errorf(`ent: validator failed for field "User.signup_device_hash": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.RestrictPublicGroups(); !ok {
@@ -856,6 +922,18 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.SignupSource(); ok {
 		_spec.SetField(user.FieldSignupSource, field.TypeString, value)
 		_node.SignupSource = value
+	}
+	if value, ok := _c.mutation.SignupIPHash(); ok {
+		_spec.SetField(user.FieldSignupIPHash, field.TypeString, value)
+		_node.SignupIPHash = value
+	}
+	if value, ok := _c.mutation.SignupDeviceHash(); ok {
+		_spec.SetField(user.FieldSignupDeviceHash, field.TypeString, value)
+		_node.SignupDeviceHash = value
+	}
+	if value, ok := _c.mutation.WelcomeRechargeOrderID(); ok {
+		_spec.SetField(user.FieldWelcomeRechargeOrderID, field.TypeInt64, value)
+		_node.WelcomeRechargeOrderID = &value
 	}
 	if value, ok := _c.mutation.LastLoginAt(); ok {
 		_spec.SetField(user.FieldLastLoginAt, field.TypeTime, value)
@@ -1373,6 +1451,54 @@ func (u *UserUpsert) UpdateSignupSource() *UserUpsert {
 	return u
 }
 
+// SetSignupIPHash sets the "signup_ip_hash" field.
+func (u *UserUpsert) SetSignupIPHash(v string) *UserUpsert {
+	u.Set(user.FieldSignupIPHash, v)
+	return u
+}
+
+// UpdateSignupIPHash sets the "signup_ip_hash" field to the value that was provided on create.
+func (u *UserUpsert) UpdateSignupIPHash() *UserUpsert {
+	u.SetExcluded(user.FieldSignupIPHash)
+	return u
+}
+
+// SetSignupDeviceHash sets the "signup_device_hash" field.
+func (u *UserUpsert) SetSignupDeviceHash(v string) *UserUpsert {
+	u.Set(user.FieldSignupDeviceHash, v)
+	return u
+}
+
+// UpdateSignupDeviceHash sets the "signup_device_hash" field to the value that was provided on create.
+func (u *UserUpsert) UpdateSignupDeviceHash() *UserUpsert {
+	u.SetExcluded(user.FieldSignupDeviceHash)
+	return u
+}
+
+// SetWelcomeRechargeOrderID sets the "welcome_recharge_order_id" field.
+func (u *UserUpsert) SetWelcomeRechargeOrderID(v int64) *UserUpsert {
+	u.Set(user.FieldWelcomeRechargeOrderID, v)
+	return u
+}
+
+// UpdateWelcomeRechargeOrderID sets the "welcome_recharge_order_id" field to the value that was provided on create.
+func (u *UserUpsert) UpdateWelcomeRechargeOrderID() *UserUpsert {
+	u.SetExcluded(user.FieldWelcomeRechargeOrderID)
+	return u
+}
+
+// AddWelcomeRechargeOrderID adds v to the "welcome_recharge_order_id" field.
+func (u *UserUpsert) AddWelcomeRechargeOrderID(v int64) *UserUpsert {
+	u.Add(user.FieldWelcomeRechargeOrderID, v)
+	return u
+}
+
+// ClearWelcomeRechargeOrderID clears the value of the "welcome_recharge_order_id" field.
+func (u *UserUpsert) ClearWelcomeRechargeOrderID() *UserUpsert {
+	u.SetNull(user.FieldWelcomeRechargeOrderID)
+	return u
+}
+
 // SetLastLoginAt sets the "last_login_at" field.
 func (u *UserUpsert) SetLastLoginAt(v time.Time) *UserUpsert {
 	u.Set(user.FieldLastLoginAt, v)
@@ -1811,6 +1937,62 @@ func (u *UserUpsertOne) SetSignupSource(v string) *UserUpsertOne {
 func (u *UserUpsertOne) UpdateSignupSource() *UserUpsertOne {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateSignupSource()
+	})
+}
+
+// SetSignupIPHash sets the "signup_ip_hash" field.
+func (u *UserUpsertOne) SetSignupIPHash(v string) *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.SetSignupIPHash(v)
+	})
+}
+
+// UpdateSignupIPHash sets the "signup_ip_hash" field to the value that was provided on create.
+func (u *UserUpsertOne) UpdateSignupIPHash() *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateSignupIPHash()
+	})
+}
+
+// SetSignupDeviceHash sets the "signup_device_hash" field.
+func (u *UserUpsertOne) SetSignupDeviceHash(v string) *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.SetSignupDeviceHash(v)
+	})
+}
+
+// UpdateSignupDeviceHash sets the "signup_device_hash" field to the value that was provided on create.
+func (u *UserUpsertOne) UpdateSignupDeviceHash() *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateSignupDeviceHash()
+	})
+}
+
+// SetWelcomeRechargeOrderID sets the "welcome_recharge_order_id" field.
+func (u *UserUpsertOne) SetWelcomeRechargeOrderID(v int64) *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.SetWelcomeRechargeOrderID(v)
+	})
+}
+
+// AddWelcomeRechargeOrderID adds v to the "welcome_recharge_order_id" field.
+func (u *UserUpsertOne) AddWelcomeRechargeOrderID(v int64) *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.AddWelcomeRechargeOrderID(v)
+	})
+}
+
+// UpdateWelcomeRechargeOrderID sets the "welcome_recharge_order_id" field to the value that was provided on create.
+func (u *UserUpsertOne) UpdateWelcomeRechargeOrderID() *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateWelcomeRechargeOrderID()
+	})
+}
+
+// ClearWelcomeRechargeOrderID clears the value of the "welcome_recharge_order_id" field.
+func (u *UserUpsertOne) ClearWelcomeRechargeOrderID() *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.ClearWelcomeRechargeOrderID()
 	})
 }
 
@@ -2442,6 +2624,62 @@ func (u *UserUpsertBulk) SetSignupSource(v string) *UserUpsertBulk {
 func (u *UserUpsertBulk) UpdateSignupSource() *UserUpsertBulk {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateSignupSource()
+	})
+}
+
+// SetSignupIPHash sets the "signup_ip_hash" field.
+func (u *UserUpsertBulk) SetSignupIPHash(v string) *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.SetSignupIPHash(v)
+	})
+}
+
+// UpdateSignupIPHash sets the "signup_ip_hash" field to the value that was provided on create.
+func (u *UserUpsertBulk) UpdateSignupIPHash() *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateSignupIPHash()
+	})
+}
+
+// SetSignupDeviceHash sets the "signup_device_hash" field.
+func (u *UserUpsertBulk) SetSignupDeviceHash(v string) *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.SetSignupDeviceHash(v)
+	})
+}
+
+// UpdateSignupDeviceHash sets the "signup_device_hash" field to the value that was provided on create.
+func (u *UserUpsertBulk) UpdateSignupDeviceHash() *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateSignupDeviceHash()
+	})
+}
+
+// SetWelcomeRechargeOrderID sets the "welcome_recharge_order_id" field.
+func (u *UserUpsertBulk) SetWelcomeRechargeOrderID(v int64) *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.SetWelcomeRechargeOrderID(v)
+	})
+}
+
+// AddWelcomeRechargeOrderID adds v to the "welcome_recharge_order_id" field.
+func (u *UserUpsertBulk) AddWelcomeRechargeOrderID(v int64) *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.AddWelcomeRechargeOrderID(v)
+	})
+}
+
+// UpdateWelcomeRechargeOrderID sets the "welcome_recharge_order_id" field to the value that was provided on create.
+func (u *UserUpsertBulk) UpdateWelcomeRechargeOrderID() *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateWelcomeRechargeOrderID()
+	})
+}
+
+// ClearWelcomeRechargeOrderID clears the value of the "welcome_recharge_order_id" field.
+func (u *UserUpsertBulk) ClearWelcomeRechargeOrderID() *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.ClearWelcomeRechargeOrderID()
 	})
 }
 
