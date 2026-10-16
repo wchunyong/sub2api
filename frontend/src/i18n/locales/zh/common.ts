@@ -175,6 +175,8 @@ export default {
     affiliateRebateRecords: '返利记录',
     affiliateTransferRecords: '提取记录',
     profile: '个人资料',
+    contactUs: '联系我们',
+    contactSupportHint: '有任何问题，请联系我们获得技术支持。',
     users: '用户管理',
     groups: '分组管理',
     activities: '活动',
