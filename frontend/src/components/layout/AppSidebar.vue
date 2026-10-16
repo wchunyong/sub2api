@@ -129,32 +129,44 @@
       <!-- Regular User View -->
       <template v-else-if="!appStore.backendModeEnabled">
         <div class="sidebar-section">
-          <router-link
-            v-for="item in userNavItems"
-            :key="item.path"
-            :to="item.path"
-            class="sidebar-link mb-1"
-            :class="{
-              'sidebar-link-active': isActive(item.path),
-              'sidebar-link-collapsed': sidebarCollapsed,
-              'sidebar-promo-welcome': item.promoTone === 'welcome',
-              'sidebar-promo-activity': item.promoTone === 'activity'
-            }"
-            :title="sidebarCollapsed ? item.label : undefined"
-            :aria-label="item.promoTone ? item.label : undefined"
-            :data-tour="item.path === '/keys' ? 'sidebar-my-keys' : undefined"
-            @click="handleMenuItemClick(item.path)"
-          >
-            <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
-            <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" :class="{ 'sidebar-promo-icon': item.promoTone }" />
-            <span v-if="item.promoTone" class="sidebar-label sidebar-promo-viewport" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" aria-hidden="true">
-              <span class="sidebar-promo-track">
-                <span class="sidebar-promo-copy">{{ item.label }} · {{ item.promoText }}</span>
-                <span class="sidebar-promo-copy">{{ item.label }} · {{ item.promoText }}</span>
+          <template v-for="item in userNavItems" :key="item.path">
+            <router-link
+              :to="item.path"
+              class="sidebar-link mb-1"
+              :class="{
+                'sidebar-link-active': isActive(item.path),
+                'sidebar-link-collapsed': sidebarCollapsed,
+                'sidebar-promo-welcome': item.promoTone === 'welcome',
+                'sidebar-promo-activity': item.promoTone === 'activity'
+              }"
+              :title="sidebarCollapsed ? item.label : undefined"
+              :aria-label="item.promoTone ? item.label : undefined"
+              :data-tour="item.path === '/keys' ? 'sidebar-my-keys' : undefined"
+              @click="handleMenuItemClick(item.path)"
+            >
+              <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
+              <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" :class="{ 'sidebar-promo-icon': item.promoTone }" />
+              <span v-if="item.promoTone" class="sidebar-label sidebar-promo-viewport" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" aria-hidden="true">
+                <span class="sidebar-promo-track">
+                  <span class="sidebar-promo-copy">{{ item.label }} · {{ item.promoText }}</span>
+                  <span class="sidebar-promo-copy">{{ item.label }} · {{ item.promoText }}</span>
+                </span>
               </span>
-            </span>
-            <span v-else class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ item.label }}</span>
-          </router-link>
+              <span v-else class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ item.label }}</span>
+            </router-link>
+            <button
+              v-if="item.path === '/profile'"
+              type="button"
+              class="sidebar-link mb-1 w-full"
+              :class="{ 'sidebar-link-collapsed': sidebarCollapsed }"
+              :title="sidebarCollapsed ? t('nav.contactUs') : undefined"
+              :aria-label="t('nav.contactUs')"
+              @click="openContactDialog"
+            >
+              <ContactIcon class="h-5 w-5 flex-shrink-0" />
+              <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ t('nav.contactUs') }}</span>
+            </button>
+          </template>
         </div>
       </template>
     </nav>
@@ -173,6 +185,19 @@
         <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{
           isDark ? t('nav.lightMode') : t('nav.darkMode')
         }}</span>
+      </button>
+
+      <button
+        v-if="!isAdmin && !appStore.backendModeEnabled"
+        type="button"
+        class="sidebar-link mb-2 w-full"
+        :class="{ 'sidebar-link-collapsed': sidebarCollapsed }"
+        :title="sidebarCollapsed ? t('nav.contactUs') : undefined"
+        :aria-label="t('nav.contactUs')"
+        @click="openContactDialog"
+      >
+        <ContactIcon class="h-5 w-5 flex-shrink-0" />
+        <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ t('nav.contactUs') }}</span>
       </button>
 
       <!-- Collapse Button -->
@@ -197,6 +222,7 @@
       @click="closeMobile"
     ></div>
   </transition>
+  <ContactSupportDialog :show="contactDialogOpen" @close="contactDialogOpen = false" />
 </template>
 
 <script setup lang="ts">
@@ -205,6 +231,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
 import VersionBadge from '@/components/common/VersionBadge.vue'
+import ContactSupportDialog from './ContactSupportDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { sanitizeSvg } from '@/utils/sanitize'
 import { sanitizeUrl } from '@/utils/url'
@@ -269,6 +296,7 @@ const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 const mobileOpen = computed(() => appStore.mobileOpen)
 const isAdmin = computed(() => authStore.isAdmin)
 const sidebarNavRef = ref<HTMLElement | null>(null)
+const contactDialogOpen = ref(false)
 const isDark = ref(document.documentElement.classList.contains('dark'))
 const tenYuanActivity = ref<TenYuanActivityState | null>(null)
 const activityNow = ref(Date.now())
@@ -394,6 +422,21 @@ const UserIcon = {
           'stroke-linecap': 'round',
           'stroke-linejoin': 'round',
           d: 'M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z'
+        })
+      ]
+    )
+}
+
+const ContactIcon = {
+  render: () =>
+    h(
+      'svg',
+      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
+      [
+        h('path', {
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          d: 'M7.5 8.25h9m-9 3.75h6m8.25 0a9.75 9.75 0 01-9.75 9.75 9.7 9.7 0 01-4.5-1.1l-4.38 1.1 1.1-4.38A9.75 9.75 0 1121.75 12z'
         })
       ]
     )
@@ -904,6 +947,11 @@ function toggleTheme() {
 
 function closeMobile() {
   appStore.setMobileOpen(false)
+}
+
+function openContactDialog() {
+  closeMobile()
+  contactDialogOpen.value = true
 }
 
 function handleMenuItemClick(itemPath: string) {

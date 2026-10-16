@@ -175,6 +175,8 @@ export default {
     affiliateRebateRecords: 'Rebate Records',
     affiliateTransferRecords: 'Transfer Records',
     profile: 'Profile',
+    contactUs: 'Contact Us',
+    contactSupportHint: 'If you have any questions, contact us for technical support.',
     users: 'Users',
     groups: 'Groups',
     activities: 'Campaigns',
