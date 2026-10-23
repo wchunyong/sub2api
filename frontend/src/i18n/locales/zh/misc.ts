@@ -21,6 +21,24 @@ export default {
     details: '活动说明', fixedEnd: '所有已领取福利统一在本轮结束时间到期；提前关闭活动只停止新领取。',
     partialDays: '每日额度在北京时间 0 点刷新。活动持续精确 7×24 小时，首尾日期可能只有部分时段。'
   },
+  crazyMonday: {
+    kicker: '每周福利', title: '疯狂星期一',
+    description: '感谢一路支持！历史累计实付超过 10 元的用户，每周一可获得 $10 当日使用额度。',
+    startsIn: '距离下周一', endsIn: '本周福利剩余', schedule: '每周一北京时间 00:00 发放，额度于次日 00:00 到期。',
+    benefitLabel: '每周福利', benefit: '每周一赠送 $10', benefitDetails: '额度按“疯狂星期一”分组规则使用，当日有效；每位符合条件的用户每周领取一次。',
+    eligibilityLabel: '参与条件', eligibility: '历史累计实付 > 10', eligibilityDetails: '统计已完成的人民币支付订单，充值和付费订阅均计入；恰好 10 元尚未达到门槛。',
+    recharge: '去充值', details: '为什么调整规则？',
+    reason: '疯狂星期一受到大家欢迎，也让周一的并发请求明显增加，影响了付费用户的使用体验。为了保障服务稳定和付费用户的使用质量，我们将参与资格调整为历史累计实付超过 10 元。感谢理解，也欢迎通过充值支持我们持续提供这份每周福利！'
+  },
+  programmersDay: {
+    kicker: '1024 限时福利', title: '程序员 1024 节',
+    description: '致每一位热爱创造的你：活动期间充值，额外赠送 {percent}% 余额。',
+    startsIn: '距离开始', endsIn: '距离结束', ended: '本年度活动已结束', disabled: '活动暂未开放。',
+    scheduled: '活动即将开始。开始后充值多送 {percent}%，下单时可查看实际到账金额。', rule: '活动进行中，充值多送 {percent}%；下单时即可看到实际到账金额。', recharge: '去充值', rechargeUpcoming: '活动开始后可按加赠规则充值。',
+    benefitLabel: '充值福利', example: '充 100，到 {total}', benefitDetails: '额外赠送按充值金额计算，同笔充值不叠加常规档位赠送；支付成功后按下单时的活动规则到账。',
+    timeLabel: '活动时间', duration: '限时 3 天', timeDetails: '每年北京时间 10 月 24 日 00:00 至 10 月 27 日 00:00，具体以活动开启状态为准。',
+    checkoutHint: '程序员 1024 节进行中：充值额外赠送 {percent}%，到账金额以订单预览为准。'
+  },
 
   // Subscription Progress (Header component)
   subscriptionProgress: {

@@ -1,7 +1,10 @@
 export default {
   activity: {
     kicker: 'Campaign management', title: 'Campaigns',
-    description: 'Set the start time and benefit group. Each round lasts exactly 7×24 hours.',
+    description: 'Manage Ten Yuan Seven Days and the Programmers\' Day offer.',
+    programmersDayTitle: "Programmers' Day",
+    programmersDayRule: 'Active each year from October 24 at 00:00 to October 27 at 00:00 Beijing time, when enabled.',
+    programmersDayEnabled: 'Enable annual offer', programmersDayPercent: 'Extra credit percentage (%)',
     campaignName: 'Ten Yuan Seven Days',
     rule: 'A single recharge of at least ¥10 unlocks the benefit. One claim per user per round.',
     start: 'Starts', end: 'Ends', group: 'Benefit group', dailyLimit: 'Actual daily limit', startBeijing: 'Start time (Beijing, seconds)',

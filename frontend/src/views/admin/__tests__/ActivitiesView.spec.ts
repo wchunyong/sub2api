@@ -6,11 +6,15 @@ const getActivity = vi.hoisted(() => vi.fn())
 const scheduleActivity = vi.hoisted(() => vi.fn())
 const closeActivity = vi.hoisted(() => vi.fn())
 const getGroups = vi.hoisted(() => vi.fn())
+const getProgrammersDay = vi.hoisted(() => vi.fn())
+const updateProgrammersDay = vi.hoisted(() => vi.fn())
 
 vi.mock('@/api/admin/activities', () => ({
   getTenYuanActivityAdmin: getActivity,
   scheduleTenYuanActivity: scheduleActivity,
   closeTenYuanActivity: closeActivity,
+  getProgrammersDayAdmin: getProgrammersDay,
+  updateProgrammersDay,
 }))
 vi.mock('@/api/admin/groups', async () => ({ ...(await vi.importActual<typeof import('@/api/admin/groups')>('@/api/admin/groups')), getAll: getGroups }))
 vi.mock('vue-i18n', async () => ({ ...(await vi.importActual<typeof import('vue-i18n')>('vue-i18n')), useI18n: () => ({ t: (key: string) => key }) }))
@@ -30,6 +34,8 @@ describe('admin ten yuan activity', () => {
     ])
     scheduleActivity.mockReset().mockResolvedValue({})
     closeActivity.mockReset().mockResolvedValue(undefined)
+    getProgrammersDay.mockReset().mockResolvedValue({ enabled: true, active: false, bonus_percent: 24, starts_at: '2026-10-24T00:00:00+08:00', ends_at: '2026-10-27T00:00:00+08:00' })
+    updateProgrammersDay.mockReset().mockResolvedValue({ enabled: false, active: false, bonus_percent: 30, starts_at: '2026-10-24T00:00:00+08:00', ends_at: '2026-10-27T00:00:00+08:00' })
   })
 
   it('selects the exact default group and sends Beijing time to the second', async () => {
@@ -37,7 +43,7 @@ describe('admin ten yuan activity', () => {
     await flushPromises()
     expect((wrapper.get('[data-test="activity-group"]').element as HTMLSelectElement).value).toBe('10')
     await wrapper.get('[data-test="activity-start"]').setValue('2026-10-12T09:30:45')
-    await wrapper.get('button.btn-primary').trigger('click')
+    await wrapper.get('[data-test="ten-yuan-save"]').trigger('click')
     await flushPromises()
     expect(scheduleActivity).toHaveBeenCalledWith(10, '2026-10-12T09:30:45+08:00')
   })
@@ -63,9 +69,9 @@ describe('admin ten yuan activity', () => {
     const wrapper = mountPage()
     await flushPromises()
     expect((wrapper.get('[data-test="activity-group"]').element as HTMLSelectElement).value).toBe('0')
-    expect((wrapper.get('button.btn-primary').element as HTMLButtonElement).disabled).toBe(true)
+    expect((wrapper.get('[data-test="ten-yuan-save"]').element as HTMLButtonElement).disabled).toBe(true)
     await wrapper.get('[data-test="activity-group"]').setValue('11')
-    expect((wrapper.get('button.btn-primary').element as HTMLButtonElement).disabled).toBe(false)
+    expect((wrapper.get('[data-test="ten-yuan-save"]').element as HTMLButtonElement).disabled).toBe(false)
   })
 
   it('uses the exact default group for a new round after an older round ends', async () => {
@@ -76,5 +82,15 @@ describe('admin ten yuan activity', () => {
     const wrapper = mountPage()
     await flushPromises()
     expect((wrapper.get('[data-test="activity-group"]').element as HTMLSelectElement).value).toBe('10')
+  })
+
+  it('saves the annual 1024 switch and bonus percentage', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    await wrapper.get('[data-test="programmers-day-enabled"]').setValue(false)
+    await wrapper.get('[data-test="programmers-day-percent"]').setValue('30')
+    await wrapper.get('[data-test="programmers-day-settings"] button').trigger('click')
+    await flushPromises()
+    expect(updateProgrammersDay).toHaveBeenCalledWith(false, 30)
   })
 })

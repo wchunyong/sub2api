@@ -19,3 +19,15 @@ func (h *PaymentHandler) GetTenYuanActivity(c *gin.Context) {
 	}
 	response.Success(c, state)
 }
+
+func (h *PaymentHandler) GetProgrammersDay(c *gin.Context) {
+	if _, ok := requireAuth(c); !ok {
+		return
+	}
+	state, err := h.configService.GetProgrammersDay(c.Request.Context(), time.Now())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, state)
+}

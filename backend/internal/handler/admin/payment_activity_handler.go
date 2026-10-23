@@ -73,3 +73,28 @@ func (h *PaymentHandler) CloseTenYuanActivity(c *gin.Context) {
 	}
 	response.Success(c, gin.H{"closed": true})
 }
+
+func (h *PaymentHandler) GetProgrammersDay(c *gin.Context) {
+	state, err := h.configService.GetProgrammersDay(c.Request.Context(), time.Now())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, state)
+}
+
+func (h *PaymentHandler) UpdateProgrammersDay(c *gin.Context) {
+	var req struct {
+		Enabled      *bool    `json:"enabled" binding:"required"`
+		BonusPercent *float64 `json:"bonus_percent" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.Enabled == nil || req.BonusPercent == nil {
+		response.BadRequest(c, "enabled and bonus_percent are required")
+		return
+	}
+	if err := h.configService.UpdateProgrammersDay(c.Request.Context(), *req.Enabled, *req.BonusPercent); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	h.GetProgrammersDay(c)
+}

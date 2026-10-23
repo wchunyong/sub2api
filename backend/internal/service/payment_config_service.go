@@ -67,13 +67,15 @@ type PaymentConfig struct {
 	// RechargeBonusMode 阶梯模式：bonus（赠金）/ discount（折扣），已归一化。
 	RechargeBonusMode string `json:"recharge_bonus_mode"`
 	// RechargeBonusNotice 充值页展示的 Markdown 活动文案；空表示不展示。
-	RechargeBonusNotice  string `json:"recharge_bonus_notice"`
-	LoadBalanceStrategy  string `json:"load_balance_strategy"`
-	ProductNamePrefix    string `json:"product_name_prefix"`
-	ProductNameSuffix    string `json:"product_name_suffix"`
-	HelpImageURL         string `json:"help_image_url"`
-	HelpText             string `json:"help_text"`
-	StripePublishableKey string `json:"stripe_publishable_key,omitempty"`
+	RechargeBonusNotice        string  `json:"recharge_bonus_notice"`
+	ProgrammersDayEnabled      bool    `json:"programmers_day_enabled"`
+	ProgrammersDayBonusPercent float64 `json:"programmers_day_bonus_percent"`
+	LoadBalanceStrategy        string  `json:"load_balance_strategy"`
+	ProductNamePrefix          string  `json:"product_name_prefix"`
+	ProductNameSuffix          string  `json:"product_name_suffix"`
+	HelpImageURL               string  `json:"help_image_url"`
+	HelpText                   string  `json:"help_text"`
+	StripePublishableKey       string  `json:"stripe_publishable_key,omitempty"`
 
 	// Cancel rate limit settings
 	CancelRateLimitEnabled bool   `json:"cancel_rate_limit_enabled"`
@@ -231,6 +233,7 @@ func (s *PaymentConfigService) GetPaymentConfig(ctx context.Context) (*PaymentCo
 		SettingDailyRechargeLimit, SettingOrderTimeoutMinutes, SettingMaxPendingOrders,
 		SettingEnabledPaymentTypes, SettingBalancePayDisabled, SettingBalanceRechargeMult, SettingSubscriptionUSDToCNYRate, SettingRechargeFeeRate, SettingLoadBalanceStrategy,
 		SettingRechargeBonusTiers, SettingRechargeBonusMode, SettingRechargeBonusNotice,
+		SettingProgrammersDayEnabled, SettingProgrammersDayBonusPercent,
 		SettingProductNamePrefix, SettingProductNameSuffix,
 		SettingHelpImageURL, SettingHelpText,
 		SettingCancelRateLimitOn, SettingCancelRateLimitMax,
@@ -251,23 +254,25 @@ func (s *PaymentConfigService) GetPaymentConfig(ctx context.Context) (*PaymentCo
 
 func (s *PaymentConfigService) parsePaymentConfig(vals map[string]string) *PaymentConfig {
 	cfg := &PaymentConfig{
-		Enabled:                   vals[SettingPaymentEnabled] == "true",
-		MinAmount:                 pcParseFloat(vals[SettingMinRechargeAmount], 1),
-		MaxAmount:                 pcParseFloat(vals[SettingMaxRechargeAmount], 0),
-		DailyLimit:                pcParseFloat(vals[SettingDailyRechargeLimit], 0),
-		OrderTimeoutMin:           pcParseInt(vals[SettingOrderTimeoutMinutes], defaultOrderTimeoutMin),
-		MaxPendingOrders:          pcParseInt(vals[SettingMaxPendingOrders], defaultMaxPendingOrders),
-		BalanceDisabled:           vals[SettingBalancePayDisabled] == "true",
-		BalanceRechargeMultiplier: normalizeBalanceRechargeMultiplier(pcParseFloat(vals[SettingBalanceRechargeMult], defaultBalanceRechargeMultiplier)),
-		SubscriptionUSDToCNYRate:  normalizeSubscriptionUSDToCNYRate(pcParseFloat(vals[SettingSubscriptionUSDToCNYRate], 0)),
-		RechargeFeeRate:           pcParseFloat(vals[SettingRechargeFeeRate], 0),
-		RechargeBonusTiers:        parseRechargeBonusTiers(vals[SettingRechargeBonusTiers]),
-		RechargeBonusNotice:       vals[SettingRechargeBonusNotice],
-		LoadBalanceStrategy:       vals[SettingLoadBalanceStrategy],
-		ProductNamePrefix:         vals[SettingProductNamePrefix],
-		ProductNameSuffix:         vals[SettingProductNameSuffix],
-		HelpImageURL:              vals[SettingHelpImageURL],
-		HelpText:                  vals[SettingHelpText],
+		Enabled:                    vals[SettingPaymentEnabled] == "true",
+		MinAmount:                  pcParseFloat(vals[SettingMinRechargeAmount], 1),
+		MaxAmount:                  pcParseFloat(vals[SettingMaxRechargeAmount], 0),
+		DailyLimit:                 pcParseFloat(vals[SettingDailyRechargeLimit], 0),
+		OrderTimeoutMin:            pcParseInt(vals[SettingOrderTimeoutMinutes], defaultOrderTimeoutMin),
+		MaxPendingOrders:           pcParseInt(vals[SettingMaxPendingOrders], defaultMaxPendingOrders),
+		BalanceDisabled:            vals[SettingBalancePayDisabled] == "true",
+		BalanceRechargeMultiplier:  normalizeBalanceRechargeMultiplier(pcParseFloat(vals[SettingBalanceRechargeMult], defaultBalanceRechargeMultiplier)),
+		SubscriptionUSDToCNYRate:   normalizeSubscriptionUSDToCNYRate(pcParseFloat(vals[SettingSubscriptionUSDToCNYRate], 0)),
+		RechargeFeeRate:            pcParseFloat(vals[SettingRechargeFeeRate], 0),
+		RechargeBonusTiers:         parseRechargeBonusTiers(vals[SettingRechargeBonusTiers]),
+		RechargeBonusNotice:        vals[SettingRechargeBonusNotice],
+		ProgrammersDayEnabled:      vals[SettingProgrammersDayEnabled] != "false",
+		ProgrammersDayBonusPercent: parseProgrammersDayBonusPercent(vals[SettingProgrammersDayBonusPercent]),
+		LoadBalanceStrategy:        vals[SettingLoadBalanceStrategy],
+		ProductNamePrefix:          vals[SettingProductNamePrefix],
+		ProductNameSuffix:          vals[SettingProductNameSuffix],
+		HelpImageURL:               vals[SettingHelpImageURL],
+		HelpText:                   vals[SettingHelpText],
 
 		CancelRateLimitEnabled: vals[SettingCancelRateLimitOn] == "true",
 		CancelRateLimitMax:     pcParseInt(vals[SettingCancelRateLimitMax], 10),

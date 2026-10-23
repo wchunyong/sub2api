@@ -153,6 +153,11 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
+	programmersDay, err := h.configService.GetProgrammersDay(ctx, time.Now())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 	newUserRechargeAvailable, err := h.paymentService.NewUserRechargeAvailable(ctx, subject.UserID, time.Now())
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -178,6 +183,7 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 		AlipayMobilePrecreateDeepLink: alipayMobilePrecreateDeepLink,
 		NationalDayPromotion:          nationalDayPromotion,
 		TenYuanActivity:               tenYuanActivity,
+		ProgrammersDay:                programmersDay,
 		NewUserRechargeAvailable:      newUserRechargeAvailable,
 	})
 }
@@ -201,6 +207,7 @@ type checkoutInfoResponse struct {
 	AlipayMobilePrecreateDeepLink bool                                  `json:"alipay_mobile_precreate_deep_link"`
 	NationalDayPromotion          *service.NationalDayPromotionCheckout `json:"national_day_promotion,omitempty"`
 	TenYuanActivity               *service.TenYuanActivityUserState     `json:"ten_yuan_activity,omitempty"`
+	ProgrammersDay                *service.ProgrammersDayState          `json:"programmers_day,omitempty"`
 	NewUserRechargeAvailable      bool                                  `json:"new_user_recharge_available"`
 }
 

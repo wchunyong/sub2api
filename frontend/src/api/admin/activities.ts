@@ -1,4 +1,5 @@
 import { apiClient } from '../client'
+import type { ProgrammersDayState } from '../activities'
 
 export interface TenYuanActivityRun {
   id: number
@@ -30,4 +31,16 @@ export async function scheduleTenYuanActivity(groupId: number, startsAt: string)
 
 export async function closeTenYuanActivity(runId: number): Promise<void> {
   await apiClient.post(`${path}/close`, { run_id: runId })
+}
+
+const programmersDayPath = '/admin/payment/activities/programmers-day'
+
+export async function getProgrammersDayAdmin(): Promise<ProgrammersDayState> {
+  const { data } = await apiClient.get<ProgrammersDayState>(programmersDayPath)
+  return data
+}
+
+export async function updateProgrammersDay(enabled: boolean, bonusPercent: number): Promise<ProgrammersDayState> {
+  const { data } = await apiClient.put<ProgrammersDayState>(programmersDayPath, { enabled, bonus_percent: bonusPercent })
+  return data
 }

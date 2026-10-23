@@ -120,6 +120,12 @@ func calculateBalanceRechargeOrderAmounts(cfg *PaymentConfig, paymentAmount floa
 		// 活动到账奖励按订单金额计算，活动期间不叠加常规固定档位和阶梯赠额。
 		return calculateBalanceOrderAmount(paymentAmount, cfg.BalanceRechargeMultiplier, now), paymentAmount, 0
 	}
+	if cfg != nil && cfg.ProgrammersDayEnabled && programmersDayWindowActive(now) {
+		// The festival replaces fixed recharge gifts and regular bonus tiers.
+		base := decimal.NewFromFloat(paymentAmount).Round(2).InexactFloat64()
+		bonus := calculateRechargeBonus(base, cfg.ProgrammersDayBonusPercent)
+		return addRechargeBonus(base, bonus), paymentAmount, bonus
+	}
 	// 阈值按支付金额命中。赠金模式增加到账，折扣模式减少实付基数。
 	quote := quoteRechargeBonus(cfg, paymentAmount, currency)
 	// 推广返利只计入实付对应的额度，固定档位和阶梯优惠都属于免费额度。

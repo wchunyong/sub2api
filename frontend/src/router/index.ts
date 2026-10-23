@@ -334,6 +334,18 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresAdmin: false, titleKey: 'nav.tenYuanActivity', requiresPayment: true }
   },
   {
+    path: '/crazy-monday',
+    name: 'CrazyMonday',
+    component: () => import('@/views/user/CrazyMondayView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: false, titleKey: 'nav.crazyMonday' }
+  },
+  {
+    path: '/programmers-day',
+    name: 'ProgrammersDay',
+    component: () => import('@/views/user/ProgrammersDayView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: false, titleKey: 'nav.programmersDay', requiresPayment: true }
+  },
+  {
     path: '/new-user-benefits',
     name: 'NewUserBenefits',
     component: () => import('@/views/user/NewUserBenefitsView.vue'),

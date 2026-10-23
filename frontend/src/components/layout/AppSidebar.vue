@@ -238,7 +238,7 @@ import { sanitizeUrl } from '@/utils/url'
 import { resolveCustomMenuRoute } from '@/utils/custom-menu-route'
 import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
-import { getTenYuanActivity, type TenYuanActivityState } from '@/api/activities'
+import { getTenYuanActivity, getProgrammersDay, type TenYuanActivityState, type ProgrammersDayState } from '@/api/activities'
 import { activityNavigationVisible } from '@/features/activity/countdown'
 import { isNewUserBenefitActive } from '@/features/newUserBenefits/eligibility'
 import { insertCampaignsAfterCanvas } from './sidebarCampaignOrder'
@@ -299,11 +299,13 @@ const sidebarNavRef = ref<HTMLElement | null>(null)
 const contactDialogOpen = ref(false)
 const isDark = ref(document.documentElement.classList.contains('dark'))
 const tenYuanActivity = ref<TenYuanActivityState | null>(null)
+const programmersDay = ref<ProgrammersDayState | null>(null)
 const activityNow = ref(Date.now())
 const activityClockOffset = ref(0)
 let activityRefreshTimer: ReturnType<typeof setInterval> | undefined
 let activityClockTimer: ReturnType<typeof setInterval> | undefined
 const activityNavEnabled = computed(() => activityNavigationVisible(tenYuanActivity.value, activityNow.value + activityClockOffset.value))
+const programmersDayNavEnabled = computed(() => programmersDay.value?.visible === true && activityNow.value + activityClockOffset.value < new Date(programmersDay.value.ends_at).getTime())
 
 async function refreshTenYuanActivity() {
   if (isAdmin.value || appStore.backendModeEnabled) return
@@ -315,7 +317,13 @@ async function refreshTenYuanActivity() {
   } catch { tenYuanActivity.value = null }
 }
 
-function refreshActivityOnFocus() { void refreshTenYuanActivity() }
+async function refreshProgrammersDay() {
+  if (isAdmin.value || appStore.backendModeEnabled) return
+  try { programmersDay.value = await getProgrammersDay() }
+  catch { programmersDay.value = null }
+}
+
+function refreshActivityOnFocus() { void refreshTenYuanActivity(); void refreshProgrammersDay() }
 
 const homePath = computed(() => (isAdmin.value ? '/admin/dashboard' : '/dashboard'))
 
@@ -815,6 +823,8 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   const campaigns: NavItem[] = [
     { path: '/new-user-benefits', label: t('nav.newUserBenefits'), icon: GiftIcon, promoTone: 'welcome', promoText: t('nav.newUserBenefitsTicker'), featureFlag: () => authStore.user?.role === 'user' && isNewUserBenefitActive(authStore.user?.created_at, activityNow.value) },
     { path: '/ten-yuan-seven-days', label: t('nav.tenYuanActivity'), icon: PriceTagIcon, promoTone: 'activity', promoText: t('nav.tenYuanActivityTicker'), hideInSimpleMode: true, featureFlag: () => flagPayment() !== false && activityNavEnabled.value },
+    { path: '/crazy-monday', label: t('nav.crazyMonday'), icon: GiftIcon, promoTone: 'activity', promoText: t('nav.crazyMondayTicker'), hideInSimpleMode: true },
+    { path: '/programmers-day', label: t('nav.programmersDay'), icon: PriceTagIcon, promoTone: 'activity', promoText: t('nav.programmersDayTicker'), hideInSimpleMode: true, featureFlag: () => flagPayment() !== false && programmersDayNavEnabled.value },
   ]
   return insertCampaignsAfterCanvas(items, customItems, campaigns)
 }
@@ -1038,8 +1048,9 @@ watch(
 onMounted(() => {
   void refreshBatchImageAccess()
   void refreshTenYuanActivity()
+  void refreshProgrammersDay()
   activityClockTimer = setInterval(() => { activityNow.value = Date.now() }, 1000)
-  activityRefreshTimer = setInterval(() => { void refreshTenYuanActivity() }, 30000)
+  activityRefreshTimer = setInterval(() => { void refreshTenYuanActivity(); void refreshProgrammersDay() }, 30000)
   window.addEventListener('focus', refreshActivityOnFocus)
   document.addEventListener('visibilitychange', refreshActivityOnFocus)
   if (isAdmin.value) {

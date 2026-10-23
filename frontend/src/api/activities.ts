@@ -17,3 +17,18 @@ export async function getTenYuanActivity(): Promise<TenYuanActivityState> {
   const { data } = await apiClient.get<TenYuanActivityState>('/payment/activities/ten-yuan-seven-days')
   return data
 }
+
+export interface ProgrammersDayState {
+  enabled: boolean
+  active: boolean
+  visible: boolean
+  bonus_percent: number
+  starts_at: string
+  ends_at: string
+  server_now: string
+}
+
+export async function getProgrammersDay(): Promise<ProgrammersDayState> {
+  const { data } = await apiClient.get<ProgrammersDayState>('/payment/activities/programmers-day')
+  return data
+}

@@ -385,6 +385,24 @@ describe('PaymentView recharge-only user checkout', () => {
     expect(amountInput.props('creditForAmount')(200, 1)).toBe(210)
   })
 
+  it('previews the 1024 bonus without stacking fixed gifts or regular tiers', async () => {
+    const wrapper = await mountRechargePage({
+      checkout: {
+        recharge_bonus_tiers: [{ min_amount: 100, bonus_percent: 50 }],
+        recharge_bonus_mode: 'discount',
+        programmers_day: { enabled: true, active: true, visible: true, bonus_percent: 24, starts_at: '2026-10-24T00:00:00+08:00', ends_at: '2026-10-27T00:00:00+08:00', server_now: '2026-10-24T00:00:00+08:00' },
+      },
+    })
+    expect(wrapper.find('[data-test="programmers-day-checkout-hint"]').exists()).toBe(true)
+    const amountInput = wrapper.findComponent(AmountInput)
+    await amountInput.vm.$emit('update:modelValue', 200)
+    await flushPromises()
+    expect(wrapper.text()).toContain('$248.00')
+    expect(wrapper.find('[data-test="programmers-day-checkout-hint"]').exists()).toBe(true)
+    expect(amountInput.props('bonusMode')).toBe('bonus')
+    expect(amountInput.props('creditForAmount')(200, 1)).toBe(200)
+  })
+
   it('shows the national day total credited amount when the promotion is active', async () => {
     const wrapper = await mountRechargePage({
       checkout: {

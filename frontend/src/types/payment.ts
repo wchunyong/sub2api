@@ -75,6 +75,16 @@ export interface TenYuanActivityCheckout {
   min_recharge: number
 }
 
+export interface ProgrammersDayCheckout {
+  enabled: boolean
+  active: boolean
+  visible: boolean
+  bonus_percent: number
+  starts_at: string
+  ends_at: string
+  server_now: string
+}
+
 /** Response from /payment/limits API */
 export interface MethodLimitsResponse {
   methods: Record<string, MethodLimit>
@@ -108,6 +118,7 @@ export interface CheckoutInfoResponse {
   alipay_mobile_precreate_deep_link?: boolean
   national_day_promotion?: NationalDayPromotionCheckout
   ten_yuan_activity?: TenYuanActivityCheckout
+  programmers_day?: ProgrammersDayCheckout
   new_user_recharge_available?: boolean
 }
 

@@ -39,9 +39,12 @@
             </div>
             <template v-else>
             <div class="card p-6">
+              <RouterLink v-if="programmersDayActive" to="/programmers-day" data-test="programmers-day-checkout-hint" class="mb-5 block rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold leading-6 text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
+                {{ t('programmersDay.checkoutHint', { percent: checkout.programmers_day?.bonus_percent ?? 24 }) }}
+              </RouterLink>
               <!-- 充值赠送活动文案（后台 Markdown 配置，空则不渲染） -->
               <div
-                v-if="renderedBonusNotice && !nationalDayPromotionActive"
+                v-if="renderedBonusNotice && !nationalDayPromotionActive && !programmersDayActive"
                 class="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100 [&_a]:font-medium [&_a]:underline [&_h1]:text-base [&_h1]:font-semibold [&_h2]:text-base [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_ol]:my-1 [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:my-1 [&_strong]:font-semibold [&_ul]:my-1 [&_ul]:ml-5 [&_ul]:list-disc"
                 data-testid="recharge-bonus-notice"
                 v-html="renderedBonusNotice"
@@ -286,12 +289,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import '@/styles/announcement-markdown.css'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePaymentStore } from '@/stores/payment'
 import { useSubscriptionStore } from '@/stores/subscriptions'
@@ -553,6 +556,7 @@ const rechargeCreditByPaymentAmount = new Map<number, number>([
 ])
 
 function calculateRechargeCredit(paymentAmount: number, multiplier: number): number {
+  if (programmersDayActive.value) return Math.round(paymentAmount * 100) / 100
   return rechargeCreditByPaymentAmount.get(paymentAmount) ?? Math.round(paymentAmount * multiplier * 100) / 100
 }
 
@@ -586,6 +590,15 @@ const subscriptionUsdToCnyRate = computed(() => {
   return Number.isFinite(rate) && rate > 0 ? rate : 0
 })
 const nationalDayPromotionActive = computed(() => checkout.value.national_day_promotion?.active === true)
+const campaignClock = ref(Date.now())
+const campaignClockOffset = ref(0)
+let campaignTimer: ReturnType<typeof setInterval> | undefined
+const programmersDayActive = computed(() => {
+  const festival = checkout.value.programmers_day
+  if (!festival?.enabled) return false
+  const now = campaignClock.value + campaignClockOffset.value
+  return now >= new Date(festival.starts_at).getTime() && now < new Date(festival.ends_at).getTime()
+})
 const tenYuanActivityEligible = computed(() => {
   const activity = checkout.value.ten_yuan_activity
   return activity?.enabled === true && activity.status === 'active' && !activity.claimed && validAmount.value >= (activity.min_recharge ?? 10)
@@ -610,8 +623,10 @@ const nationalDayOldUserLimitedQuota = computed(() => {
   ) ?? 0
 })
 const rechargeBonusTiers = computed(() => normalizeRechargeBonusTiers(checkout.value.recharge_bonus_tiers))
-const effectiveRechargeBonusTiers = computed(() => nationalDayPromotionActive.value ? [] : rechargeBonusTiers.value)
-const rechargeBonusMode = computed(() => normalizeRechargeBonusMode(checkout.value.recharge_bonus_mode))
+const effectiveRechargeBonusTiers = computed(() => programmersDayActive.value
+  ? [{ min_amount: 0, bonus_percent: checkout.value.programmers_day?.bonus_percent ?? 24 }]
+  : nationalDayPromotionActive.value ? [] : rechargeBonusTiers.value)
+const rechargeBonusMode = computed(() => programmersDayActive.value ? 'bonus' : normalizeRechargeBonusMode(checkout.value.recharge_bonus_mode))
 
 // Adaptive grid: center single card, 2-col for 2 plans, 3-col for 3+
 const planGridClass = computed(() => {
@@ -1199,9 +1214,14 @@ async function resumeWechatPaymentFromQuery() {
 }
 
 onMounted(async () => {
+  campaignTimer = setInterval(() => { campaignClock.value = Date.now() }, 1000)
   try {
     const res = await paymentAPI.getCheckoutInfo()
     checkout.value = res.data
+    if (res.data.programmers_day?.server_now) {
+      campaignClock.value = Date.now()
+      campaignClockOffset.value = new Date(res.data.programmers_day.server_now).getTime() - campaignClock.value
+    }
     if (enabledMethods.value.length) {
       const order: readonly string[] = METHOD_ORDER
       const sorted = [...enabledMethods.value].sort((a, b) => {
@@ -1257,4 +1277,5 @@ onMounted(async () => {
   // Fetch active subscriptions (uses cache, non-blocking)
   subscriptionStore.fetchActiveSubscriptions().catch(() => {})
 })
+onBeforeUnmount(() => { if (campaignTimer) clearInterval(campaignTimer) })
 </script>

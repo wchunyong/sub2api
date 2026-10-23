@@ -1,7 +1,10 @@
 export default {
   activity: {
     kicker: '活动管理', title: '活动',
-    description: '设置十元七天乐的开始时间与福利分组。每轮持续精确 7×24 小时。',
+    description: '管理十元七天乐和程序员 1024 节活动。',
+    programmersDayTitle: '程序员 1024 节',
+    programmersDayRule: '每年北京时间 10 月 24 日 00:00 至 27 日 00:00 生效，活动期内充值多送指定比例。',
+    programmersDayEnabled: '开启年度活动', programmersDayPercent: '额外赠送百分比（%）',
     campaignName: '十元七天乐',
     rule: '活动期间单笔充值满 10 元即可解锁；同一用户每轮限领一次。',
     start: '开始时间', end: '结束时间', group: '福利分组', dailyLimit: '实际日限额',

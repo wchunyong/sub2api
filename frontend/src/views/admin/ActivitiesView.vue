@@ -10,6 +10,27 @@
       <div v-if="error" role="alert" class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">{{ error }}</div>
       <div v-if="loading" class="card p-8 text-center text-gray-500">{{ t('common.loading') }}</div>
       <template v-else>
+        <section class="card p-6" data-test="programmers-day-settings">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 class="text-xl font-semibold text-gray-900 dark:text-white">{{ t('admin.activity.programmersDayTitle') }}</h2>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('admin.activity.programmersDayRule') }}</p>
+            </div>
+            <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">{{ programmersDayStatus }}</span>
+          </div>
+          <div class="mt-5 grid gap-5 sm:grid-cols-2">
+            <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200">
+              <input v-model="programmersDayEnabled" type="checkbox" data-test="programmers-day-enabled" />
+              {{ t('admin.activity.programmersDayEnabled') }}
+            </label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">
+              {{ t('admin.activity.programmersDayPercent') }}
+              <input v-model.number="programmersDayPercent" type="number" min="0" max="1000" step="0.01" class="input mt-2 w-full" data-test="programmers-day-percent" />
+            </label>
+          </div>
+          <p v-if="programmersDay" class="mt-4 text-sm text-gray-500 dark:text-gray-400">{{ formatBeijing(programmersDay.starts_at) }} — {{ formatBeijing(programmersDay.ends_at) }}</p>
+          <button class="btn btn-primary mt-5" :disabled="savingProgrammersDay || !Number.isFinite(programmersDayPercent) || programmersDayPercent < 0 || programmersDayPercent > 1000" @click="saveProgrammersDay">{{ savingProgrammersDay ? t('common.saving') : t('admin.activity.save') }}</button>
+        </section>
         <section class="card p-6">
           <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -45,7 +66,7 @@
           </div>
           <p class="mt-4 text-sm text-gray-500">{{ t('admin.activity.derivedEnd') }}: {{ derivedEnd }}</p>
           <p class="mt-1 text-xs text-gray-500">{{ t('admin.activity.partialDays') }}</p>
-          <button class="btn btn-primary mt-5" :disabled="saving || !groupId || !startsAtLocal" @click="save">{{ saving ? t('common.saving') : t('admin.activity.save') }}</button>
+          <button class="btn btn-primary mt-5" data-test="ten-yuan-save" :disabled="saving || !groupId || !startsAtLocal" @click="save">{{ saving ? t('common.saving') : t('admin.activity.save') }}</button>
         </section>
 
         <section v-if="state?.current && (state.current.status === 'scheduled' || state.current.status === 'active')" class="card border-amber-200 p-6 dark:border-amber-900">
@@ -63,12 +84,17 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { getAll } from '@/api/admin/groups'
-import { closeTenYuanActivity, getTenYuanActivityAdmin, scheduleTenYuanActivity, type TenYuanActivityAdminState } from '@/api/admin/activities'
+import { closeTenYuanActivity, getTenYuanActivityAdmin, scheduleTenYuanActivity, getProgrammersDayAdmin, updateProgrammersDay, type TenYuanActivityAdminState } from '@/api/admin/activities'
+import type { ProgrammersDayState } from '@/api/activities'
 import type { AdminGroup } from '@/types'
 import { extractApiErrorMessage } from '@/utils/apiError'
 
 const { t } = useI18n()
 const state = ref<TenYuanActivityAdminState | null>(null)
+const programmersDay = ref<ProgrammersDayState | null>(null)
+const programmersDayEnabled = ref(true)
+const programmersDayPercent = ref(24)
+const savingProgrammersDay = ref(false)
 const groups = ref<AdminGroup[]>([])
 const groupId = ref(0)
 const startsAtLocal = ref('')
@@ -78,6 +104,11 @@ const error = ref('')
 const selectedGroup = computed(() => groups.value.find(group => group.id === state.value?.current?.group_id))
 const canSchedule = computed(() => !state.value?.current || state.value.current.status === 'scheduled' || state.value.current.status === 'ended')
 const statusLabel = computed(() => t(`admin.activity.status.${state.value?.current?.status ?? 'off'}`))
+const programmersDayStatus = computed(() => {
+  if (!programmersDay.value?.enabled) return t('admin.activity.status.off')
+  if (programmersDay.value.active) return t('admin.activity.status.active')
+  return Date.now() >= new Date(programmersDay.value.ends_at).getTime() ? t('admin.activity.status.ended') : t('admin.activity.status.scheduled')
+})
 
 function formatBeijing(value: string): string {
   return new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date(value))
@@ -97,8 +128,11 @@ async function load() {
   error.value = ''
   loading.value = true
   try {
-    const [activity, allGroups] = await Promise.all([getTenYuanActivityAdmin(), getAll()])
+    const [activity, allGroups, festival] = await Promise.all([getTenYuanActivityAdmin(), getAll(), getProgrammersDayAdmin()])
     state.value = activity
+    programmersDay.value = festival
+    programmersDayEnabled.value = festival.enabled
+    programmersDayPercent.value = festival.bonus_percent
     groups.value = allGroups.filter(group => group.subscription_type === 'subscription' && group.status === 'active')
     groupId.value = activity.current?.status === 'scheduled' ? activity.current.group_id : activity.default_group_id ?? 0
     startsAtLocal.value = activity.current?.status === 'scheduled' ? beijingInput(activity.current.starts_at) : beijingInput(new Date(Date.now() + 60 * 60 * 1000).toISOString())
@@ -107,6 +141,16 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+async function saveProgrammersDay() {
+  savingProgrammersDay.value = true
+  error.value = ''
+  try {
+    programmersDay.value = await updateProgrammersDay(programmersDayEnabled.value, programmersDayPercent.value)
+  } catch (cause) {
+    error.value = extractApiErrorMessage(cause, t('common.unknownError'))
+  } finally { savingProgrammersDay.value = false }
 }
 
 async function save() {

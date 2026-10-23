@@ -21,6 +21,24 @@ export default {
     details: 'Campaign details', fixedEnd: 'All claims expire at the round end. Early closure stops only new claims.',
     partialDays: 'Daily quota resets at midnight Beijing time. The round lasts exactly 7×24 hours, so its first and last calendar days may be partial.'
   },
+  crazyMonday: {
+    kicker: 'Weekly benefit', title: 'Crazy Monday',
+    description: 'Users with more than ¥10 in completed lifetime payments receive $10 of daily quota every Monday.',
+    startsIn: 'Next Monday in', endsIn: 'Benefit ends in', schedule: 'Granted at 00:00 Beijing time every Monday and expires at 00:00 Tuesday.',
+    benefitLabel: 'Weekly benefit', benefit: '$10 every Monday', benefitDetails: 'Usable under the Crazy Monday group rules for that day. One grant per eligible user each week.',
+    eligibilityLabel: 'Eligibility', eligibility: 'Lifetime payments > 10', eligibilityDetails: 'Completed CNY recharge and paid subscription orders count. Exactly ¥10 does not qualify.',
+    recharge: 'Recharge now', details: 'Why did the rules change?',
+    reason: 'Crazy Monday has become popular, and the resulting Monday traffic spikes have affected paying users. To keep the service stable and protect their experience, eligibility now requires more than ¥10 in completed lifetime payments. Thank you for understanding and for supporting this weekly benefit.'
+  },
+  programmersDay: {
+    kicker: 'Limited 1024 offer', title: "Programmers' Day",
+    description: 'A little extra for everyone who loves to build: recharge during the event and receive {percent}% more credit.',
+    startsIn: 'Starts in', endsIn: 'Ends in', ended: "This year's offer has ended", disabled: 'The offer is currently closed.',
+    scheduled: 'The offer starts soon. Recharge after it begins to receive {percent}% extra credit; your order preview will show the credited amount.', rule: 'Recharge now and receive {percent}% extra credit. Your order preview shows the credited amount.', recharge: 'Recharge now', rechargeUpcoming: 'Recharge after the offer starts to receive the bonus.',
+    benefitLabel: 'Recharge bonus', example: 'Pay 100, receive {total}', benefitDetails: 'The bonus is based on the recharge amount and replaces regular tier gifts for the same order. The order keeps its original offer terms after payment.',
+    timeLabel: 'Event time', duration: 'Three days', timeDetails: 'October 24 at 00:00 through October 27 at 00:00 Beijing time each year, when enabled.',
+    checkoutHint: "Programmers' Day is live: recharge for {percent}% extra credit. Check the credited amount in your order preview."
+  },
 
   // Subscription Progress (Header component)
   subscriptionProgress: {

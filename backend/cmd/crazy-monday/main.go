@@ -186,6 +186,7 @@ func applyCampaign(ctx context.Context, db *sql.DB, groupID int64, window monday
 			return result, nil
 		}
 		for _, userID := range userIDs {
+			cursor = userID
 			result.scanned++
 			status, err := applyUserSubscription(ctx, db, userID, groupID, window, opts.execute)
 			if err != nil {
@@ -201,7 +202,6 @@ func applyCampaign(ctx context.Context, db *sql.DB, groupID int64, window monday
 			case "skipped":
 				result.skipped++
 			}
-			cursor = userID
 		}
 	}
 }
@@ -213,6 +213,11 @@ func loadActiveUserIDs(ctx context.Context, db *sql.DB, cursor int64, limit int)
 		WHERE id > $1
 		  AND status = 'active'
 		  AND deleted_at IS NULL
+		  AND (SELECT COALESCE(SUM(pay_amount), 0)
+		       FROM payment_orders
+		       WHERE user_id = users.id
+		         AND status = 'completed'
+		         AND COALESCE(NULLIF(provider_snapshot->>'currency', ''), 'CNY') = 'CNY') > 10
 		ORDER BY id ASC
 		LIMIT $2
 	`, cursor, limit)
