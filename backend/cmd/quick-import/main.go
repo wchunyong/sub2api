@@ -18,6 +18,34 @@ import (
 
 func main() { os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr)) }
 
+func agentName(agent string) string {
+	return map[string]string{
+		"claude": "Claude Code", "codex": "Codex", "deepseek-harness": "DeepSeek Harness",
+		"workbuddy": "WorkBuddy", "opencode": "OpenCode", "pi": "Pi",
+	}[agent]
+}
+
+func launchHint(agent, profile string) string {
+	switch agent {
+	case "claude":
+		return "在项目目录运行 claude"
+	case "codex":
+		return "在项目目录运行 codex"
+	case "deepseek-harness":
+		if profile == "desktop" {
+			return "打开 DeepSeek Harness 桌面应用"
+		}
+		return "运行 dsh web（通过 npx 使用时运行 npx @deepseek-ai/dsh web）"
+	case "workbuddy":
+		return "打开 WorkBuddy 桌面应用并进入项目"
+	case "opencode":
+		return "在项目目录运行 opencode"
+	case "pi":
+		return "在项目目录运行 pi"
+	}
+	return "打开对应工具"
+}
+
 func run(args []string, in io.Reader, out, stderr io.Writer) int {
 	fail := func(message string) int { fmt.Fprintln(stderr, message); return 1 }
 	if len(args) == 0 || (args[0] != "install" && args[0] != "clean") {
@@ -40,6 +68,7 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 	if !native.ValidAgent(*agent) {
 		return fail("Choose a supported --agent value")
 	}
+	name := agentName(*agent)
 	if *dshProfile != "" && *agent != "deepseek-harness" {
 		return fail("--dsh-profile applies only to DeepSeek Harness")
 	}
@@ -58,7 +87,7 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 		return fail("Invalid home directory")
 	}
 	if args[0] == "clean" {
-		fmt.Fprintf(out, "正在恢复 %s 最近一次连接AI导入；其他工具的配置不会更改。\n", *agent)
+		fmt.Fprintf(out, "正在恢复 %s 最近一次连接AI导入；其他工具的配置不会更改。\n", name)
 		if !*yes {
 			fmt.Fprint(out, "确认恢复？输入 y 继续 [y/N] ")
 			answer, _ := bufio.NewReader(in).ReadString('\n')
@@ -89,7 +118,7 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 		}
 		fmt.Fprintf(out, "将配置 DeepSeek Harness 的 %s 版本。\n", profile)
 	}
-	fmt.Fprintf(out, "正在检查 %s 安装状态和本机配置…\n", *agent)
+	fmt.Fprintf(out, "正在检查 %s 安装状态和本机配置…\n", name)
 	if err = native.Preflight(*agent, !*skip); err != nil {
 		return fail("安装或配置检查未通过：" + err.Error())
 	}
@@ -128,13 +157,14 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 			return fail("模型目录读取失败。请检查 Key、分组和网络，再重新生成命令。详情：" + err.Error())
 		}
 		if *agent == "claude" && !payload.ClaudeModelPickerSupported {
-			fmt.Fprintln(out, "Claude Code < 2.1.242: selected model is configured. Upgrade for the full lianjieai /model menu.")
+			fmt.Fprintln(out, "当前 Claude Code 版本低于 2.1.242：已配置所选模型。升级后可在 /model 菜单中查看完整的连接AI模型列表。")
 		}
 	}
 	if native.Install(root, payload) != nil {
 		return fail("配置写入失败。原配置已保留，或可使用本机恢复信息撤销；请检查文件权限与配置语法。")
 	}
-	fmt.Fprintf(out, "%s 配置已写入。请完全退出并重启工具，选择导入时选定的模型，发送一条测试消息。\n", *agent)
+	fmt.Fprintf(out, "%s 配置已写入。\n", name)
+	fmt.Fprintf(out, "下一步：完全退出并重开工具；%s，选择导入时选定的模型并发送一条测试消息。\n", launchHint(*agent, profile))
 	fmt.Fprintln(out, "如果工具仍使用旧服务，请检查项目级配置是否覆盖了用户配置。")
 	fmt.Fprintf(out, "本机恢复信息：%s\n", filepath.Join(root, ".sub2api-quick-import", *agent))
 	return 0

@@ -15,7 +15,15 @@ func TestSixAgentsInstallAndRestoreFromIsolatedInput(t *testing.T) {
 	for _, name := range []string{"CLAUDE_CONFIG_DIR", "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY", "CODEX_HOME", "OPENCODE_CONFIG", "OPENCODE_CONFIG_CONTENT", "XDG_CONFIG_HOME", "PI_CODING_AGENT_DIR", "DSH_HOME"} {
 		t.Setenv(name, "")
 	}
-	for _, agent := range []string{"claude", "codex", "deepseek-harness", "workbuddy", "opencode", "pi"} {
+	steps := map[string]struct{ label, launch string }{
+		"claude":           {"Claude Code", "在项目目录运行 claude"},
+		"codex":            {"Codex", "在项目目录运行 codex"},
+		"deepseek-harness": {"DeepSeek Harness", "运行 dsh web"},
+		"workbuddy":        {"WorkBuddy", "打开 WorkBuddy 桌面应用"},
+		"opencode":         {"OpenCode", "在项目目录运行 opencode"},
+		"pi":               {"Pi", "在项目目录运行 pi"},
+	}
+	for agent, step := range steps {
 		t.Run(agent, func(t *testing.T) {
 			root := t.TempDir()
 			payload := native.Payload{Version: 1, Agent: agent, APIKey: "private-test-key", BaseURL: "https://example.test/v1", Model: "selected-model", Models: []native.Model{{ID: "selected-model", Name: "Selected Model"}}}
@@ -33,7 +41,7 @@ func TestSixAgentsInstallAndRestoreFromIsolatedInput(t *testing.T) {
 			if code := run([]string{"install", "--agent", agent, "--stdin", "--home", root, "--skip-client-check"}, bytes.NewReader(body), &out, &stderr); code != 0 {
 				t.Fatalf("install failed: %s", stderr.String())
 			}
-			if !strings.Contains(out.String(), "配置已写入") || strings.Contains(out.String(), "private-test-key") {
+			if !strings.Contains(out.String(), step.label+" 配置已写入") || !strings.Contains(out.String(), step.launch) || strings.Contains(out.String(), "private-test-key") {
 				t.Fatalf("wrong install output: %s", out.String())
 			}
 			out.Reset()
@@ -65,6 +73,9 @@ func TestDeepSeekHarnessDesktopSelectionSurvivesCleanup(t *testing.T) {
 	args := []string{"install", "--agent", "deepseek-harness", "--dsh-profile", "desktop", "--stdin", "--home", root, "--skip-client-check"}
 	if code := run(args, bytes.NewReader(body), &out, &stderr); code != 0 {
 		t.Fatal(stderr.String())
+	}
+	if !strings.Contains(out.String(), "打开 DeepSeek Harness 桌面应用") {
+		t.Fatalf("wrong desktop next step: %s", out.String())
 	}
 	desktopPatch := filepath.Join(root, ".dsh", "profiles", "desktop", "cordis.patch.yml")
 	if _, err := os.Stat(desktopPatch); err != nil {
