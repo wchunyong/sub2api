@@ -1141,6 +1141,7 @@
       :hide-ccs="publicSettings?.hide_ccs_import_button"
       :api-key="selectedKey?.key || ''"
       :base-url="publicSettings?.api_base_url || ''"
+      :doc-url="publicSettings?.doc_url || appStore.docUrl"
       :platform="selectedKey?.group?.platform || null"
       :claude-code-only="selectedKey?.group?.claude_code_only || false"
       :allow-messages-dispatch="selectedKey?.group?.allow_messages_dispatch || false"

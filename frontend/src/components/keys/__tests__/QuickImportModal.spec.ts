@@ -111,6 +111,18 @@ describe('QuickImportModal', () => {
     await wrapper.get('[data-testid="manual"]').trigger('click')
     expect(wrapper.get('[data-testid="manual-client"]').text()).toBe('opencode')
   })
+  it('opens the configured documentation for agents with a separate manual guide', async () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    try {
+      const wrapper = render({ docUrl: 'https://guide.example.com/zh/' })
+      await wrapper.get('[data-testid="agent-workbuddy"]').trigger('click')
+      await wrapper.get('[data-testid="manual"]').trigger('click')
+      expect(open).toHaveBeenCalledWith('https://guide.example.com/zh/agent/workbuddy', '_blank', 'noopener,noreferrer')
+      wrapper.unmount()
+    } finally {
+      open.mockRestore()
+    }
+  })
   it('honors CCS hiding and resets the selection when the key changes', async () => {
     const wrapper = render({ hideCcs: true })
     await wrapper.get('[data-testid="agent-codex"]').trigger('click')

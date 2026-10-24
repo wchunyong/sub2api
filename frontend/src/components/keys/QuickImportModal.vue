@@ -63,8 +63,9 @@ import { automaticAgent, cleanupCommand, importCommand, type ImportOS } from '@/
 import { createImportTicket, importServer } from '@/api/quickImport'
 import { buildCodexModelsManifestUrl } from '@/api/codex'
 import { parseCodexCatalogModels } from '@/utils/codexCatalogConfig'
+import { sanitizeUrl } from '@/utils/url'
 import { useClipboard } from '@/composables/useClipboard'
-const props = withDefaults(defineProps<{ show: boolean; keyId: number; keyName?: string; apiKey: string; baseUrl: string; platform: GroupPlatform | null; allowMessagesDispatch?: boolean; hideCcs?: boolean; active?: boolean; claudeCodeOnly?: boolean }>(), { active: true })
+const props = withDefaults(defineProps<{ show: boolean; keyId: number; keyName?: string; apiKey: string; baseUrl: string; docUrl?: string; platform: GroupPlatform | null; allowMessagesDispatch?: boolean; hideCcs?: boolean; active?: boolean; claudeCodeOnly?: boolean }>(), { active: true })
 const emit = defineEmits<{ (e: 'close'): void }>()
 const { t } = useI18n()
 const { copyToClipboard } = useClipboard()
@@ -162,7 +163,8 @@ function back() { if (step.value === 'actions') agent.value = null; else step.va
 function openManual() {
   if (!agent.value) return
   if (['deepseek-harness', 'workbuddy', 'pi'].includes(agent.value)) {
-    window.open(`https://docs.lianjieai.top/agent/${agent.value}`, '_blank', 'noopener,noreferrer')
+    const base = (sanitizeUrl(props.docUrl || '') || 'https://docs.lianjieai.top/').replace(/\/+$/, '')
+    window.open(`${base}/agent/${agent.value}`, '_blank', 'noopener,noreferrer')
     return
   }
   step.value = 'manual'
