@@ -121,6 +121,60 @@ func target(root, agent string) (string, error) {
 	return path, safePath(root, path)
 }
 
+// CheckLocalConfig catches unsupported local state before a one-time ticket is
+// consumed. Install repeats the checks under its own lock before writing.
+func CheckLocalConfig(root, agent string) error {
+	root, err := filepath.Abs(root)
+	if err != nil {
+		return err
+	}
+	path, err := target(root, agent)
+	if err != nil {
+		return err
+	}
+	if agent == "opencode" {
+		if err := checkOpenCodeJSONC(path); err != nil {
+			return err
+		}
+	}
+	text, _, err := readText(path)
+	if err != nil {
+		return err
+	}
+	if _, err := load(text, agent); err != nil {
+		return err
+	}
+	folder := filepath.Join(root, ".sub2api-quick-import", agent)
+	if err := safePath(root, folder); err != nil {
+		return err
+	}
+	records, err := readJournal(folder)
+	if err != nil {
+		return err
+	}
+	return checkPending(records)
+}
+
+func checkOpenCodeJSONC(path string) error {
+	overlay, exists, err := readText(strings.TrimSuffix(path, ".json") + ".jsonc")
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return nil
+	}
+	data, err := load(overlay, "opencode")
+	if err != nil || strings.TrimSpace(overlay) == "" {
+		return errors.New("existing OpenCode JSONC configuration requires manual configuration")
+	}
+	for key := range data {
+		if key != "$schema" {
+			return errors.New("existing OpenCode JSONC configuration requires manual configuration")
+		}
+	}
+	return nil
+}
+
 func claudeUserMCPConfigPath(root string) (string, error) {
 	path := filepath.Join(root, ".claude.json")
 	return path, safePath(root, path)
@@ -675,20 +729,8 @@ func Install(root string, p Payload) error {
 		return err
 	}
 	if p.Agent == "opencode" {
-		overlay, exists, e := readText(strings.TrimSuffix(path, ".json") + ".jsonc")
-		if e != nil {
-			return e
-		}
-		if exists {
-			data, e := load(overlay, "opencode")
-			if e != nil || strings.TrimSpace(overlay) == "" {
-				return errors.New("existing OpenCode JSONC configuration requires manual configuration")
-			}
-			for k := range data {
-				if k != "$schema" {
-					return errors.New("existing OpenCode JSONC configuration requires manual configuration")
-				}
-			}
+		if err := checkOpenCodeJSONC(path); err != nil {
+			return err
 		}
 	}
 	folder, unlock, err := lock(root, p.Agent)

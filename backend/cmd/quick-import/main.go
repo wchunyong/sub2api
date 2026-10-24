@@ -76,6 +76,9 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 	if err = native.Preflight(*agent, !*skip); err != nil {
 		return fail("安装或配置检查未通过：" + err.Error())
 	}
+	if err = native.CheckLocalConfig(root, *agent); err != nil {
+		return fail("现有本机配置需要先处理；尚未兑换配置码：" + err.Error())
+	}
 	var payload native.Payload
 	network := native.Network{}
 	if *stdin {

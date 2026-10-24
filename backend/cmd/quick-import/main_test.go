@@ -140,3 +140,23 @@ func TestStdinDoesNotExposeInvalidPayload(t *testing.T) {
 		t.Fatal("credential leaked")
 	}
 }
+
+func TestInstallChecksExistingConfigBeforeReadingOneTimePayload(t *testing.T) {
+	t.Setenv("CODEX_HOME", "")
+	root := t.TempDir()
+	path := filepath.Join(root, ".codex", "config.toml")
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("model = ["), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var out, stderr bytes.Buffer
+	code := run([]string{"install", "--agent", "codex", "--stdin", "--home", root, "--skip-client-check"}, strings.NewReader(`{"api_key":"private-test-key"}`), &out, &stderr)
+	if code == 0 || !strings.Contains(stderr.String(), "尚未兑换配置码") || !strings.Contains(stderr.String(), "configuration syntax") {
+		t.Fatalf("missing early config error: %s", stderr.String())
+	}
+	if strings.Contains(stderr.String(), "private-test-key") {
+		t.Fatal("credential leaked")
+	}
+}

@@ -347,6 +347,29 @@ func TestInstallCleanPreservesUnrelated(t *testing.T) {
 	}
 }
 
+func TestCheckLocalConfigRejectsUnsupportedFilesBeforeTicketExchange(t *testing.T) {
+	for _, tc := range []struct {
+		name, agent, path, content, want string
+	}{
+		{"invalid-codex-toml", "codex", ".codex/config.toml", "model = [", "configuration syntax"},
+		{"opencode-jsonc-overlay", "opencode", ".config/opencode/opencode.jsonc", `{ "provider": { "existing": {} } }`, "manual configuration"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			path := filepath.Join(root, filepath.FromSlash(tc.path))
+			if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte(tc.content), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := CheckLocalConfig(root, tc.agent); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("expected %q, got %v", tc.want, err)
+			}
+		})
+	}
+}
+
 func TestInstallRegistersImageMCPOnlyWhenEnabled(t *testing.T) {
 	enabled := true
 	for _, agent := range []string{"claude", "codex", "opencode"} {
