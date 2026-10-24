@@ -50,7 +50,7 @@ func TestTicketExpiryAndAtomicConsumption(t *testing.T) {
 }
 
 func TestConfigTargets(t *testing.T) {
-	for _, agent := range []string{"claude", "codex", "opencode", "deepseek-harness", "workbuddy", "pi"} {
+	for _, agent := range []string{"claude", "opencode", "deepseek-harness", "workbuddy", "pi"} {
 		c, err := BuildConfig(agent, "deepseek", false, "https://example.com/v1", "mock-key", "deepseek-chat")
 		if err != nil || c.Agent != agent || c.Model != "deepseek-chat" {
 			t.Fatalf("%s: %#v %v", agent, c, err)
@@ -68,6 +68,15 @@ func TestConfigTargets(t *testing.T) {
 		if (agent == "deepseek-harness" || agent == "workbuddy" || agent == "pi") && c.Protocol != "openai-completions" {
 			t.Fatalf("%s: wrong protocol: %#v", agent, c)
 		}
+	}
+	for _, platform := range []string{"openai", "composite"} {
+		c, err := BuildConfig("codex", platform, false, "https://example.com/v1", "mock-key", "mock-codex-model")
+		if err != nil || c.BaseURL != "https://example.com/v1" || c.Protocol != "openai" {
+			t.Fatalf("Codex %s: %#v %v", platform, c, err)
+		}
+	}
+	if _, err := BuildConfig("codex", "deepseek", false, "https://example.com/v1", "mock-key", "deepseek-chat"); err == nil {
+		t.Fatal("Codex import accepted a group without a Codex model catalog")
 	}
 	if _, err := BuildConfig("workbuddy", "deepseek", false, "https://example.com/v1", "mock-key", ""); err == nil {
 		t.Fatal("missing model silently selected a potentially unavailable default")

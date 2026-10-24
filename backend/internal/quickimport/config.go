@@ -36,6 +36,9 @@ func BuildConfig(agent, platform string, messages bool, baseURL, apiKey, model s
 	if agent == "claude" && (platform == "gemini" || platform == "openai" && !messages) {
 		return Config{}, fail
 	}
+	if agent == "codex" && platform != "openai" && platform != "composite" {
+		return Config{}, fail
+	}
 	if strings.TrimSpace(model) == "" || len(model) > 200 || strings.ContainsAny(model, "\r\n\x00") {
 		return Config{}, fail
 	}
