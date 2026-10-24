@@ -492,6 +492,12 @@ func TestWorkBuddyFreshImportWritesDesktopArrayAndCleanRemovesIt(t *testing.T) {
 	if models[0]["vendor"] != "Custom" || models[0]["useCustomProtocol"] != true || models[0]["url"] != "https://example.test/v1/chat/completions" {
 		t.Fatalf("WorkBuddy must send the exact gateway endpoint without appending a second path: %s", content)
 	}
+	if _, set := models[0]["maxInputTokens"]; set {
+		t.Fatalf("WorkBuddy import must not invent the selected model's input limit: %s", content)
+	}
+	if _, set := models[0]["maxOutputTokens"]; set {
+		t.Fatalf("WorkBuddy import must not invent the selected model's output limit: %s", content)
+	}
 	if err := Clean(root, "workbuddy"); err != nil {
 		t.Fatal(err)
 	}
