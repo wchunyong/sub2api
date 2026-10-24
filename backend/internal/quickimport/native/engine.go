@@ -21,7 +21,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const provider = "sub2api_quick"
+const provider = "lianjieai_quick"
+const legacyProvider = "sub2api_quick"
 
 var ErrDSHAmbiguousProfile = errors.New("both DeepSeek Harness web and desktop profiles exist; choose the one you use")
 
@@ -451,8 +452,8 @@ func render(text, agent string, changes []change) (string, error) {
 		} else {
 			tableName := ""
 			switch {
-			case reflect.DeepEqual(c.Path, []string{"model_providers", provider}):
-				tableName = "model_providers." + provider
+			case reflect.DeepEqual(c.Path, []string{"model_providers", provider}), reflect.DeepEqual(c.Path, []string{"model_providers", legacyProvider}):
+				tableName = "model_providers." + c.Path[1]
 			case reflect.DeepEqual(c.Path, []string{"mcp_servers", "lianjieai_image"}):
 				tableName = "mcp_servers.lianjieai_image"
 			default:
@@ -1090,7 +1091,7 @@ func Clean(root, agent string) error {
 	}
 	for _, c := range rec.Changes {
 		if !equal(get(data, c.Path), c.Value) {
-			if agent == "codex" && reflect.DeepEqual(c.Path, []string{"model"}) && data["model_provider"] == provider {
+			if agent == "codex" && reflect.DeepEqual(c.Path, []string{"model"}) && (data["model_provider"] == provider || data["model_provider"] == legacyProvider) {
 				if selected, ok := data["model"].(string); ok && strings.TrimSpace(selected) != "" {
 					continue
 				}
@@ -1098,7 +1099,7 @@ func Clean(root, agent string) error {
 			field := "managed configuration"
 			if agent == "codex" {
 				switch strings.Join(c.Path, ".") {
-				case "model", "model_provider", "model_catalog_json", "model_providers.sub2api_quick", "mcp_servers.lianjieai_image":
+				case "model", "model_provider", "model_catalog_json", "model_providers.lianjieai_quick", "model_providers.sub2api_quick", "mcp_servers.lianjieai_image":
 					field = strings.Join(c.Path, ".")
 				}
 			}

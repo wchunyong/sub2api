@@ -165,6 +165,9 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 	}
 	fmt.Fprintf(out, "%s 配置已写入。\n", name)
 	fmt.Fprintf(out, "下一步：完全退出并重开工具；%s，选择导入时选定的模型并发送一条测试消息。\n", launchHint(*agent, profile))
+	if *agent == "opencode" {
+		fmt.Fprintf(out, "在 OpenCode 的 /models 中选择 lianjieai_quick/%s。\n", payload.Model)
+	}
 	fmt.Fprintln(out, "如果工具仍使用旧服务，请检查项目级配置是否覆盖了用户配置。")
 	fmt.Fprintf(out, "本机恢复信息：%s\n", filepath.Join(root, ".sub2api-quick-import", *agent))
 	return 0

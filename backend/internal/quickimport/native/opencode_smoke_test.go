@@ -62,7 +62,7 @@ func TestOpenCodeNativeSmoke(t *testing.T) {
 		}
 		cmd.Env = append(cmd.Env, entry)
 	}
-	cmd.Env = append(cmd.Env, "HOME="+root, "USERPROFILE="+root, "XDG_CONFIG_HOME="+filepath.Join(root, ".config"), "XDG_DATA_HOME="+filepath.Join(root, ".data"), "XDG_STATE_HOME="+filepath.Join(root, ".state"), "XDG_CACHE_HOME="+filepath.Join(root, ".cache"), "OPENCODE_DISABLE_PROJECT_CONFIG=true", "OPENCODE_DISABLE_AUTOUPDATE=true", `OPENCODE_CONFIG_CONTENT={"permission":{"*":"deny"},"share":"disabled","autoupdate":false,"enabled_providers":["sub2api_quick"]}`)
+	cmd.Env = append(cmd.Env, "HOME="+root, "USERPROFILE="+root, "XDG_CONFIG_HOME="+filepath.Join(root, ".config"), "XDG_DATA_HOME="+filepath.Join(root, ".data"), "XDG_STATE_HOME="+filepath.Join(root, ".state"), "XDG_CACHE_HOME="+filepath.Join(root, ".cache"), "OPENCODE_DISABLE_PROJECT_CONFIG=true", "OPENCODE_DISABLE_AUTOUPDATE=true", `OPENCODE_CONFIG_CONTENT={"permission":{"*":"deny"},"share":"disabled","autoupdate":false,"enabled_providers":["lianjieai_quick"]}`)
 	output, err := cmd.CombinedOutput()
 	if err != nil || !strings.Contains(string(output), "IMPORT_OK") || calls.Load() == 0 {
 		t.Fatalf("OpenCode smoke failed: %v %s", err, output)

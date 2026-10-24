@@ -44,6 +44,9 @@ func TestSixAgentsInstallAndRestoreFromIsolatedInput(t *testing.T) {
 			if !strings.Contains(out.String(), step.label+" 配置已写入") || !strings.Contains(out.String(), step.launch) || strings.Contains(out.String(), "private-test-key") {
 				t.Fatalf("wrong install output: %s", out.String())
 			}
+			if agent == "opencode" && !strings.Contains(out.String(), "lianjieai_quick/selected-model") {
+				t.Fatalf("OpenCode model picker hint is missing: %s", out.String())
+			}
 			out.Reset()
 			stderr.Reset()
 			if code := run([]string{"clean", "--agent", agent, "--home", root, "--yes"}, strings.NewReader(""), &out, &stderr); code != 0 {
@@ -128,7 +131,7 @@ func TestCleanReportsConflictWithoutCredentials(t *testing.T) {
 	if run([]string{"clean", "--agent", "codex", "--home", root, "--yes"}, strings.NewReader(""), &out, &stderr) == 0 {
 		t.Fatal("accepted changed credentials")
 	}
-	if !strings.Contains(stderr.String(), "model_providers.sub2api_quick") {
+	if !strings.Contains(stderr.String(), "model_providers.lianjieai_quick") {
 		t.Fatal("missing conflict field")
 	}
 	if strings.Contains(stderr.String(), "private") {

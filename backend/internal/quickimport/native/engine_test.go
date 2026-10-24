@@ -39,6 +39,133 @@ func TestLegacyPythonJournal(t *testing.T) {
 	}
 }
 
+func TestNewImportsUseLianjieAIProviderID(t *testing.T) {
+	for _, agent := range []string{"codex", "opencode"} {
+		t.Run(agent, func(t *testing.T) {
+			root := t.TempDir()
+			payload := Payload{Version: 1, Agent: agent, APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "test-model"}
+			if err := Install(root, payload); err != nil {
+				t.Fatal(err)
+			}
+			text, _, err := readText(filepath.Join(root, paths[agent]))
+			if err != nil {
+				t.Fatal(err)
+			}
+			data, err := load(text, agent)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if agent == "codex" {
+				if get(data, []string{"model_provider"}).Value != "lianjieai_quick" || !get(data, []string{"model_providers", "lianjieai_quick"}).Exists {
+					t.Fatal("Codex import did not use the connection AI provider ID")
+				}
+			} else if get(data, []string{"model"}).Value != "lianjieai_quick/test-model" || !get(data, []string{"provider", "lianjieai_quick"}).Exists {
+				t.Fatal("OpenCode import did not use the connection AI provider ID")
+			}
+			if err := Clean(root, agent); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestCleanLegacyCodexProviderPreservesLaterSettings(t *testing.T) {
+	root := t.TempDir()
+	before := "theme = \"old\"\n"
+	changes := []change{
+		{Path: []string{"model"}, Value: value{Exists: true, Value: "test-model"}},
+		{Path: []string{"model_provider"}, Value: value{Exists: true, Value: "sub2api_quick"}},
+		{Path: []string{"model_providers", "sub2api_quick"}, Value: value{Exists: true, Value: map[string]any{"name": "legacy", "base_url": "https://example.test/v1", "wire_api": "responses", "experimental_bearer_token": "test-secret"}}},
+	}
+	after, err := render(before, "codex", changes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	original, err := load(before, "codex")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := record{Agent: "codex", Existed: true, Before: before, After: after, Changes: changes, Owned: []ownedFile{}}
+	for _, c := range changes {
+		rec.Inverse = append(rec.Inverse, change{Path: c.Path, Value: get(original, c.Path)})
+	}
+	path := filepath.Join(root, paths["codex"])
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("later = \"keep\"\n"+after), 0600); err != nil {
+		t.Fatal(err)
+	}
+	folder := filepath.Join(root, ".sub2api-quick-import", "codex")
+	if err := os.MkdirAll(folder, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJournal(folder, []record{rec}); err != nil {
+		t.Fatal(err)
+	}
+	if err := Clean(root, "codex"); err != nil {
+		t.Fatal(err)
+	}
+	text, _, err := readText(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := load(text, "codex")
+	if err != nil || get(data, []string{"later"}).Value != "keep" || get(data, []string{"model_providers", "sub2api_quick"}).Exists {
+		t.Fatalf("legacy cleanup lost newer settings: %v %s", err, text)
+	}
+}
+
+func TestCleanLegacyOpenCodeProviderPreservesLaterSettings(t *testing.T) {
+	root := t.TempDir()
+	before := `{"theme":"old"}`
+	changes := []change{
+		{Path: []string{"model"}, Value: value{Exists: true, Value: "sub2api_quick/test-model"}},
+		{Path: []string{"provider", "sub2api_quick"}, Value: value{Exists: true, Value: map[string]any{"name": "legacy", "options": map[string]any{"apiKey": "test-secret"}}}},
+	}
+	after, err := render(before, "opencode", changes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	original, err := load(before, "opencode")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := record{Agent: "opencode", Existed: true, Before: before, After: after, Changes: changes, Owned: []ownedFile{}}
+	for _, c := range changes {
+		rec.Inverse = append(rec.Inverse, change{Path: c.Path, Value: get(original, c.Path)})
+	}
+	current, err := render(after, "opencode", []change{{Path: []string{"later"}, Value: value{Exists: true, Value: "keep"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, paths["opencode"])
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(current), 0600); err != nil {
+		t.Fatal(err)
+	}
+	folder := filepath.Join(root, ".sub2api-quick-import", "opencode")
+	if err := os.MkdirAll(folder, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJournal(folder, []record{rec}); err != nil {
+		t.Fatal(err)
+	}
+	if err := Clean(root, "opencode"); err != nil {
+		t.Fatal(err)
+	}
+	text, _, err := readText(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := load(text, "opencode")
+	if err != nil || get(data, []string{"later"}).Value != "keep" || get(data, []string{"provider", "sub2api_quick"}).Exists {
+		t.Fatalf("legacy cleanup lost newer settings: %v %s", err, text)
+	}
+}
+
 func TestPendingAndLockRefuseChanges(t *testing.T) {
 	for _, kind := range []string{"pending", "lock"} {
 		t.Run(kind, func(t *testing.T) {
