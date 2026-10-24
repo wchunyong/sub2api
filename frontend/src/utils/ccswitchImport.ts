@@ -126,13 +126,19 @@ export function buildCcSwitchImportDeeplink(input: CcSwitchImportDeeplinkInput):
 
 function resolveSelectedAgentConfig(input: CcSwitchImportDeeplinkInput): CcSwitchImportConfig | undefined {
   if (input.agent === 'codex' || input.agent === 'opencode') {
+    const root = withoutTrailingSlashes(input.baseUrl).replace(/\/v1$/, '')
     const openCodeFormat = input.platform === 'anthropic' || input.platform === 'antigravity'
       ? 'anthropic' : input.platform === 'gemini'
         ? 'gemini_native' : input.platform === 'openai'
           ? 'openai_responses' : 'openai_chat'
+    const endpoint = input.agent === 'opencode' && input.platform === 'antigravity'
+      ? `${root}/antigravity/v1`
+      : input.agent === 'opencode' && input.platform === 'gemini'
+        ? `${root}/v1beta`
+        : withV1Endpoint(input.baseUrl)
     return {
       app: input.agent,
-      endpoint: withV1Endpoint(input.baseUrl),
+      endpoint,
       model: input.model || (input.agent === 'codex' && input.platform === 'openai' ? OPENAI_CC_SWITCH_CODEX_MODEL : undefined),
       apiFormat: input.agent === 'codex' ? 'openai_responses' : openCodeFormat
     }

@@ -83,6 +83,19 @@ describe('ccswitchImport utils', () => {
   })
 
   it.each([
+    { platform: 'antigravity', endpoint: 'https://api.example.com/antigravity/v1', format: 'anthropic' },
+    { platform: 'gemini', endpoint: 'https://api.example.com/v1beta', format: 'gemini_native' }
+  ] as const)('uses the $platform gateway path for OpenCode in CC Switch', ({ platform, endpoint, format }) => {
+    for (const baseUrl of ['https://api.example.com', 'https://api.example.com/v1']) {
+      const params = paramsFromDeeplink(buildCcSwitchImportDeeplink({
+        ...baseInput, baseUrl, platform, clientType: 'claude', agent: 'opencode', model: 'selected-model-id'
+      }))
+      expect(params.get('endpoint')).toBe(endpoint)
+      expect(params.get('apiFormat')).toBe(format)
+    }
+  })
+
+  it.each([
     ['https://api.example.com', 'https://api.example.com'],
     ['https://api.example.com/', 'https://api.example.com'],
     ['https://api.example.com/v1', 'https://api.example.com/v1'],
