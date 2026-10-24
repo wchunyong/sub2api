@@ -832,6 +832,10 @@ func Install(root string, p Payload) error {
 			"api":         "openai-completions",
 			"baseURL":     strings.TrimRight(p.BaseURL, "/"),
 			"headers":     map[string]any{"Authorization": "Bearer " + p.APIKey},
+			"compat": map[string]any{
+				"supportsDeveloperRole": false,
+				"maxTokensField":       "max_tokens",
+			},
 			"models":      []any{map[string]any{"id": p.Model, "name": modelName}},
 		}
 		updated := append([]any{}, entries...)

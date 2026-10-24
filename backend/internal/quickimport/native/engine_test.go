@@ -515,7 +515,7 @@ func TestDeepSeekHarnessMergesExistingPiAIProvider(t *testing.T) {
 		t.Fatal(err)
 	}
 	content, err := os.ReadFile(path)
-	if err != nil || !strings.Contains(string(content), "other-model") || !strings.Contains(string(content), "test-model") || strings.Contains(string(content), "image-only") || !strings.Contains(string(content), "test-secret") {
+	if err != nil || !strings.Contains(string(content), "other-model") || !strings.Contains(string(content), "test-model") || strings.Contains(string(content), "image-only") || !strings.Contains(string(content), "test-secret") || !strings.Contains(string(content), "supportsDeveloperRole: false") || !strings.Contains(string(content), "maxTokensField: max_tokens") {
 		t.Fatalf("existing provider was not preserved: %s %v", content, err)
 	}
 	if err := Clean(root, "deepseek-harness"); err != nil {
