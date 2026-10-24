@@ -205,6 +205,30 @@ func TestWorkBuddyPreflightRejectsCustomConfigDirectory(t *testing.T) {
 	}
 }
 
+func TestCodexAppOrInitializedConfigIsRecognizedWithoutCLI(t *testing.T) {
+	root := t.TempDir()
+	local := t.TempDir()
+	if codexClientPresent(root, local) {
+		t.Fatal("empty home should not look like a Codex App installation")
+	}
+	packageDir := filepath.Join(local, "Packages", "OpenAI.Codex_2p2nqsd0c76g0")
+	if err := os.MkdirAll(packageDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if !codexClientPresent(root, local) {
+		t.Fatal("Windows Codex desktop package was not recognized")
+	}
+	if codexClientPresent(root, "") {
+		t.Fatal("the Windows package should not affect another location")
+	}
+	if err := os.MkdirAll(filepath.Join(root, ".codex"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if !codexClientPresent(root, "") {
+		t.Fatal("initialized desktop configuration was not recognized")
+	}
+}
+
 func TestClientVersionWindowsCommandShim(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("Windows command shim")

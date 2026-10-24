@@ -30,7 +30,7 @@ func launchHint(agent, profile string) string {
 	case "claude":
 		return "在项目目录运行 claude"
 	case "codex":
-		return "在项目目录运行 codex"
+		return "在项目目录运行 codex，或打开 Codex 桌面 App"
 	case "deepseek-harness":
 		if profile == "desktop" {
 			return "打开 DeepSeek Harness 桌面应用"

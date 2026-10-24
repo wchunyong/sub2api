@@ -17,7 +17,7 @@ func TestSixAgentsInstallAndRestoreFromIsolatedInput(t *testing.T) {
 	}
 	steps := map[string]struct{ label, launch string }{
 		"claude":           {"Claude Code", "在项目目录运行 claude"},
-		"codex":            {"Codex", "在项目目录运行 codex"},
+		"codex":            {"Codex", "在项目目录运行 codex，或打开 Codex 桌面 App"},
 		"deepseek-harness": {"DeepSeek Harness", "运行 dsh web"},
 		"workbuddy":        {"WorkBuddy", "打开 WorkBuddy 桌面应用"},
 		"opencode":         {"OpenCode", "在项目目录运行 opencode"},

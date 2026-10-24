@@ -263,6 +263,27 @@ func atLeast(version string, min [3]int) bool {
 	return true
 }
 
+// codexClientPresent accepts an initialized shared config directory or a
+// Windows Store desktop package, so App-only users do not need the CLI on PATH.
+func codexClientPresent(home, localAppData string) bool {
+	if home != "" {
+		for _, candidate := range []string{filepath.Join(home, ".codex"), filepath.Join(home, "Applications", "ChatGPT.app")} {
+			if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+				return true
+			}
+		}
+	}
+	if localAppData != "" {
+		matches, _ := filepath.Glob(filepath.Join(localAppData, "Packages", "OpenAI.Codex_*"))
+		for _, candidate := range matches {
+			if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // Preflight preserves the supported clients' default user-config semantics.
 func Preflight(agent string, checkClient bool) error {
 	overrides := map[string][]string{"opencode": {"OPENCODE_CONFIG", "OPENCODE_CONFIG_CONTENT", "XDG_CONFIG_HOME"}, "claude": {"CLAUDE_CONFIG_DIR", "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY"}, "codex": {"CODEX_HOME"}, "pi": {"PI_CODING_AGENT_DIR"}, "workbuddy": {"WORKBUDDY_CONFIG_DIR", "CODEBUDDY_CONFIG_DIR"}, "deepseek-harness": {"DSH_HOME"}}
@@ -284,6 +305,17 @@ func Preflight(agent string, checkClient bool) error {
 	}
 	if _, err := exec.LookPath(command); err == nil {
 		return nil
+	}
+	if agent == "codex" {
+		home, _ := os.UserHomeDir()
+		if codexClientPresent(home, os.Getenv("LOCALAPPDATA")) {
+			return nil
+		}
+		if runtime.GOOS == "darwin" {
+			if info, err := os.Stat("/Applications/ChatGPT.app"); err == nil && info.IsDir() {
+				return nil
+			}
+		}
 	}
 	if agent == "workbuddy" {
 		home, _ := os.UserHomeDir()
@@ -311,7 +343,10 @@ func Preflight(agent string, checkClient bool) error {
 			}
 		}
 	}
-	instructions := map[string]string{"claude": "https://code.claude.com/docs/en/setup", "codex": "https://developers.openai.com/codex/cli", "opencode": "https://opencode.ai/download", "pi": "https://pi.dev", "workbuddy": "https://www.workbuddy.cn", "deepseek-harness": "https://github.com/deepseek-ai/deepseek-harness"}
+	if agent == "codex" {
+		return errors.New("未检测到 Codex CLI 或桌面 App。请先安装并打开一次 App，或安装 CLI：https://developers.openai.com/codex/cli")
+	}
+	instructions := map[string]string{"claude": "https://code.claude.com/docs/en/setup", "opencode": "https://opencode.ai/download", "pi": "https://pi.dev", "workbuddy": "https://www.workbuddy.cn", "deepseek-harness": "https://github.com/deepseek-ai/deepseek-harness"}
 	return fmt.Errorf("install %s first: %s; reopen the terminal and generate a new command", agent, instructions[agent])
 }
 
