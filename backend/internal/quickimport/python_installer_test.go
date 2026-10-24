@@ -7,12 +7,16 @@ import (
 )
 
 func TestLegacyPythonInstallerNeverInjectsImageMCP(t *testing.T) {
-	python, err := exec.LookPath("python")
-	if err != nil {
-		python, err = exec.LookPath("python3")
+	python := ""
+	for _, name := range []string{"python3.11", "python", "python3"} {
+		candidate, err := exec.LookPath(name)
+		if err == nil && exec.Command(candidate, "-c", "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)").Run() == nil {
+			python = candidate
+			break
+		}
 	}
-	if err != nil {
-		t.Skip("Python is unavailable")
+	if python == "" {
+		t.Skip("legacy installer requires Python 3.11 or newer")
 	}
 	const script = `import runpy
 installer = runpy.run_path('assets/installer.py')
