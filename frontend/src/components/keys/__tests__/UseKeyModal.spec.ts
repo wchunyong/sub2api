@@ -57,13 +57,13 @@ describe('UseKeyModal', () => {
     })
 
     const clientTabs = () => wrapper.find('nav[aria-label="Client"]').text()
-    expect(clientTabs()).toContain('keys.useKeyModal.cliTabs.codexCli')
+    expect(clientTabs()).not.toContain('keys.useKeyModal.cliTabs.codexCli')
     expect(clientTabs()).toContain('keys.useKeyModal.cliTabs.opencode')
 
-    const codexTab = wrapper.find('nav[aria-label="Client"]').findAll('button').find(
-      (button) => button.text().includes('keys.useKeyModal.cliTabs.codexCli')
+    const openCodeTab = wrapper.find('nav[aria-label="Client"]').findAll('button').find(
+      (button) => button.text().includes('keys.useKeyModal.cliTabs.opencode')
     )
-    await codexTab!.trigger('click')
+    await openCodeTab!.trigger('click')
     await wrapper.setProps({ claudeCodeOnly: true })
 
     expect(clientTabs()).toContain('keys.useKeyModal.cliTabs.claudeCode')
@@ -318,66 +318,6 @@ describe('UseKeyModal', () => {
       expect.stringContaining('ANTHROPIC_AUTH_TOKEN="sk-grok-claude-test"'),
       'keys.copied'
     )
-  })
-
-  it('renders Codex custom provider setup through the Grok Responses gateway', async () => {
-    const wrapper = mount(UseKeyModal, {
-      props: {
-        show: true,
-        apiKey: 'sk-grok-codex-test',
-        baseUrl: 'https://example.com/v1',
-        platform: 'grok'
-      },
-      global: {
-        stubs: {
-          BaseDialog: {
-            template: '<div><slot /><slot name="footer" /></div>'
-          },
-          Icon: {
-            template: '<span />'
-          }
-        }
-      }
-    })
-
-    const codexTab = wrapper.findAll('button').find((button) =>
-      button.text().includes('keys.useKeyModal.cliTabs.codexCli')
-    )
-    expect(codexTab).toBeDefined()
-    await codexTab!.trigger('click')
-    await nextTick()
-
-    let codeBlocks = wrapper.findAll('pre code').map((code) => code.text())
-    const configToml = codeBlocks.find((content) => content.includes('[model_providers.sub2api]'))
-    expect(configToml).toBeDefined()
-    expect(configToml).toContain('model_provider = "sub2api"')
-    expect(configToml).toContain('model = "YOUR_AVAILABLE_MODEL_ID"')
-    expect(configToml).toContain('base_url = "https://example.com/v1"')
-    expect(configToml).toContain('env_key = "SUB2API_API_KEY"')
-    expect(configToml).toContain('wire_api = "responses"')
-    // API-key provider: Codex must not require a ChatGPT OAuth login.
-    expect(configToml).toContain('requires_openai_auth = false')
-    expect(configToml).toContain('supports_websockets = false')
-    expect(configToml).toContain('grok-4.20-multi-agent-0309 (text / web_search)')
-    expect(configToml).toContain('grok-imagine-image')
-    expect(configToml).toContain('grok-imagine-video')
-    // Hardcoded bearer is only a commented fallback when env cannot be set.
-    expect(configToml).toMatch(/# experimental_bearer_token = "sk-grok-codex-test"/)
-    expect(configToml).not.toContain('supports_websockets = true')
-    expect(configToml).not.toContain('responses_websockets_v2')
-    expect(wrapper.text()).not.toContain('auth.json')
-    expect(codeBlocks.join('\n')).toContain('SUB2API_API_KEY')
-
-    const windowsTab = wrapper.findAll('button').find(
-      (button) => button.text().trim() === 'Windows'
-    )
-    expect(windowsTab).toBeDefined()
-    await windowsTab!.trigger('click')
-    await nextTick()
-
-    codeBlocks = wrapper.findAll('pre code').map((code) => code.text())
-    expect(wrapper.text().toLowerCase()).toContain('%userprofile%\\.codex\\config.toml'.toLowerCase())
-    expect(codeBlocks.join('\n')).toContain('experimental_bearer_token = "sk-grok-codex-test"')
   })
 
   it('uses environment key authentication in OpenAI Codex config by default', () => {
@@ -927,7 +867,7 @@ describe('UseKeyModal', () => {
   })
 
   it.each(['anthropic', 'gemini', 'antigravity', 'grok', 'kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go'] as const)(
-    'offers Codex catalog configuration for the %s routed group',
+    'hides Codex setup for the %s group without a Codex model catalog',
     async (platform) => {
       const wrapper = mount(UseKeyModal, {
         props: {
@@ -951,18 +891,13 @@ describe('UseKeyModal', () => {
       const codexTab = wrapper.findAll('button').find((button) =>
         button.text().includes('keys.useKeyModal.cliTabs.codexCli')
       )
-      expect(codexTab).toBeDefined()
-      await codexTab!.trigger('click')
-      await nextTick()
+      expect(codexTab).toBeUndefined()
+      expect(wrapper.find('[data-testid="codex-model-catalog"]').exists()).toBe(false)
 
-      expect(wrapper.find('[data-testid="codex-model-catalog"]').exists()).toBe(true)
-      const config = wrapper.findAll('pre code')
-        .map((code) => code.text())
-        .find((content) => content.includes('[model_providers.sub2api]'))
-      expect(config).toContain('model_catalog_url = "https://example.com/v1/models"')
-      expect(config).not.toContain('model_catalog_json')
-      expect(config).toContain('base_url = "https://example.com/v1"')
-      expect(config).toContain('wire_api = "responses"')
+      await wrapper.setProps({ client: 'codex' })
+      expect(wrapper.find('[data-testid="codex-model-catalog"]').exists()).toBe(false)
+      expect(wrapper.findAll('pre code').map((code) => code.text()).join('\n'))
+        .not.toContain('[model_providers.sub2api]')
     }
   )
 

@@ -406,13 +406,24 @@ const defaultClientTab = computed(() => {
   }
 })
 
+function availableClientTab(requested?: string): string {
+  if (props.claudeCodeOnly) return 'claude'
+  if (requested === 'codex' && props.platform !== 'openai' && props.platform !== 'composite') {
+    return defaultClientTab.value
+  }
+  if (requested === 'codex-ws' && props.platform !== 'openai') {
+    return defaultClientTab.value
+  }
+  return requested || defaultClientTab.value
+}
+
 watch(() => [props.platform, props.claudeCodeOnly], () => {
   activeTab.value = 'unix'
-  activeClientTab.value = props.client || defaultClientTab.value
+  activeClientTab.value = availableClientTab(props.client)
   codexAuthMode.value = 'api-key'
 }, { immediate: true })
 
-watch(() => props.client, (client) => { activeClientTab.value = client || defaultClientTab.value })
+watch(() => props.client, (client) => { activeClientTab.value = availableClientTab(client) })
 
 watch(() => [props.show, props.baseUrl, props.apiKey, activeClientTab.value], async () => {
   claudeModelsController?.abort()
@@ -564,21 +575,18 @@ const clientTabs = computed((): TabConfig[] => {
     case 'gemini':
       return [
         { id: 'gemini', label: t('keys.useKeyModal.cliTabs.geminiCli'), icon: SparkleIcon },
-        { id: 'codex', label: t('keys.useKeyModal.cliTabs.codexCli'), icon: TerminalIcon },
         { id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon }
       ]
     case 'antigravity':
       return [
         { id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon },
         { id: 'gemini', label: t('keys.useKeyModal.cliTabs.geminiCli'), icon: SparkleIcon },
-        { id: 'codex', label: t('keys.useKeyModal.cliTabs.codexCli'), icon: TerminalIcon },
         { id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon }
       ]
     case 'grok':
       return [
         { id: 'grok', label: t('keys.useKeyModal.cliTabs.grokCli'), icon: TerminalIcon },
         { id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon },
-        { id: 'codex', label: t('keys.useKeyModal.cliTabs.codexCli'), icon: TerminalIcon },
         { id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon }
       ]
     case 'typesafe':
@@ -587,6 +595,10 @@ const clientTabs = computed((): TabConfig[] => {
       ]
     case 'deepseek':
     case 'minimax':
+      return [
+        { id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon },
+        { id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon }
+      ]
     case 'composite':
       return [
         { id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon },
@@ -596,7 +608,6 @@ const clientTabs = computed((): TabConfig[] => {
     default:
       return [
         { id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon },
-        { id: 'codex', label: t('keys.useKeyModal.cliTabs.codexCli'), icon: TerminalIcon },
         { id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon }
       ]
   }
