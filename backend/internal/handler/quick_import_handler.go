@@ -48,6 +48,10 @@ func (h *QuickImportHandler) Issue(c *gin.Context) {
 		response.BadRequest(c, "Invalid import request")
 		return
 	}
+	if strings.TrimSpace(request.Model) == "" {
+		response.BadRequest(c, "Select a model available to this API key")
+		return
+	}
 	key, ok := h.validKey(c.Request.Context(), request.KeyID, subject.UserID)
 	if !ok || key.Group.ClaudeCodeOnly && request.Agent != "claude" {
 		response.BadRequest(c, "Key is unavailable for import")

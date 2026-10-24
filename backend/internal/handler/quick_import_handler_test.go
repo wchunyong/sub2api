@@ -43,14 +43,17 @@ func TestQuickImportOwnershipRevocationAndExchange(t *testing.T) {
 		method(c)
 		return w
 	}
-	if w := request(h.Issue, `{"key_id":2,"agent":"opencode"}`, 3); w.Code == 200 {
+	if w := request(h.Issue, `{"key_id":2,"agent":"opencode","model":"gpt-5.5"}`, 3); w.Code == 200 {
 		t.Fatal("other user accepted")
 	}
 	if w := request(h.Issue, `{"key_id":2,"agent":"opencode"}`, 0); w.Code != 401 {
 		t.Fatal("missing authentication accepted")
 	}
+	if w := request(h.Issue, `{"key_id":2,"agent":"opencode"}`, 1); w.Code != 400 || !strings.Contains(w.Body.String(), "Select a model") {
+		t.Fatal("missing model did not get a clear validation error")
+	}
 	issue := func() string {
-		w := request(h.Issue, `{"key_id":2,"agent":"opencode"}`, 1)
+		w := request(h.Issue, `{"key_id":2,"agent":"opencode","model":"gpt-5.5"}`, 1)
 		if w.Code != 200 {
 			t.Fatalf("issue: %d %s", w.Code, w.Body.String())
 		}
@@ -94,7 +97,7 @@ func TestQuickImportOwnershipRevocationAndExchange(t *testing.T) {
 	}
 	keys.key.Status = service.StatusActive
 	keys.key.Group.ClaudeCodeOnly = true
-	if w = request(h.Issue, `{"key_id":2,"agent":"codex"}`, 1); w.Code == 200 {
+	if w = request(h.Issue, `{"key_id":2,"agent":"codex","model":"gpt-5.5"}`, 1); w.Code == 200 {
 		t.Fatal("Claude-only group accepted a Codex import")
 	}
 	keys.key.Group.ClaudeCodeOnly = false

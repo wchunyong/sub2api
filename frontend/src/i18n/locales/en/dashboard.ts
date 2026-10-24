@@ -185,7 +185,7 @@ export default {
       cleanHint: 'Undo the most recent import for this Agent only. Other Agents and later edits are preserved. Confirm in the terminal. Works offline without an active key.',
       runtimeHint: 'No Python required. The verified native helper is downloaded on first use. The script backs up and merges configuration. Restart your client afterwards.',
       system: 'Operating system',
-      model: 'Model (optional)',
+      model: 'Model (required)',
       modelHint: 'Leave empty for the group default',
       generating: 'Generating…',
       generate: 'Generate setup command',

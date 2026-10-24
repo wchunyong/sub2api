@@ -28,18 +28,15 @@ func BuildConfig(agent, platform string, messages bool, baseURL, apiKey, model s
 	if agent != "claude" && agent != "codex" && agent != "opencode" && agent != "workbuddy" && agent != "pi" && agent != "deepseek-harness" {
 		return Config{}, fail
 	}
-	defaults := map[string]string{"openai": "gpt-5.5", "anthropic": "claude-sonnet-4-6", "antigravity": "claude-sonnet-4-6", "gemini": "gemini-2.5-pro", "deepseek": "deepseek-v4-pro", "grok": "grok-4.5", "kimi": "kimi-k2.5", "zhipu": "glm-4.7", "composite": "gpt-5.5"}
-	fallback, ok := defaults[platform]
+	platforms := map[string]bool{"openai": true, "anthropic": true, "antigravity": true, "gemini": true, "deepseek": true, "grok": true, "kimi": true, "zhipu": true, "composite": true}
+	_, ok := platforms[platform]
 	if !ok {
 		return Config{}, fail
 	}
 	if agent == "claude" && (platform == "gemini" || platform == "openai" && !messages) {
 		return Config{}, fail
 	}
-	if model == "" {
-		model = fallback
-	}
-	if len(model) > 200 || strings.ContainsAny(model, "\r\n\x00") {
+	if strings.TrimSpace(model) == "" || len(model) > 200 || strings.ContainsAny(model, "\r\n\x00") {
 		return Config{}, fail
 	}
 	parsed, err := url.Parse(baseURL)

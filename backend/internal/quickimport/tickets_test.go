@@ -51,8 +51,8 @@ func TestTicketExpiryAndAtomicConsumption(t *testing.T) {
 
 func TestConfigTargets(t *testing.T) {
 	for _, agent := range []string{"claude", "codex", "opencode", "deepseek-harness", "workbuddy", "pi"} {
-		c, err := BuildConfig(agent, "deepseek", false, "https://example.com/v1", "mock-key", "")
-		if err != nil || c.Agent != agent || c.Model != "deepseek-v4-pro" {
+		c, err := BuildConfig(agent, "deepseek", false, "https://example.com/v1", "mock-key", "deepseek-chat")
+		if err != nil || c.Agent != agent || c.Model != "deepseek-chat" {
 			t.Fatalf("%s: %#v %v", agent, c, err)
 		}
 		expectedBase := "https://example.com/v1"
@@ -69,20 +69,23 @@ func TestConfigTargets(t *testing.T) {
 			t.Fatalf("%s: wrong protocol: %#v", agent, c)
 		}
 	}
+	if _, err := BuildConfig("workbuddy", "deepseek", false, "https://example.com/v1", "mock-key", ""); err == nil {
+		t.Fatal("missing model silently selected a potentially unavailable default")
+	}
 	if _, err := BuildConfig("claude", "openai", false, "https://example.com", "mock-key", ""); err == nil {
 		t.Fatal("unsupported messages dispatch accepted")
 	}
 	if _, err := BuildConfig("chatgpt", "openai", false, "https://example.com", "mock-key", ""); err == nil {
 		t.Fatal("unknown agent accepted")
 	}
-	c, err := BuildConfig("opencode", "gemini", false, "https://example.com/v1", "mock-key", "")
+	c, err := BuildConfig("opencode", "gemini", false, "https://example.com/v1", "mock-key", "gemini-2.5-pro")
 	if err != nil || c.BaseURL != "https://example.com/v1beta" {
 		t.Fatalf("bad gemini endpoint: %#v %v", c, err)
 	}
 	if c.MCPEndpoint != "https://example.com/mcp" {
 		t.Fatalf("bad MCP endpoint for gemini payload: %#v", c)
 	}
-	c, err = BuildConfig("opencode", "antigravity", false, "https://example.com/v1", "mock-key", "")
+	c, err = BuildConfig("opencode", "antigravity", false, "https://example.com/v1", "mock-key", "claude-sonnet-4-5")
 	if err != nil || c.BaseURL != "https://example.com/antigravity/v1" || c.MCPEndpoint != "https://example.com/mcp" {
 		t.Fatalf("bad antigravity payload: %#v %v", c, err)
 	}

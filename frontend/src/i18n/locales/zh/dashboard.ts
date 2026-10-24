@@ -185,7 +185,7 @@ export default {
       cleanHint: '仅撤销所选 Agent 最近一次由本工具导入的配置。保留其他 Agent 和后续修改；终端将请求确认。无需网站在线或有效密钥。',
       runtimeHint: '无需 Python。首次执行会下载并校验导入工具。脚本会备份原配置并合并写入，完成后重启客户端。',
       system: '操作系统',
-      model: '模型（可选）',
+      model: '模型（必选）',
       modelHint: '留空使用当前分组默认模型',
       generating: '正在生成…',
       generate: '生成配置命令',
