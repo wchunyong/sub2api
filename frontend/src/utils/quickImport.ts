@@ -11,7 +11,7 @@ export const importAgents: { id: ImportAgent; name: string }[] = [
 // Only rule out unmistakable non-chat families; aliases and unknown names remain selectable.
 export function isClearlyNonChatModel(model: string): boolean {
   const id = model.trim().toLowerCase().split('/').pop() || ''
-  return /^(?:gpt-image-|dall-e-|grok-imagine(?:-|$)|imagen-|veo-|sora-|text-embedding-|whisper(?:-|$)|tts-|gpt-audio(?:-|$)|gpt-realtime(?:-|$)|omni-moderation(?:-|$)|text-moderation(?:-|$))/.test(id) ||
+  return /^(?:gpt-image-|dall-e-|grok-imagine(?:-|$)|imagen-|veo-|sora-|text-embedding-|whisper(?:-|$)|tts-|gpt-transcribe(?:-|$)|gpt-live-transcribe(?:-|$)|gpt-realtime-whisper(?:-|$)|gpt-4o(?:-mini)?-(?:transcribe|tts)(?:-|$)|omni-moderation(?:-|$)|text-moderation(?:-|$))/.test(id) ||
     /^gemini-.*-image(?:-|$)/.test(id) || /^gemini-nano-banana(?:-|$)/.test(id)
 }
 export function supportsAgent(agent: ImportAgent, platform: GroupPlatform | null, messages = false): boolean {

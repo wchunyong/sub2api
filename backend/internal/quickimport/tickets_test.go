@@ -86,6 +86,9 @@ func TestConfigTargets(t *testing.T) {
 			t.Fatalf("non-chat model %q accepted for coding assistant", model)
 		}
 	}
+	if _, err := BuildConfig("workbuddy", "openai", false, "https://example.com/v1", "mock-key", "gpt-audio"); err != nil {
+		t.Fatalf("chat-capable audio model was rejected by a name-only filter: %v", err)
+	}
 	if _, err := BuildConfig("claude", "openai", false, "https://example.com", "mock-key", ""); err == nil {
 		t.Fatal("unsupported messages dispatch accepted")
 	}

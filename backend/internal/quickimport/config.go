@@ -33,12 +33,12 @@ func IsClearlyNonChatModel(model string) bool {
 	if slash := strings.LastIndexByte(id, '/'); slash >= 0 {
 		id = id[slash+1:]
 	}
-	for _, prefix := range []string{"gpt-image-", "dall-e-", "grok-imagine-", "imagen-", "veo-", "sora-", "text-embedding-", "whisper-", "tts-", "gpt-audio-", "gpt-realtime-", "omni-moderation-", "text-moderation-", "gemini-nano-banana-"} {
+	for _, prefix := range []string{"gpt-image-", "dall-e-", "grok-imagine-", "imagen-", "veo-", "sora-", "text-embedding-", "whisper-", "tts-", "gpt-transcribe-", "gpt-live-transcribe-", "gpt-realtime-whisper-", "gpt-4o-transcribe-", "gpt-4o-mini-transcribe-", "gpt-4o-mini-tts-", "omni-moderation-", "text-moderation-", "gemini-nano-banana-"} {
 		if strings.HasPrefix(id, prefix) {
 			return true
 		}
 	}
-	for _, exact := range []string{"grok-imagine", "whisper", "gpt-audio", "gpt-realtime", "omni-moderation", "text-moderation", "gemini-nano-banana"} {
+	for _, exact := range []string{"grok-imagine", "whisper", "gpt-transcribe", "gpt-live-transcribe", "gpt-realtime-whisper", "gpt-4o-transcribe", "gpt-4o-mini-transcribe", "gpt-4o-mini-tts", "omni-moderation", "text-moderation", "gemini-nano-banana"} {
 		if id == exact {
 			return true
 		}
