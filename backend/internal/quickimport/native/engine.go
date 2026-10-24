@@ -126,8 +126,14 @@ func ResolveDSHProfile(root, requested string) (string, error) {
 		return requested, nil
 	}
 	profiles := filepath.Join(root, ".dsh", "profiles")
-	_, webErr := os.Stat(filepath.Join(profiles, "web"))
-	_, desktopErr := os.Stat(filepath.Join(profiles, "desktop"))
+	webInfo, webErr := os.Stat(filepath.Join(profiles, "web"))
+	desktopInfo, desktopErr := os.Stat(filepath.Join(profiles, "desktop"))
+	if webErr == nil && !webInfo.IsDir() {
+		return "", errors.New("DeepSeek Harness web profile path is not a directory")
+	}
+	if desktopErr == nil && !desktopInfo.IsDir() {
+		return "", errors.New("DeepSeek Harness desktop profile path is not a directory")
+	}
 	if webErr == nil && desktopErr == nil {
 		return "", ErrDSHAmbiguousProfile
 	}
