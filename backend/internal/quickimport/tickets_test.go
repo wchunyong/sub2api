@@ -81,6 +81,11 @@ func TestConfigTargets(t *testing.T) {
 	if _, err := BuildConfig("workbuddy", "deepseek", false, "https://example.com/v1", "mock-key", ""); err == nil {
 		t.Fatal("missing model silently selected a potentially unavailable default")
 	}
+	for _, model := range []string{"gpt-image-1", "models/gemini-3.1-flash-image", "grok-imagine-image", "text-embedding-3-large"} {
+		if _, err := BuildConfig("workbuddy", "deepseek", false, "https://example.com/v1", "mock-key", model); err == nil {
+			t.Fatalf("non-chat model %q accepted for coding assistant", model)
+		}
+	}
 	if _, err := BuildConfig("claude", "openai", false, "https://example.com", "mock-key", ""); err == nil {
 		t.Fatal("unsupported messages dispatch accepted")
 	}

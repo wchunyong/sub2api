@@ -118,8 +118,8 @@
             <option value="">{{ t('keys.quickImport.chooseModel') }}</option>
             <option v-for="model in claudeModels" :key="model" :value="model">{{ model }}</option>
           </select>
-          <input v-else id="claude-model" v-model.trim="selectedClaudeModel" class="input w-full" :placeholder="t('keys.useKeyModal.claudeModelPlaceholder')" />
-          <p class="mt-1 text-xs text-gray-500">{{ t(claudeModels.length ? 'keys.useKeyModal.claudeModelHint' : 'keys.useKeyModal.claudeModelFallback') }}</p>
+          <input v-else id="claude-model" v-model.trim="selectedClaudeModel" class="input w-full" :disabled="claudeOnlyNonChatModels" :placeholder="t('keys.useKeyModal.claudeModelPlaceholder')" />
+          <p class="mt-1 text-xs text-gray-500">{{ t(claudeOnlyNonChatModels ? 'keys.quickImport.modelNoChatAvailable' : claudeModels.length ? 'keys.useKeyModal.claudeModelHint' : 'keys.useKeyModal.claudeModelFallback') }}</p>
         </div>
         <div v-if="activeClientTab === 'codex' || activeClientTab === 'codex-ws' || activeClientTab === 'opencode'" class="rounded-lg border border-gray-200 p-3 dark:border-dark-700">
           <label for="manual-model" class="mb-1 block text-sm font-medium">{{ t('keys.quickImport.model') }}</label>
@@ -127,10 +127,10 @@
             <option value="">{{ t('keys.quickImport.chooseModel') }}</option>
             <option v-for="model in manualModels" :key="model" :value="model">{{ model }}</option>
           </select>
-          <input v-else id="manual-model" v-model.trim="selectedManualModel" class="input w-full" :placeholder="t('keys.quickImport.modelPlaceholder')" />
-          <p class="mt-1 text-xs text-gray-500">{{ t(manualModels.length ? 'keys.quickImport.modelFromKey' : 'keys.quickImport.modelUnavailable') }}</p>
+          <input v-else id="manual-model" v-model.trim="selectedManualModel" class="input w-full" :disabled="manualOnlyNonChatModels" :placeholder="t('keys.quickImport.modelPlaceholder')" />
+          <p class="mt-1 text-xs text-gray-500">{{ t(manualOnlyNonChatModels ? 'keys.quickImport.modelNoChatAvailable' : manualModels.length ? 'keys.quickImport.modelFromKey' : 'keys.quickImport.modelUnavailable') }}</p>
         </div>
-        <p v-if="!manualModelReady" class="text-sm text-amber-700 dark:text-amber-300" data-testid="manual-model-required">{{ t('keys.useKeyModal.selectModelBeforeCopy') }}</p>
+        <p v-if="!manualModelReady" class="text-sm text-amber-700 dark:text-amber-300" data-testid="manual-model-required">{{ t(currentOnlyNonChatModels ? 'keys.quickImport.modelNoChatAvailable' : manualModelIsNonChat ? 'keys.quickImport.modelNotChat' : 'keys.useKeyModal.selectModelBeforeCopy') }}</p>
 
         <!-- OS/Shell Tabs -->
         <div v-if="showShellTabs" class="overflow-x-auto border-b border-gray-200 dark:border-dark-700">
@@ -297,6 +297,7 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { buildCodexModelCatalogUrl, buildCodexModelsManifestUrl, fetchCodexModelsManifest } from '@/api/codex'
+import { isClearlyNonChatModel } from '@/utils/quickImport'
 import type { GroupPlatform } from '@/types'
 import {
   findCodexCatalogModel,
@@ -341,18 +342,22 @@ const { copyToClipboard: clipboardCopy } = useClipboard()
 
 const copiedIndex = ref<number | null>(null)
 const claudeModels = ref<string[]>([])
+const claudeOnlyNonChatModels = ref(false)
 const selectedClaudeModel = ref('')
 const claudeModelsLoading = ref(false)
 let claudeModelsController: AbortController | null = null
 const manualModels = ref<string[]>([])
+const manualOnlyNonChatModels = ref(false)
 const selectedManualModel = ref('')
 const manualModelsLoading = ref(false)
 let manualModelsController: AbortController | null = null
+const currentOnlyNonChatModels = computed(() => activeClientTab.value === 'claude' ? claudeOnlyNonChatModels.value : manualOnlyNonChatModels.value)
+const manualModelIsNonChat = computed(() => isClearlyNonChatModel(activeClientTab.value === 'claude' ? selectedClaudeModel.value : selectedManualModel.value))
 const manualModelReady = computed(() => {
   const model = activeClientTab.value === 'claude' ? selectedClaudeModel.value : selectedManualModel.value
   const loading = activeClientTab.value === 'claude' ? claudeModelsLoading.value : manualModelsLoading.value
   if (!['claude', 'codex', 'codex-ws', 'opencode'].includes(activeClientTab.value)) return true
-  if (loading || !/^[A-Za-z0-9_.:/-]+$/.test(model)) return false
+  if (loading || currentOnlyNonChatModels.value || !/^[A-Za-z0-9_.:/-]+$/.test(model) || manualModelIsNonChat.value) return false
   if (['codex', 'codex-ws'].includes(activeClientTab.value) && codexCatalogModelSlugs.value.length) {
     return codexCatalogModelSlugs.value.includes(model)
   }
@@ -438,6 +443,7 @@ watch(() => props.client, (client) => { activeClientTab.value = availableClientT
 watch(() => [props.show, props.baseUrl, props.apiKey, activeClientTab.value], async () => {
   claudeModelsController?.abort()
   claudeModels.value = []
+  claudeOnlyNonChatModels.value = false
   selectedClaudeModel.value = ''
   claudeModelsLoading.value = false
   if (!props.show || activeClientTab.value !== 'claude' || !props.apiKey) return
@@ -453,7 +459,8 @@ watch(() => [props.show, props.baseUrl, props.apiKey, activeClientTab.value], as
     const body = await response.json() as { data?: Array<{ id?: string }> }
     if (controller.signal.aborted || !Array.isArray(body.data)) return
     const names = body.data.map(item => item.id).filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9_.:/-]+$/.test(id))
-    claudeModels.value = [...new Set(names)]
+    claudeModels.value = [...new Set(names.filter(id => !isClearlyNonChatModel(id)))]
+    claudeOnlyNonChatModels.value = names.length > 0 && claudeModels.value.length === 0
     if (claudeModels.value.length) selectedClaudeModel.value = ''
   } catch { /* Manual entry remains available when model discovery fails. */ }
   finally { if (claudeModelsController === controller) claudeModelsLoading.value = false }
@@ -462,6 +469,7 @@ watch(() => [props.show, props.baseUrl, props.apiKey, activeClientTab.value], as
 watch(() => [props.show, props.baseUrl, props.apiKey, activeClientTab.value], async () => {
   manualModelsController?.abort()
   manualModels.value = []
+  manualOnlyNonChatModels.value = false
   selectedManualModel.value = ''
   manualModelsLoading.value = false
   if (!props.show || !['codex', 'codex-ws', 'opencode'].includes(activeClientTab.value) || !props.apiKey) return
@@ -482,7 +490,9 @@ watch(() => [props.show, props.baseUrl, props.apiKey, activeClientTab.value], as
       : typeof body === 'object' && body !== null && 'data' in body && Array.isArray(body.data)
         ? body.data.map((item: { id?: string }) => item?.id)
         : []
-    manualModels.value = [...new Set(names.filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9_.:/-]+$/.test(id)))]
+    const validNames = names.filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9_.:/-]+$/.test(id))
+    manualModels.value = [...new Set(validNames.filter(id => !isClearlyNonChatModel(id)))]
+    manualOnlyNonChatModels.value = validNames.length > 0 && manualModels.value.length === 0
     if (manualModels.value.length) selectedManualModel.value = ''
   } catch { /* Manual model entry remains available. */ }
   finally { if (manualModelsController === controller) manualModelsLoading.value = false }

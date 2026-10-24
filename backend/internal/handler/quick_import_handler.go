@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -68,6 +69,10 @@ func (h *QuickImportHandler) Issue(c *gin.Context) {
 	}
 	config, err := quickimport.BuildConfig(request.Agent, key.Group.Platform, key.Group.AllowMessagesDispatch, base, key.Key, request.Model)
 	if err != nil {
+		if errors.Is(err, quickimport.ErrNonChatModel) {
+			response.BadRequest(c, "Choose a chat model; media and embedding models cannot configure a coding agent")
+			return
+		}
 		response.BadRequest(c, "Unsupported Agent or group; configure an HTTPS API base URL")
 		return
 	}
@@ -101,6 +106,10 @@ func (h *QuickImportHandler) Exchange(c *gin.Context) {
 	}
 	config, err := quickimport.BuildConfig(ticket.Agent, key.Group.Platform, key.Group.AllowMessagesDispatch, ticket.BaseURL, key.Key, ticket.Model)
 	if err != nil {
+		if errors.Is(err, quickimport.ErrNonChatModel) {
+			response.BadRequest(c, "Choose a chat model; media and embedding models cannot configure a coding agent")
+			return
+		}
 		response.BadRequest(c, "Group no longer supports this Agent")
 		return
 	}

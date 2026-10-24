@@ -293,6 +293,25 @@ func TestClaudeImportPinsEveryModelRoute(t *testing.T) {
 	}
 }
 
+func TestImportCatalogOmitsDedicatedMediaModels(t *testing.T) {
+	for _, agent := range []string{"claude", "opencode"} {
+		t.Run(agent, func(t *testing.T) {
+			root := t.TempDir()
+			p := Payload{Version: 1, Agent: agent, APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "deepseek-chat", ClaudeModelPickerSupported: true, Models: []Model{{ID: "deepseek-chat"}, {ID: "gpt-image-1"}}}
+			if err := Install(root, p); err != nil {
+				t.Fatal(err)
+			}
+			content, err := os.ReadFile(filepath.Join(root, paths[agent]))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(string(content), "gpt-image-1") {
+				t.Fatalf("media model was offered as a coding model: %s", content)
+			}
+		})
+	}
+}
+
 func TestStrictJSONTrailingValue(t *testing.T) {
 	if _, err := load(`{} {}`, "claude"); err == nil {
 		t.Fatal("accepted trailing config JSON")

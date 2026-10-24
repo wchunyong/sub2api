@@ -176,6 +176,8 @@ export default {
       modelLoading: 'Loading models available to this key…',
       modelFromKey: 'This list comes from the current key. Choose a coding model supported by the client.',
       modelUnavailable: 'Could not load models. Check the complete available model ID on the Models page.',
+      modelNotChat: 'This ID is for image, audio, video, or embedding tasks. Choose a chat model for a coding agent.',
+      modelNoChatAvailable: 'This key has no chat models for coding agents. Choose another group or create a key with chat model access.',
       directHint: 'System detected automatically · Paste into your terminal to run',
       importCopied: 'Import command copied. Paste into your terminal within 5 minutes.',
       cleanCopied: 'Cleanup command copied. Run in the original import environment.',

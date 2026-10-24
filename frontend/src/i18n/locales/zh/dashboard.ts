@@ -176,6 +176,8 @@ export default {
       modelLoading: '正在读取这把密钥可用的模型…',
       modelFromKey: '模型列表来自当前密钥；请按目标工具选择支持的编程模型。',
       modelUnavailable: '无法读取模型列表。请到模型页确认当前密钥可用的完整模型 ID。',
+      modelNotChat: '这个 ID 对应生图、语音、视频或向量模型，不能用于编程助手；请选择对话模型。',
+      modelNoChatAvailable: '这把 Key 的列表里没有适合编程助手的对话模型，请更换分组或创建能访问对话模型的 Key。',
       directHint: '自动适配当前系统 · 复制后粘贴到终端执行',
       importCopied: '已复制导入命令，请在 5 分钟内粘贴到终端执行。',
       cleanCopied: '已复制清理命令，请在原导入环境的终端执行。',

@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/quickimport"
 	"github.com/pelletier/go-toml/v2"
 	"gopkg.in/yaml.v3"
 )
@@ -501,7 +502,7 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 				valid = false
 			}
 		}
-		if !valid || seen[m.ID] {
+		if !valid || seen[m.ID] || quickimport.IsClearlyNonChatModel(m.ID) {
 			continue
 		}
 		seen[m.ID] = true

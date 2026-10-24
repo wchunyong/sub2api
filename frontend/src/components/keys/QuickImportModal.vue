@@ -21,8 +21,8 @@
               <option value="">{{ t('keys.quickImport.chooseModel') }}</option>
               <option v-for="model in modelChoices" :key="model" :value="model">{{ model }}</option>
             </select>
-            <input v-else id="quick-import-model" v-model.trim="selectedModel" class="input" :placeholder="t('keys.quickImport.modelPlaceholder')" />
-            <small>{{ t(modelLoading ? 'keys.quickImport.modelLoading' : modelChoices.length ? 'keys.quickImport.modelFromKey' : 'keys.quickImport.modelUnavailable') }}</small>
+            <input v-else id="quick-import-model" v-model.trim="selectedModel" class="input" :disabled="modelListOnlyNonChat" :placeholder="t('keys.quickImport.modelPlaceholder')" />
+            <small>{{ t(modelListOnlyNonChat ? 'keys.quickImport.modelNoChatAvailable' : modelIsNonChat ? 'keys.quickImport.modelNotChat' : modelLoading ? 'keys.quickImport.modelLoading' : modelChoices.length ? 'keys.quickImport.modelFromKey' : 'keys.quickImport.modelUnavailable') }}</small>
           </div>
           <div class="qi-actions">
             <div class="qi-choice qi-choice-main"><span class="qi-corner"><span>{{ t('keys.quickImport.recommended') }}</span></span><button class="qi-help" :aria-expanded="help === 'import'" @click="help = help === 'import' ? '' : 'import'">{{ t('keys.quickImport.operationHelp') }} ⓘ</button>
@@ -57,7 +57,7 @@ import chatgptIcon from '@/assets/agents/chatgpt.png'
 import opencodeIcon from '@/assets/agents/opencode.png'
 import UseKeyModal from './UseKeyModal.vue'
 import type { GroupPlatform } from '@/types'
-import { importAgents, supportsAgent, supportsCcs, type ImportAgent } from '@/utils/quickImport'
+import { importAgents, isClearlyNonChatModel, supportsAgent, supportsCcs, type ImportAgent } from '@/utils/quickImport'
 import { buildCcSwitchImportDeeplink, CC_SWITCH_USAGE_SCRIPT } from '@/utils/ccswitchImport'
 import { automaticAgent, cleanupCommand, importCommand, type ImportOS } from '@/utils/quickImportCommands'
 import { createImportTicket, importServer } from '@/api/quickImport'
@@ -80,13 +80,16 @@ const error = ref('')
 const loading = ref(false)
 const copied = ref<'import' | 'clean' | ''>('')
 const modelChoices = ref<string[]>([])
+const modelListOnlyNonChat = ref(false)
 const selectedModel = ref('')
 const modelLoading = ref(false)
-const validModel = computed(() => !modelLoading.value && /^[A-Za-z0-9_.:/-]+$/.test(selectedModel.value))
+const modelIsNonChat = computed(() => isClearlyNonChatModel(selectedModel.value))
+const validModel = computed(() => !modelLoading.value && !modelListOnlyNonChat.value && /^[A-Za-z0-9_.:/-]+$/.test(selectedModel.value) && !modelIsNonChat.value)
 let modelController: AbortController | undefined
 watch([agent, () => props.show, () => props.apiKey, () => props.baseUrl], async () => {
   modelController?.abort()
   modelChoices.value = []
+  modelListOnlyNonChat.value = false
   selectedModel.value = ''
   modelLoading.value = false
   if (!agent.value || !props.show || !props.apiKey) return
@@ -105,7 +108,9 @@ watch([agent, () => props.show, () => props.apiKey, () => props.baseUrl], async 
       : typeof body === 'object' && body !== null && 'data' in body && Array.isArray(body.data)
         ? body.data.map((item: { id?: string }) => item?.id)
         : []
-    modelChoices.value = [...new Set(names.filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9_.:/-]+$/.test(id)))]
+    const validNames = names.filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9_.:/-]+$/.test(id))
+    modelChoices.value = [...new Set(validNames.filter(id => !isClearlyNonChatModel(id)))]
+    modelListOnlyNonChat.value = validNames.length > 0 && modelChoices.value.length === 0
     if (modelChoices.value.length) selectedModel.value = ''
   } catch { /* Manual model entry remains available. */ }
   finally {

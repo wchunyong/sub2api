@@ -6,6 +6,14 @@ export const importAgents: { id: ImportAgent; name: string }[] = [
   { id: 'deepseek-harness', name: 'DeepSeek Harness' }, { id: 'workbuddy', name: 'WorkBuddy' },
   { id: 'opencode', name: 'OpenCode' }, { id: 'pi', name: 'Pi' }
 ]
+
+// /v1/models reports models available to a key, including dedicated media APIs.
+// Only rule out unmistakable non-chat families; aliases and unknown names remain selectable.
+export function isClearlyNonChatModel(model: string): boolean {
+  const id = model.trim().toLowerCase().split('/').pop() || ''
+  return /^(?:gpt-image-|dall-e-|grok-imagine(?:-|$)|imagen-|veo-|sora-|text-embedding-|whisper(?:-|$)|tts-|gpt-audio(?:-|$)|gpt-realtime(?:-|$)|omni-moderation(?:-|$)|text-moderation(?:-|$))/.test(id) ||
+    /^gemini-.*-image(?:-|$)/.test(id) || /^gemini-nano-banana(?:-|$)/.test(id)
+}
 export function supportsAgent(agent: ImportAgent, platform: GroupPlatform | null, messages = false): boolean {
   if (!platform || !['openai', 'anthropic', 'antigravity', 'gemini', 'deepseek', 'grok', 'kimi', 'zhipu', 'composite'].includes(platform)) return false
   if (agent === 'codex-ws') return platform === 'openai'

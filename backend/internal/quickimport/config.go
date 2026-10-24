@@ -24,6 +24,28 @@ type Config struct {
 	MCPEndpoint string `json:"mcp_endpoint,omitempty"`
 }
 
+var ErrNonChatModel = errors.New("select a chat model for a coding agent")
+
+// /v1/models includes dedicated media and embedding APIs. Keep this list
+// conservative: unfamiliar names and user-defined aliases remain available.
+func IsClearlyNonChatModel(model string) bool {
+	id := strings.ToLower(strings.TrimSpace(model))
+	if slash := strings.LastIndexByte(id, '/'); slash >= 0 {
+		id = id[slash+1:]
+	}
+	for _, prefix := range []string{"gpt-image-", "dall-e-", "grok-imagine-", "imagen-", "veo-", "sora-", "text-embedding-", "whisper-", "tts-", "gpt-audio-", "gpt-realtime-", "omni-moderation-", "text-moderation-", "gemini-nano-banana-"} {
+		if strings.HasPrefix(id, prefix) {
+			return true
+		}
+	}
+	for _, exact := range []string{"grok-imagine", "whisper", "gpt-audio", "gpt-realtime", "omni-moderation", "text-moderation", "gemini-nano-banana"} {
+		if id == exact {
+			return true
+		}
+	}
+	return strings.HasPrefix(id, "gemini-") && (strings.Contains(id, "-image-") || strings.HasSuffix(id, "-image"))
+}
+
 func BuildConfig(agent, platform string, messages bool, baseURL, apiKey, model string) (Config, error) {
 	fail := errors.New("unsupported Agent, group or gateway configuration")
 	if agent != "claude" && agent != "codex" && agent != "opencode" && agent != "workbuddy" && agent != "pi" && agent != "deepseek-harness" {
@@ -42,6 +64,9 @@ func BuildConfig(agent, platform string, messages bool, baseURL, apiKey, model s
 	}
 	if strings.TrimSpace(model) == "" || len(model) > 200 || strings.ContainsAny(model, "\r\n\x00") {
 		return Config{}, fail
+	}
+	if IsClearlyNonChatModel(model) {
+		return Config{}, ErrNonChatModel
 	}
 	parsed, err := url.Parse(baseURL)
 	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {

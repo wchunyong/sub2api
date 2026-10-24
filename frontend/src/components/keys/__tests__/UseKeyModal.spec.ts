@@ -1097,7 +1097,7 @@ describe('UseKeyModal', () => {
       global: { stubs: { BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' }, Icon: { template: '<span />' } } }
     })
     await flushPromises()
-    expect(wrapper.get('#claude-model').findAll('option').map(option => option.attributes('value'))).toEqual(['', 'gpt-image-1', 'claude-sonnet-example'])
+    expect(wrapper.get('#claude-model').findAll('option').map(option => option.attributes('value'))).toEqual(['', 'claude-sonnet-example'])
     expect((wrapper.get('#claude-model').element as HTMLSelectElement).value).toBe('')
     expect(wrapper.get('[data-testid="manual-model-required"]').exists()).toBe(true)
     await wrapper.get('#claude-model').setValue('claude-sonnet-example')
@@ -1107,6 +1107,18 @@ describe('UseKeyModal', () => {
     for (const name of ['ANTHROPIC_MODEL', 'ANTHROPIC_DEFAULT_OPUS_MODEL', 'ANTHROPIC_DEFAULT_SONNET_MODEL', 'ANTHROPIC_DEFAULT_HAIKU_MODEL', 'ANTHROPIC_DEFAULT_FABLE_MODEL', 'CLAUDE_CODE_SUBAGENT_MODEL', 'ANTHROPIC_CUSTOM_MODEL_OPTION']) {
       expect(env[name]).toBe('claude-sonnet-example')
     }
+    wrapper.unmount()
+  })
+
+  it('does not offer manual Claude settings when the key only lists media models', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [{ id: 'gpt-image-1' }] }) }))
+    const wrapper = mount(UseKeyModal, {
+      props: { show: true, client: 'claude', apiKey: 'sk-test', baseUrl: 'https://example.com', platform: 'anthropic' },
+      global: { stubs: { BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' }, Icon: { template: '<span />' } } }
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('keys.quickImport.modelNoChatAvailable')
+    expect(wrapper.get('#claude-model').attributes('disabled')).toBeDefined()
     wrapper.unmount()
   })
 
