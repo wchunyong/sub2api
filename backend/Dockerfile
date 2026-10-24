@@ -14,6 +14,9 @@ RUN go mod download
 # 复制源代码
 COPY . .
 
+# 先生成并嵌入六个平台的快速导入工具。
+RUN go run ./cmd/build-quick-import
+
 # 构建应用
 RUN VERSION_VALUE="$(./scripts/resolve-version.sh)" && \
     go build -ldflags="-s -w -X main.Version=${VERSION_VALUE}" -o main ./cmd/server/
