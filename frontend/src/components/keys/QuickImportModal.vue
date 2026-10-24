@@ -30,7 +30,7 @@
               <button data-testid="clean" class="qi-clean" :disabled="!automaticAgent(agent)" @click="clean"><Icon name="refresh" size="xs" />{{ t(copied === 'clean' ? 'keys.useKeyModal.copied' : 'keys.quickImport.copyClean') }}</button>
             </div>
             <div v-if="!hideCcs && supportsCcs(agent, platform)" class="qi-choice"><span class="qi-corner"><span>{{ t('keys.quickImport.recommended') }}</span></span><button class="qi-help" :aria-expanded="help === 'ccs'" @click="help = help === 'ccs' ? '' : 'ccs'">{{ t('keys.quickImport.operationHelp') }} ⓘ</button>
-              <button data-testid="ccs" class="qi-action" :disabled="!compatible || !supportsCcs(agent, platform)" @click="openCcs"><Icon name="externalLink" size="lg" /><strong>{{ t('keys.importToCcSwitch') }}</strong><small>{{ t(supportsCcs(agent, platform) ? 'keys.quickImport.ccsHint' : 'keys.quickImport.ccsUnavailable') }}</small></button>
+              <button data-testid="ccs" class="qi-action" :disabled="!compatible || !validModel || !supportsCcs(agent, platform)" @click="openCcs"><Icon name="externalLink" size="lg" /><strong>{{ t('keys.importToCcSwitch') }}</strong><small>{{ t(supportsCcs(agent, platform) ? 'keys.quickImport.ccsHint' : 'keys.quickImport.ccsUnavailable') }}</small></button>
             </div>
             <div class="qi-choice"><button class="qi-help" :aria-expanded="help === 'manual'" @click="help = help === 'manual' ? '' : 'manual'">{{ t('keys.quickImport.operationHelp') }} ⓘ</button><button data-testid="manual" class="qi-action" :disabled="!compatible" @click="openManual"><Icon name="cog" size="lg" /><strong>{{ t('keys.quickImport.manual') }}</strong><small>{{ t('keys.quickImport.manualHint') }}</small></button></div>
           </div>
@@ -58,7 +58,7 @@ import opencodeIcon from '@/assets/agents/opencode.png'
 import UseKeyModal from './UseKeyModal.vue'
 import type { GroupPlatform } from '@/types'
 import { importAgents, supportsAgent, supportsCcs, type ImportAgent } from '@/utils/quickImport'
-import { buildCcSwitchImportDeeplink } from '@/utils/ccswitchImport'
+import { buildCcSwitchImportDeeplink, CC_SWITCH_USAGE_SCRIPT } from '@/utils/ccswitchImport'
 import { automaticAgent, cleanupCommand, importCommand, type ImportOS } from '@/utils/quickImportCommands'
 import { createImportTicket, importServer } from '@/api/quickImport'
 import { useClipboard } from '@/composables/useClipboard'
@@ -160,9 +160,8 @@ function openManual() {
   step.value = 'manual'
 }
 function openCcs() {
-  if (!agent.value || !compatible.value || !supportsCcs(agent.value, props.platform)) return
-  const usageScript = `({request:{url:"{{baseUrl}}/v1/usage",method:"GET",headers:{Authorization:"Bearer {{apiKey}}"}},extractor:function(r){return {isValid:r.is_active??true,remaining:r.remaining??r.quota?.remaining??r.balance,unit:r.unit??"USD"}}})`
-  const link = buildCcSwitchImportDeeplink({ baseUrl: props.baseUrl || window.location.origin, platform: props.platform, agent: agent.value, clientType: agent.value === 'gemini' ? 'gemini' : 'claude', providerName: props.keyName || 'Sub2API', apiKey: props.apiKey, usageScript })
+  if (!agent.value || !compatible.value || !validModel.value || !supportsCcs(agent.value, props.platform)) return
+  const link = buildCcSwitchImportDeeplink({ baseUrl: props.baseUrl || window.location.origin, platform: props.platform, agent: agent.value, model: selectedModel.value, clientType: agent.value === 'gemini' ? 'gemini' : 'claude', providerName: props.keyName || '连接AI', apiKey: props.apiKey, usageScript: CC_SWITCH_USAGE_SCRIPT })
   window.location.assign(link)
   ccsOpened.value = true
 }

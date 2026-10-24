@@ -1,6 +1,7 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import QuickImportModal from '../QuickImportModal.vue'
+import { CC_SWITCH_USAGE_SCRIPT } from '@/utils/ccswitchImport'
 
 vi.mock('vue-i18n', async (original) => ({ ...await original<typeof import('vue-i18n')>(), useI18n: () => ({ t: (key: string) => key }) }))
 const { copy } = vi.hoisted(() => ({ copy: vi.fn().mockResolvedValue(true) }))
@@ -24,6 +25,7 @@ describe('QuickImportModal', () => {
   it.each(['claude', 'codex', 'opencode'])('enables CCS for %s in the same DeepSeek group', async (agent) => {
     const wrapper = render({ platform: 'deepseek' })
     await wrapper.get(`[data-testid="agent-${agent}"]`).trigger('click')
+    await flushPromises()
     expect(wrapper.get('[data-testid="ccs"]').attributes('disabled')).toBeUndefined()
     expect(wrapper.findAll('.qi-choice')).toHaveLength(3)
     const assign = vi.fn()
@@ -34,6 +36,9 @@ describe('QuickImportModal', () => {
       const params = new URL(assign.mock.calls[0][0]).searchParams
       expect(params.get('app')).toBe(agent)
       expect(params.get('endpoint')).toBe(agent === 'claude' ? props.baseUrl : `${props.baseUrl}/v1`)
+      expect(params.get('model')).toBe('gpt-5.5')
+      expect(params.get('apiFormat')).toBe(agent === 'claude' ? 'anthropic' : agent === 'codex' ? 'openai_responses' : 'openai_chat')
+      expect(atob(params.get('usageScript') || '')).toBe(CC_SWITCH_USAGE_SCRIPT)
     } finally {
       vi.unstubAllGlobals()
     }

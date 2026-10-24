@@ -13,6 +13,21 @@ function paramsFromDeeplink(deeplink: string): URLSearchParams {
 }
 
 describe('ccswitchImport utils', () => {
+  it.each([
+    ['https://lianjieai.top', 'https://lianjieai.top/v1/usage'],
+    ['https://lianjieai.top/v1', 'https://lianjieai.top/v1/usage'],
+    ['https://lianjieai.top/v1/', 'https://lianjieai.top/v1/usage']
+  ])('queries usage without repeating /v1 for %s', (endpoint, expectedUrl) => {
+    const script = CC_SWITCH_USAGE_SCRIPT
+      .replace('{{baseUrl}}', endpoint)
+      .replace('{{apiKey}}', 'sk-test')
+    const config = Function(`return ${script}`)() as {
+      request: { url: string; headers: { Authorization: string } }
+    }
+    expect(config.request.url).toBe(expectedUrl)
+    expect(config.request.headers.Authorization).toBe('Bearer sk-test')
+  })
+
   it('defaults OpenAI CC Switch imports to the current Codex model', () => {
     expect(OPENAI_CC_SWITCH_CODEX_MODEL).toBe('gpt-5.5')
   })
@@ -36,6 +51,25 @@ describe('ccswitchImport utils', () => {
       expect(params.get('app')).toBe(agent)
       expect(params.get('endpoint')).toBe(agent === 'claude' ? baseInput.baseUrl : `${baseInput.baseUrl}/v1`)
       expect(params.get('apiKey')).toBe(baseInput.apiKey)
+    }
+  })
+
+  it.each([
+    { agent: 'claude', platform: 'deepseek', format: 'anthropic' },
+    { agent: 'codex', platform: 'openai', format: 'openai_responses' },
+    { agent: 'opencode', platform: 'deepseek', format: 'openai_chat' },
+    { agent: 'opencode', platform: 'anthropic', format: 'anthropic' },
+    { agent: 'opencode', platform: 'openai', format: 'openai_responses' }
+  ] as const)('imports selected $agent model with $format protocol', ({ agent, platform, format }) => {
+    const params = paramsFromDeeplink(buildCcSwitchImportDeeplink({
+      ...baseInput, agent, platform, clientType: 'claude', model: 'selected-model-id'
+    }))
+    expect(params.get('model')).toBe('selected-model-id')
+    expect(params.get('apiFormat')).toBe(format)
+    if (agent === 'claude') {
+      expect(params.get('haikuModel')).toBe('selected-model-id')
+      expect(params.get('sonnetModel')).toBe('selected-model-id')
+      expect(params.get('opusModel')).toBe('selected-model-id')
     }
   })
 

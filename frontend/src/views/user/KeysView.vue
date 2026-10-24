@@ -1886,6 +1886,13 @@ const resetRateLimitUsage = async () => {
 const importToCcswitch = (row: ApiKey) => {
   const platform = row.group?.platform || 'anthropic'
 
+  // The six guided clients need an explicit agent and a model from this Key.
+  // Keep the legacy direct picker for Gemini, Grok and Antigravity groups.
+  if (platform !== 'gemini' && platform !== 'grok' && platform !== 'antigravity') {
+    openUseKeyModal(row)
+    return
+  }
+
   // For antigravity platform, show client selection dialog
   if (platform === 'antigravity') {
     pendingCcsRow.value = row

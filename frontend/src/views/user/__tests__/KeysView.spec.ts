@@ -314,6 +314,17 @@ describe('user KeysView column settings', () => {
     isCurrentStep.mockReturnValue(false)
   })
 
+  it('opens the key-specific agent and model picker from the CCS row action', async () => {
+    const key = { ...createApiKey(), group: { id: 7, name: 'DeepSeek', platform: 'deepseek' } }
+    listKeys.mockResolvedValueOnce({ items: [key], total: 1, page: 1, page_size: 20, pages: 1 })
+    const wrapper = await mountView()
+    await getButtonByText(wrapper, 'keys.importToCcSwitch').trigger('click')
+    const picker = wrapper.findComponent({ name: 'QuickImportModal' })
+    expect(picker.props('show')).toBe(true)
+    expect(picker.props('keyId')).toBe(key.id)
+    wrapper.unmount()
+  })
+
   it.each([
     { initialStatus: 'quota_exhausted', status: 'active', formStatus: 'active' },
     { initialStatus: 'inactive', status: 'inactive', formStatus: 'inactive' },
