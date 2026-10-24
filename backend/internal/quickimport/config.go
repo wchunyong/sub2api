@@ -13,6 +13,7 @@ var Assets embed.FS
 type Config struct {
 	Version  int    `json:"version"`
 	Agent    string `json:"agent"`
+	Platform string `json:"platform"`
 	APIKey   string `json:"api_key"`
 	BaseURL  string `json:"base_url"`
 	Model    string `json:"model"`
@@ -73,5 +74,5 @@ func BuildConfig(agent, platform string, messages bool, baseURL, apiKey, model s
 	if agent == "workbuddy" || agent == "pi" || agent == "deepseek-harness" {
 		protocol = "openai-completions"
 	}
-	return Config{Version: 1, Agent: agent, APIKey: apiKey, BaseURL: endpoint, Model: model, Protocol: protocol, ProbeURL: root + "/v1/models", MCPEndpoint: root + "/mcp"}, nil
+	return Config{Version: 1, Agent: agent, Platform: platform, APIKey: apiKey, BaseURL: endpoint, Model: model, Protocol: protocol, ProbeURL: root + "/v1/models", MCPEndpoint: root + "/mcp"}, nil
 }

@@ -510,7 +510,7 @@ func TestDeepSeekHarnessMergesExistingPiAIProvider(t *testing.T) {
 	if err := os.WriteFile(path, []byte(before), 0600); err != nil {
 		t.Fatal(err)
 	}
-	p := Payload{Version: 1, Agent: "deepseek-harness", APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "test-model", Models: []Model{{ID: "test-model", Name: "Test Model"}, {ID: "image-only", Name: "Image"}}}
+	p := Payload{Version: 1, Agent: "deepseek-harness", Platform: "deepseek", APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "test-model", Models: []Model{{ID: "test-model", Name: "Test Model"}, {ID: "image-only", Name: "Image"}}}
 	if err := Install(root, p); err != nil {
 		t.Fatal(err)
 	}
@@ -524,6 +524,21 @@ func TestDeepSeekHarnessMergesExistingPiAIProvider(t *testing.T) {
 	content, err = os.ReadFile(path)
 	if err != nil || string(content) != before {
 		t.Fatalf("cleanup did not restore original profile: %s %v", content, err)
+	}
+}
+
+func TestDeepSeekHarnessDoesNotForceDeepSeekCompatOnOpenAI(t *testing.T) {
+	root := t.TempDir()
+	p := Payload{Version: 1, Agent: "deepseek-harness", Platform: "openai", APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "o-series-model"}
+	if err := Install(root, p); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(filepath.Join(root, paths["deepseek-harness"]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(content), "maxTokensField: max_tokens") || strings.Contains(string(content), "supportsDeveloperRole: false") {
+		t.Fatalf("OpenAI group must keep its own request defaults: %s", content)
 	}
 }
 

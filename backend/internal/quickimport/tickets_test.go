@@ -52,7 +52,7 @@ func TestTicketExpiryAndAtomicConsumption(t *testing.T) {
 func TestConfigTargets(t *testing.T) {
 	for _, agent := range []string{"claude", "opencode", "deepseek-harness", "workbuddy", "pi"} {
 		c, err := BuildConfig(agent, "deepseek", false, "https://example.com/v1", "mock-key", "deepseek-chat")
-		if err != nil || c.Agent != agent || c.Model != "deepseek-chat" {
+		if err != nil || c.Agent != agent || c.Model != "deepseek-chat" || c.Platform != "deepseek" {
 			t.Fatalf("%s: %#v %v", agent, c, err)
 		}
 		expectedBase := "https://example.com/v1"

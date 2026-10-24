@@ -31,6 +31,7 @@ type Model struct {
 type Payload struct {
 	Version                    int            `json:"version"`
 	Agent                      string         `json:"agent"`
+	Platform                   string         `json:"platform"`
 	APIKey                     string         `json:"api_key"`
 	BaseURL                    string         `json:"base_url"`
 	Model                      string         `json:"model"`
@@ -832,11 +833,13 @@ func Install(root string, p Payload) error {
 			"api":         "openai-completions",
 			"baseURL":     strings.TrimRight(p.BaseURL, "/"),
 			"headers":     map[string]any{"Authorization": "Bearer " + p.APIKey},
-			"compat": map[string]any{
-				"supportsDeveloperRole": false,
-				"maxTokensField":       "max_tokens",
-			},
 			"models":      []any{map[string]any{"id": p.Model, "name": modelName}},
+		}
+		if p.Platform == "deepseek" {
+			route["compat"] = map[string]any{
+				"supportsDeveloperRole": false,
+				"maxTokensField":        "max_tokens",
+			}
 		}
 		updated := append([]any{}, entries...)
 		found := false
