@@ -633,7 +633,7 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 			}
 			// WorkBuddy must use the full endpoint as-is, without adding a second /chat/completions.
 			name := m.Name
-			if !strings.HasPrefix(name, "连接AI") {
+			if !strings.HasPrefix(name, "连接AI · ") {
 				name = "连接AI · " + name
 			}
 			entries = append(entries, map[string]any{"id": m.ID, "name": name, "vendor": "Custom", "url": base + "/chat/completions", "apiKey": p.APIKey, "supportsToolCall": true, "supportsImages": false, "useCustomProtocol": true})
