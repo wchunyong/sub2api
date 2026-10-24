@@ -1102,6 +1102,11 @@ describe('UseKeyModal', () => {
     expect(wrapper.get('[data-testid="manual-model-required"]').exists()).toBe(true)
     await wrapper.get('#claude-model').setValue('claude-sonnet-example')
     expect(wrapper.find('[data-testid="manual-model-required"]').exists()).toBe(false)
+    const settings = wrapper.findAll('pre code').map(code => code.text()).find(content => content.includes('"$schema"'))!
+    const env = JSON.parse(settings).env
+    for (const name of ['ANTHROPIC_MODEL', 'ANTHROPIC_DEFAULT_OPUS_MODEL', 'ANTHROPIC_DEFAULT_SONNET_MODEL', 'ANTHROPIC_DEFAULT_HAIKU_MODEL', 'ANTHROPIC_DEFAULT_FABLE_MODEL', 'CLAUDE_CODE_SUBAGENT_MODEL', 'ANTHROPIC_CUSTOM_MODEL_OPTION']) {
+      expect(env[name]).toBe('claude-sonnet-example')
+    }
     wrapper.unmount()
   })
 

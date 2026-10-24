@@ -268,6 +268,31 @@ func TestLargeJSONNumbersPreserved(t *testing.T) {
 	}
 }
 
+func TestClaudeImportPinsEveryModelRoute(t *testing.T) {
+	root := t.TempDir()
+	p := Payload{Version: 1, Agent: "claude", APIKey: "test-secret", BaseURL: "https://example.test", Model: "claude-test"}
+	if err := Install(root, p); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(filepath.Join(root, paths["claude"]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := load(string(content), "claude")
+	if err != nil {
+		t.Fatal(err)
+	}
+	env, ok := data["env"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing Claude environment: %s", content)
+	}
+	for _, name := range []string{"ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL", "ANTHROPIC_DEFAULT_FABLE_MODEL", "CLAUDE_CODE_SUBAGENT_MODEL", "ANTHROPIC_CUSTOM_MODEL_OPTION"} {
+		if env[name] != "claude-test" {
+			t.Errorf("%s must use the selected model, got %v", name, env[name])
+		}
+	}
+}
+
 func TestStrictJSONTrailingValue(t *testing.T) {
 	if _, err := load(`{} {}`, "claude"); err == nil {
 		t.Fatal("accepted trailing config JSON")
