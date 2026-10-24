@@ -21,7 +21,7 @@ func main() { os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr)) }
 func run(args []string, in io.Reader, out, stderr io.Writer) int {
 	fail := func(message string) int { fmt.Fprintln(stderr, message); return 1 }
 	if len(args) == 0 || (args[0] != "install" && args[0] != "clean") {
-		return fail("Usage: quick-import install|clean --agent claude|codex|opencode [options]")
+		return fail("Usage: quick-import install|clean --agent claude|codex|opencode|workbuddy|pi|deepseek-harness [options]")
 	}
 	flags := flag.NewFlagSet("quick-import", flag.ContinueOnError)
 	// Flag parse errors can quote arguments, including an accidentally misplaced key.
@@ -37,7 +37,7 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 		return fail("Invalid command options")
 	}
 	if !native.ValidAgent(*agent) {
-		return fail("Choose --agent claude, codex or opencode")
+		return fail("Choose a supported --agent value")
 	}
 	if *skip && (!*stdin || *home == "" || args[0] != "install") {
 		return fail("--skip-client-check requires install --stdin and --home")
@@ -54,9 +54,9 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 		return fail("Invalid home directory")
 	}
 	if args[0] == "clean" {
-		fmt.Fprintf(out, "Restore the most recent Sub2API import for %s only. Other Agents are preserved.\n", *agent)
+		fmt.Fprintf(out, "正在恢复 %s 最近一次连接AI导入；其他工具的配置不会更改。\n", *agent)
 		if !*yes {
-			fmt.Fprint(out, "Continue? [y/N] ")
+			fmt.Fprint(out, "确认恢复？输入 y 继续 [y/N] ")
 			answer, _ := bufio.NewReader(in).ReadString('\n')
 			if strings.ToLower(strings.TrimSpace(answer)) != "y" {
 				return 0
@@ -65,15 +65,16 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 		if err := native.Clean(root, *agent); err != nil {
 			var conflict *native.RecoveryConflict
 			if errors.As(err, &conflict) {
-				return fail(conflict.Error())
+				return fail("原配置在导入后有变化，已保留当前文件：" + conflict.Error())
 			}
-			return fail("Recovery failed; check permissions and recovery information")
+			return fail("恢复失败。请检查配置文件权限和本机恢复信息。")
 		}
-		fmt.Fprintln(out, "Restored. Restart the client. Run again to undo an earlier import, if needed.")
+		fmt.Fprintln(out, "恢复完成。请完全退出并重启工具；若曾多次导入，可再次运行以恢复更早的版本。")
 		return 0
 	}
+	fmt.Fprintf(out, "正在检查 %s 安装状态和本机配置…\n", *agent)
 	if err = native.Preflight(*agent, !*skip); err != nil {
-		return fail(err.Error())
+		return fail("安装或配置检查未通过：" + err.Error())
 	}
 	var payload native.Payload
 	network := native.Network{}
@@ -91,26 +92,29 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 		if *server == "" || *ticket == "" {
 			return fail("Missing --server or --ticket")
 		}
+		fmt.Fprintln(out, "正在兑换一次性配置码…")
 		payload, err = network.Exchange(*server, *ticket, *agent)
 		if err != nil {
-			return fail("Failed during configuration exchange: " + err.Error())
+			return fail("配置码兑换失败。请返回密钥列表重新生成导入命令。详情：" + err.Error())
 		}
 	}
 	if err = native.ValidateTransportPayload(payload, *agent); err != nil {
 		return fail(err.Error())
 	}
 	if !*stdin {
+		fmt.Fprintln(out, "正在读取这把 Key 可用的模型并核对所选模型…")
 		if err = network.SynchronizeModels(&payload); err != nil {
-			return fail("Failed during model catalog: " + err.Error())
+			return fail("模型目录读取失败。请检查 Key、分组和网络，再重新生成命令。详情：" + err.Error())
 		}
 		if *agent == "claude" && !payload.ClaudeModelPickerSupported {
 			fmt.Fprintln(out, "Claude Code < 2.1.242: selected model is configured. Upgrade for the full lianjieai /model menu.")
 		}
 	}
 	if native.Install(root, payload) != nil {
-		return fail("Configuration write failed. Original configuration was preserved or recovery information is available; check permissions and configuration syntax.")
+		return fail("配置写入失败。原配置已保留，或可使用本机恢复信息撤销；请检查文件权限与配置语法。")
 	}
-	fmt.Fprintf(out, "Configured %s. Restart the client. A project configuration may override user settings.\n", *agent)
-	fmt.Fprintf(out, "Offline recovery is saved in %s\n", filepath.Join(root, ".sub2api-quick-import", *agent))
+	fmt.Fprintf(out, "%s 配置已写入。请完全退出并重启工具，选择导入时选定的模型，发送一条测试消息。\n", *agent)
+	fmt.Fprintln(out, "如果工具仍使用旧服务，请检查项目级配置是否覆盖了用户配置。")
+	fmt.Fprintf(out, "本机恢复信息：%s\n", filepath.Join(root, ".sub2api-quick-import", *agent))
 	return 0
 }

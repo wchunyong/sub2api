@@ -112,6 +112,25 @@
         </div>
 
         <!-- OS/Shell Tabs -->
+        <div v-if="activeClientTab === 'claude'" class="rounded-lg border border-gray-200 p-3 dark:border-dark-700">
+          <label for="claude-model" class="mb-1 block text-sm font-medium">{{ t('keys.useKeyModal.claudeModelLabel') }}</label>
+          <select v-if="claudeModels.length" id="claude-model" v-model="selectedClaudeModel" class="input w-full">
+            <option v-for="model in claudeModels" :key="model" :value="model">{{ model }}</option>
+          </select>
+          <input v-else id="claude-model" v-model.trim="selectedClaudeModel" class="input w-full" :placeholder="t('keys.useKeyModal.claudeModelPlaceholder')" />
+          <p class="mt-1 text-xs text-gray-500">{{ t(claudeModels.length ? 'keys.useKeyModal.claudeModelHint' : 'keys.useKeyModal.claudeModelFallback') }}</p>
+        </div>
+        <div v-if="activeClientTab === 'codex' || activeClientTab === 'codex-ws' || activeClientTab === 'opencode'" class="rounded-lg border border-gray-200 p-3 dark:border-dark-700">
+          <label for="manual-model" class="mb-1 block text-sm font-medium">{{ t('keys.quickImport.model') }}</label>
+          <select v-if="manualModels.length" id="manual-model" v-model="selectedManualModel" class="input w-full">
+            <option v-for="model in manualModels" :key="model" :value="model">{{ model }}</option>
+          </select>
+          <input v-else id="manual-model" v-model.trim="selectedManualModel" class="input w-full" :placeholder="t('keys.quickImport.modelPlaceholder')" />
+          <p class="mt-1 text-xs text-gray-500">{{ t(manualModels.length ? 'keys.quickImport.modelFromKey' : 'keys.quickImport.modelUnavailable') }}</p>
+        </div>
+        <p v-if="!manualModelReady" class="text-sm text-amber-700 dark:text-amber-300" data-testid="manual-model-required">{{ t('keys.useKeyModal.selectModelBeforeCopy') }}</p>
+
+        <!-- OS/Shell Tabs -->
         <div v-if="showShellTabs" class="overflow-x-auto border-b border-gray-200 dark:border-dark-700">
           <nav class="-mb-px flex min-w-max gap-4" aria-label="Tabs">
             <button
@@ -153,6 +172,7 @@
                 <button
                   type="button"
                   @click="copyContent(file.content, index)"
+                  :disabled="!manualModelReady"
                   class="flex flex-shrink-0 items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg transition-colors"
                   :class="copiedIndex === index
                     ? 'bg-green-500/20 text-green-400'
@@ -318,10 +338,20 @@ const { t } = useI18n()
 const { copyToClipboard: clipboardCopy } = useClipboard()
 
 const copiedIndex = ref<number | null>(null)
+const claudeModels = ref<string[]>([])
+const selectedClaudeModel = ref('')
+let claudeModelsController: AbortController | null = null
+const manualModels = ref<string[]>([])
+const selectedManualModel = ref('')
+let manualModelsController: AbortController | null = null
+const manualModelReady = computed(() => {
+  const model = activeClientTab.value === 'claude' ? selectedClaudeModel.value : selectedManualModel.value
+  return !['claude', 'codex', 'codex-ws', 'opencode'].includes(activeClientTab.value) || /^[A-Za-z0-9_.:/-]+$/.test(model)
+})
 const activeTab = ref<string>('unix')
 const activeClientTab = ref<string>('claude')
 type CodexAuthMode = 'legacy' | 'api-key'
-const codexAuthMode = ref<CodexAuthMode>('legacy')
+const codexAuthMode = ref<CodexAuthMode>('api-key')
 type CodexModelManifestState = 'idle' | 'loading' | 'ready' | 'error'
 const codexModelManifestState = ref<CodexModelManifestState>('idle')
 const codexModelManifestContent = ref('')
@@ -379,14 +409,56 @@ const defaultClientTab = computed(() => {
 watch(() => [props.platform, props.claudeCodeOnly], () => {
   activeTab.value = 'unix'
   activeClientTab.value = props.client || defaultClientTab.value
-  codexAuthMode.value = 'legacy'
+  codexAuthMode.value = 'api-key'
 }, { immediate: true })
 
 watch(() => props.client, (client) => { activeClientTab.value = client || defaultClientTab.value })
 
+watch(() => [props.show, props.baseUrl, props.apiKey, activeClientTab.value], async () => {
+  claudeModelsController?.abort()
+  claudeModels.value = []
+  selectedClaudeModel.value = ''
+  if (!props.show || activeClientTab.value !== 'claude' || !props.apiKey) return
+  const controller = new AbortController()
+  claudeModelsController = controller
+  try {
+    const response = await fetch(buildCodexModelCatalogUrl(props.baseUrl), {
+      headers: { Authorization: `Bearer ${props.apiKey}`, Accept: 'application/json' },
+      cache: 'no-store', signal: controller.signal
+    })
+    if (!response.ok) return
+    const body = await response.json() as { data?: Array<{ id?: string }> }
+    if (controller.signal.aborted || !Array.isArray(body.data)) return
+    const names = body.data.map(item => item.id).filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9_.:/-]+$/.test(id))
+    claudeModels.value = [...new Set(names)]
+    selectedClaudeModel.value = claudeModels.value.find(id => /claude|deepseek|glm|kimi|grok|mini|max/i.test(id)) || claudeModels.value[0] || ''
+  } catch { /* Manual entry remains available when model discovery fails. */ }
+}, { immediate: true })
+
+watch(() => [props.show, props.baseUrl, props.apiKey, activeClientTab.value], async () => {
+  manualModelsController?.abort()
+  manualModels.value = []
+  selectedManualModel.value = ''
+  if (!props.show || !['codex', 'codex-ws', 'opencode'].includes(activeClientTab.value) || !props.apiKey) return
+  const controller = new AbortController()
+  manualModelsController = controller
+  try {
+    const response = await fetch(buildCodexModelCatalogUrl(props.baseUrl), {
+      headers: { Authorization: `Bearer ${props.apiKey}`, Accept: 'application/json' },
+      cache: 'no-store', signal: controller.signal
+    })
+    if (!response.ok) return
+    const body = await response.json() as { data?: Array<{ id?: string }> }
+    if (controller.signal.aborted || !Array.isArray(body.data)) return
+    manualModels.value = [...new Set(body.data.map(item => item.id).filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9_.:/-]+$/.test(id)))]
+    const family = props.platform === 'openai' ? /gpt|codex/i : props.platform === 'anthropic' ? /claude/i : props.platform === 'deepseek' ? /deepseek/i : /./
+    selectedManualModel.value = manualModels.value.find(id => family.test(id)) || manualModels.value[0] || ''
+  } catch { /* Manual model entry remains available. */ }
+}, { immediate: true })
+
 watch(() => props.show, (show) => {
   if (show) {
-    codexAuthMode.value = 'legacy'
+    codexAuthMode.value = 'api-key'
   } else {
     resetCodexModelManifest()
   }
@@ -712,6 +784,10 @@ const codexCatalogModelSlugs = computed(() =>
 )
 
 function selectCodexCatalogModel(preferredModel: string): string {
+  const selected = selectedManualModel.value
+  if (/^[A-Za-z0-9_.:/-]+$/.test(selected) && (!codexCatalogModelSlugs.value.length || codexCatalogModelSlugs.value.includes(selected))) {
+    return selected
+  }
   if (codexCatalogModelSlugs.value.includes(preferredModel)) return preferredModel
   return codexCatalogModelSlugs.value[0] || preferredModel
 }
@@ -775,7 +851,7 @@ const currentFiles = computed((): FileConfig[] => {
       case 'grok':
         return [generateOpenCodeConfig('grok', apiBase, apiKey)]
       default:
-        return [generateOpenCodeConfig('openai', apiBase, apiKey)]
+        return [generateOpenCodeConfig('lianjieai', apiBase, apiKey)]
     }
   }
 
@@ -804,7 +880,7 @@ const currentFiles = computed((): FileConfig[] => {
       if (activeClientTab.value === 'gemini') {
         return [generateGeminiCliContent(`${baseUrl}/antigravity`, apiKey)]
       }
-      return generateAnthropicFiles(`${baseUrl}/antigravity`, apiKey)
+      return generateAnthropicFiles(`${baseRoot}/antigravity`, apiKey)
     case 'grok':
       if (activeClientTab.value === 'claude') {
         return generateGrokClaudeFiles(baseRoot, apiKey)
@@ -832,7 +908,7 @@ const currentFiles = computed((): FileConfig[] => {
       if (activeClientTab.value === 'codex' && props.platform) {
         return generateRoutedCodexFiles(apiBase, apiKey, props.platform)
       }
-      return generateAnthropicFiles(baseUrl, apiKey)
+      return generateAnthropicFiles(baseRoot, apiKey)
   }
 })
 
@@ -877,6 +953,7 @@ Invoke-RestMethod -Method Post -Uri "${endpoint}" -Headers $headers -ContentType
 }
 
 function generateAnthropicFiles(baseUrl: string, apiKey: string): FileConfig[] {
+  const model = /^[A-Za-z0-9_.:/-]+$/.test(selectedClaudeModel.value) ? selectedClaudeModel.value : 'YOUR_AVAILABLE_MODEL_ID'
   let path: string
   let content: string
 
@@ -885,18 +962,30 @@ function generateAnthropicFiles(baseUrl: string, apiKey: string): FileConfig[] {
       path = 'Terminal'
       content = `export ANTHROPIC_BASE_URL="${baseUrl}"
 export ANTHROPIC_AUTH_TOKEN="${apiKey}"
+export ANTHROPIC_MODEL="${model}"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="${model}"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="${model}"
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="${model}"
 export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
       break
     case 'cmd':
       path = 'Command Prompt'
       content = `set ANTHROPIC_BASE_URL=${baseUrl}
 set ANTHROPIC_AUTH_TOKEN=${apiKey}
+set ANTHROPIC_MODEL=${model}
+set ANTHROPIC_DEFAULT_OPUS_MODEL=${model}
+set ANTHROPIC_DEFAULT_SONNET_MODEL=${model}
+set ANTHROPIC_DEFAULT_HAIKU_MODEL=${model}
 set CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
       break
     case 'powershell':
       path = 'PowerShell'
       content = `$env:ANTHROPIC_BASE_URL="${baseUrl}"
 $env:ANTHROPIC_AUTH_TOKEN="${apiKey}"
+$env:ANTHROPIC_MODEL="${model}"
+$env:ANTHROPIC_DEFAULT_OPUS_MODEL="${model}"
+$env:ANTHROPIC_DEFAULT_SONNET_MODEL="${model}"
+$env:ANTHROPIC_DEFAULT_HAIKU_MODEL="${model}"
 $env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
       break
     default:
@@ -913,6 +1002,10 @@ $env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
   "env": {
     "ANTHROPIC_BASE_URL": "${baseUrl}",
     "ANTHROPIC_AUTH_TOKEN": "${apiKey}",
+    "ANTHROPIC_MODEL": "${model}",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "${model}",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "${model}",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "${model}",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
   }
 }`
@@ -928,15 +1021,16 @@ $env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
 }
 
 function generateGrokClaudeFiles(baseUrl: string, apiKey: string): FileConfig[] {
+  const model = /^[A-Za-z0-9_.:/-]+$/.test(selectedClaudeModel.value) ? selectedClaudeModel.value : 'YOUR_AVAILABLE_MODEL_ID'
   const environment = {
     ANTHROPIC_BASE_URL: baseUrl,
     ANTHROPIC_AUTH_TOKEN: apiKey,
-    ANTHROPIC_MODEL: 'grok-4.5',
-    ANTHROPIC_DEFAULT_OPUS_MODEL: 'grok-4.5',
-    ANTHROPIC_DEFAULT_SONNET_MODEL: 'grok-4.5',
-    ANTHROPIC_DEFAULT_HAIKU_MODEL: 'grok-4.5',
-    ANTHROPIC_DEFAULT_FABLE_MODEL: 'grok-4.5',
-    CLAUDE_CODE_SUBAGENT_MODEL: 'grok-4.5',
+    ANTHROPIC_MODEL: model,
+    ANTHROPIC_DEFAULT_OPUS_MODEL: model,
+    ANTHROPIC_DEFAULT_SONNET_MODEL: model,
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: model,
+    ANTHROPIC_DEFAULT_FABLE_MODEL: model,
+    CLAUDE_CODE_SUBAGENT_MODEL: model,
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
   }
   let path: string
@@ -1047,7 +1141,7 @@ windows_wsl_setup_acknowledged = true
 name = "OpenAI"
 base_url = "${baseUrl}"
 ${codexModelCatalogMode.value === 'remote' ? `model_catalog_url = "${escapeTomlBasicString(buildCodexModelCatalogUrl(baseUrl))}"\n` : ''}wire_api = "responses"
-${generateCodexProviderAuthConfig(apiKey)}
+${generateCodexProviderAuthConfig()}
 
 [features]
 ${codexModelCatalogMode.value === 'remote' ? 'api_key_model_discovery = true\n' : ''}goals = true`
@@ -1055,11 +1149,10 @@ ${codexModelCatalogMode.value === 'remote' ? 'api_key_model_discovery = true\n' 
   return buildOpenAICodexFileConfigs(configDir, configContent, apiKey)
 }
 
-function generateCodexProviderAuthConfig(apiKey: string): string {
+function generateCodexProviderAuthConfig(): string {
   if (codexAuthMode.value === 'api-key') {
     return `requires_openai_auth = false
-experimental_bearer_token = "${escapeTomlBasicString(apiKey)}"
-http_headers = { "x-openai-actor-authorization" = "local-image-extension" }`
+env_key = "LIANJIEAI_API_KEY"`
   }
 
   return 'requires_openai_auth = true'
@@ -1078,7 +1171,15 @@ function buildOpenAICodexFileConfigs(
     }
   ]
 
-  if (codexAuthMode.value === 'legacy') {
+  if (codexAuthMode.value === 'api-key') {
+    files.unshift({
+      path: activeTab.value === 'windows' ? 'PowerShell' : 'Terminal',
+      content: activeTab.value === 'windows'
+        ? `$env:LIANJIEAI_API_KEY="${apiKey}"`
+        : `export LIANJIEAI_API_KEY="${apiKey}"`,
+      hint: t('keys.useKeyModal.openai.apiKeyEnvHint')
+    })
+  } else {
     files.push({
       path: `${configDir}/auth.json`,
       content: JSON.stringify({ OPENAI_API_KEY: apiKey }, null, 2)
@@ -1396,7 +1497,7 @@ name = "OpenAI"
 base_url = "${baseUrl}"
 ${codexModelCatalogMode.value === 'remote' ? `model_catalog_url = "${escapeTomlBasicString(buildCodexModelCatalogUrl(baseUrl))}"\n` : ''}wire_api = "responses"
 supports_websockets = true
-${generateCodexProviderAuthConfig(apiKey)}
+${generateCodexProviderAuthConfig()}
 
 [features]
 ${codexModelCatalogMode.value === 'remote' ? 'api_key_model_discovery = true\n' : ''}responses_websockets_v2 = true
@@ -2043,6 +2144,17 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
     provider[platform].npm = '@ai-sdk/openai-compatible'
     provider[platform].name = 'Grok via Sub2API'
     provider[platform].models = grokModels
+  } else if (platform === 'lianjieai') {
+    provider[platform].npm = '@ai-sdk/openai-compatible'
+    provider[platform].name = '连接AI'
+  }
+
+  const chosen = /^[A-Za-z0-9_.:/-]+$/.test(selectedManualModel.value) ? selectedManualModel.value : ''
+  if (chosen && !platform.startsWith('antigravity-')) {
+    const existing = provider[platform].models?.[chosen]
+    provider[platform].models = { [chosen]: existing ?? { name: chosen } }
+  } else if (platform === 'lianjieai') {
+    provider[platform].models = { YOUR_AVAILABLE_MODEL_ID: { name: '请替换为该 Key 可用的模型 ID' } }
   }
 
   const agent =
@@ -2064,6 +2176,7 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
   const content = JSON.stringify(
     {
       provider,
+      ...(chosen && !platform.startsWith('antigravity-') ? { model: `${platform}/${chosen}` } : {}),
       ...(agent ? { agent } : {}),
       $schema: 'https://opencode.ai/config.json'
     },

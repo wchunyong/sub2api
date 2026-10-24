@@ -347,11 +347,12 @@ func TestInstallCleanPreservesUnrelated(t *testing.T) {
 	}
 }
 
-func TestInstallRegistersImageMCPByDefault(t *testing.T) {
+func TestInstallRegistersImageMCPOnlyWhenEnabled(t *testing.T) {
+	enabled := true
 	for _, agent := range []string{"claude", "codex", "opencode"} {
 		t.Run(agent, func(t *testing.T) {
 			root := t.TempDir()
-			p := Payload{Version: 1, Agent: agent, APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "test-model"}
+			p := Payload{Version: 1, Agent: agent, APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "test-model", MCPImageToolsEnabled: &enabled}
 			if err := Install(root, p); err != nil {
 				t.Fatal(err)
 			}
@@ -413,6 +414,109 @@ func TestInstallRegistersImageMCPByDefault(t *testing.T) {
 	}
 }
 
+func TestImportNewAgentsPreservesExistingConfigurationAndRestores(t *testing.T) {
+	for _, tc := range []struct{ agent, before, expected string }{
+		{"workbuddy", `[{"id":"existing-model","url":"https://other.test/v1/chat/completions"}]`, `"url": "https://example.test/v1/chat/completions"`},
+		{"pi", `{"providers":{"other":{"baseUrl":"https://other.test/v1"}}}`, `"api": "openai-completions"`},
+		{"deepseek-harness", "- id: existing-plugin\n  config:\n    value: true\n", "llm-pi-ai"},
+	} {
+		t.Run(tc.agent, func(t *testing.T) {
+			root := t.TempDir()
+			path := filepath.Join(root, paths[tc.agent])
+			if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte(tc.before), 0600); err != nil {
+				t.Fatal(err)
+			}
+			p := Payload{Version: 1, Agent: tc.agent, APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "test-model", Models: []Model{{ID: "test-model", Name: "Test Model"}}}
+			if err := Install(root, p); err != nil {
+				t.Fatal(err)
+			}
+			after, err := os.ReadFile(path)
+			if err != nil || !strings.Contains(string(after), tc.expected) || !strings.Contains(string(after), "test-secret") {
+				t.Fatalf("bad %s configuration: %s %v", tc.agent, after, err)
+			}
+			if err := Clean(root, tc.agent); err != nil {
+				t.Fatal(err)
+			}
+			restored, err := os.ReadFile(path)
+			if err != nil || tc.agent == "deepseek-harness" && !strings.Contains(string(restored), "existing-plugin") || tc.agent == "workbuddy" && string(restored) != tc.before {
+				t.Fatalf("bad cleanup: %s %v", restored, err)
+			}
+			if strings.Contains(string(restored), "test-secret") {
+				t.Fatalf("credential left after cleanup: %s", restored)
+			}
+		})
+	}
+}
+
+func TestWorkBuddyFreshImportWritesDesktopArrayAndCleanRemovesIt(t *testing.T) {
+	root := t.TempDir()
+	p := Payload{Version: 1, Agent: "workbuddy", APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "test-model", Models: []Model{{ID: "test-model", Name: "Test Model"}}}
+	if err := Install(root, p); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, ".workbuddy", "models.json")
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var models []map[string]any
+	if err := json.Unmarshal(content, &models); err != nil || len(models) != 1 || models[0]["id"] != "test-model" {
+		t.Fatalf("WorkBuddy desktop requires a model array: %s %v", content, err)
+	}
+	if err := Clean(root, "workbuddy"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("cleanup left a new WorkBuddy config: %v", err)
+	}
+}
+
+func TestDeepSeekHarnessMergesExistingPiAIProvider(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, paths["deepseek-harness"])
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	before := "- id: llm-pi-ai\n  config:\n    providers:\n      other:\n        api: openai-completions\n        baseURL: https://other.test/v1\n        models:\n          - id: other-model\n"
+	if err := os.WriteFile(path, []byte(before), 0600); err != nil {
+		t.Fatal(err)
+	}
+	p := Payload{Version: 1, Agent: "deepseek-harness", APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "test-model", Models: []Model{{ID: "test-model", Name: "Test Model"}, {ID: "image-only", Name: "Image"}}}
+	if err := Install(root, p); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil || !strings.Contains(string(content), "other-model") || !strings.Contains(string(content), "test-model") || strings.Contains(string(content), "image-only") || !strings.Contains(string(content), "test-secret") {
+		t.Fatalf("existing provider was not preserved: %s %v", content, err)
+	}
+	if err := Clean(root, "deepseek-harness"); err != nil {
+		t.Fatal(err)
+	}
+	content, err = os.ReadFile(path)
+	if err != nil || string(content) != before {
+		t.Fatalf("cleanup did not restore original profile: %s %v", content, err)
+	}
+}
+
+func TestImportDoesNotInjectImageMCPByDefault(t *testing.T) {
+	for _, agent := range []string{"claude", "codex", "opencode"} {
+		t.Run(agent, func(t *testing.T) {
+			root := t.TempDir()
+			p := Payload{Version: 1, Agent: agent, APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "test-model"}
+			if err := Install(root, p); err != nil {
+				t.Fatal(err)
+			}
+			content, err := os.ReadFile(filepath.Join(root, paths[agent]))
+			if err != nil || strings.Contains(string(content), "lianjieai_image") || strings.Contains(string(content), "lianjieai-image") {
+				t.Fatalf("unexpected MCP: %s %v", content, err)
+			}
+		})
+	}
+}
+
 func TestInstallUsesCurrentOpenCodeMCPShape(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, paths["opencode"])
@@ -423,7 +527,8 @@ func TestInstallUsesCurrentOpenCodeMCPShape(t *testing.T) {
 	if err := os.WriteFile(path, []byte(legacy), 0600); err != nil {
 		t.Fatal(err)
 	}
-	p := Payload{Version: 1, Agent: "opencode", APIKey: "new-secret", BaseURL: "https://example.test/v1", Model: "test-model"}
+	enabled := true
+	p := Payload{Version: 1, Agent: "opencode", APIKey: "new-secret", BaseURL: "https://example.test/v1", Model: "test-model", MCPImageToolsEnabled: &enabled}
 	if err := Install(root, p); err != nil {
 		t.Fatal(err)
 	}

@@ -247,7 +247,7 @@ func atLeast(version string, min [3]int) bool {
 
 // Preflight preserves the supported clients' default user-config semantics.
 func Preflight(agent string, checkClient bool) error {
-	overrides := map[string][]string{"opencode": {"OPENCODE_CONFIG", "OPENCODE_CONFIG_CONTENT", "XDG_CONFIG_HOME"}, "claude": {"CLAUDE_CONFIG_DIR", "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY"}, "codex": {"CODEX_HOME"}}
+	overrides := map[string][]string{"opencode": {"OPENCODE_CONFIG", "OPENCODE_CONFIG_CONTENT", "XDG_CONFIG_HOME"}, "claude": {"CLAUDE_CONFIG_DIR", "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY"}, "codex": {"CODEX_HOME"}, "pi": {"PI_CODING_AGENT_DIR"}, "workbuddy": {}, "deepseek-harness": {"DSH_HOME"}}
 	names, ok := overrides[agent]
 	if !ok {
 		return errors.New("unsupported agent")
@@ -260,8 +260,18 @@ func Preflight(agent string, checkClient bool) error {
 	if !checkClient {
 		return nil
 	}
-	if _, err := exec.LookPath(agent); err == nil {
+	command := agent
+	if agent == "deepseek-harness" {
+		command = "dsh"
+	}
+	if _, err := exec.LookPath(command); err == nil {
 		return nil
+	}
+	if agent == "workbuddy" {
+		home, _ := os.UserHomeDir()
+		if _, err := os.Stat(filepath.Join(home, ".workbuddy")); err == nil {
+			return nil
+		}
 	}
 	if agent == "opencode" {
 		home, _ := os.UserHomeDir()
@@ -275,13 +285,13 @@ func Preflight(agent string, checkClient bool) error {
 			}
 		}
 	}
-	instructions := map[string]string{"claude": "https://code.claude.com/docs/en/setup", "codex": "https://developers.openai.com/codex/cli", "opencode": "https://opencode.ai/download"}
+	instructions := map[string]string{"claude": "https://code.claude.com/docs/en/setup", "codex": "https://developers.openai.com/codex/cli", "opencode": "https://opencode.ai/download", "pi": "https://pi.dev", "workbuddy": "https://www.workbuddy.cn", "deepseek-harness": "https://github.com/deepseek-ai/deepseek-harness"}
 	return fmt.Errorf("install %s first: %s; reopen the terminal and generate a new command", agent, instructions[agent])
 }
 
 // ValidAgent keeps untrusted agent names out of filesystem paths.
 func ValidAgent(agent string) bool {
-	return agent == "claude" || agent == "codex" || agent == "opencode"
+	return agent == "claude" || agent == "codex" || agent == "opencode" || agent == "workbuddy" || agent == "pi" || agent == "deepseek-harness"
 }
 
 // ValidateTransportPayload runs before a credential can be sent on the network.

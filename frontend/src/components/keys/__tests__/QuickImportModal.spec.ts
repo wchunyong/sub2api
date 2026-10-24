@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import QuickImportModal from '../QuickImportModal.vue'
 
@@ -15,6 +15,12 @@ function render(extra = {}) {
   } } })
 }
 describe('QuickImportModal', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ id: 'gpt-5.5' }] })
+    }))
+  })
   it.each(['claude', 'codex', 'opencode'])('enables CCS for %s in the same DeepSeek group', async (agent) => {
     const wrapper = render({ platform: 'deepseek' })
     await wrapper.get(`[data-testid="agent-${agent}"]`).trigger('click')
@@ -44,6 +50,7 @@ describe('QuickImportModal', () => {
     copy.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
     const wrapper = render()
     await wrapper.get('[data-testid="agent-codex"]').trigger('click')
+    await flushPromises()
     await wrapper.get('[data-testid="auto"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('[role="alert"]').exists()).toBe(true)
@@ -55,14 +62,17 @@ describe('QuickImportModal', () => {
   })
   it('disables unsupported agents and copies directly without settings', async () => {
     const wrapper = render()
-    expect(wrapper.get('[data-testid="agent-gemini"]').attributes('disabled')).toBeDefined()
-    expect(wrapper.text()).toContain('ChatGPT/Codex')
+    expect(wrapper.find('[data-testid="agent-gemini"]').exists()).toBe(false)
+    expect(wrapper.findAll('.qi-agent')).toHaveLength(6)
+    expect(wrapper.text()).toContain('Codex')
     createTicket.mockResolvedValueOnce({ ticket: 'a'.repeat(64), agent: 'codex', expires_in: 300 })
     await wrapper.get('[data-testid="agent-codex"]').trigger('click')
+    await flushPromises()
     await wrapper.get('[data-testid="auto"]').trigger('click')
     await flushPromises()
-    expect(wrapper.find('select').exists()).toBe(false)
+    expect(wrapper.find('select').exists()).toBe(true)
     expect(wrapper.find('input').exists()).toBe(false)
+    expect(createTicket).toHaveBeenCalledWith(1, 'codex', 'gpt-5.5', expect.any(AbortSignal))
     expect(copy.mock.lastCall?.[0]).toContain('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
     wrapper.unmount()
   })
@@ -85,6 +95,7 @@ describe('QuickImportModal', () => {
     createTicket.mockImplementationOnce(() => new Promise(r => { resolve = r }))
     const wrapper = render()
     await wrapper.get('[data-testid="agent-opencode"]').trigger('click')
+    await flushPromises()
     await wrapper.get('[data-testid="auto"]').trigger('click')
     await wrapper.setProps({ keyId: 2 })
     resolve({ ticket: 'a'.repeat(64), agent: 'opencode', model: 'mock', expires_in: 300 })

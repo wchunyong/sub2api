@@ -25,7 +25,7 @@ type Config struct {
 
 func BuildConfig(agent, platform string, messages bool, baseURL, apiKey, model string) (Config, error) {
 	fail := errors.New("unsupported Agent, group or gateway configuration")
-	if agent != "claude" && agent != "codex" && agent != "opencode" {
+	if agent != "claude" && agent != "codex" && agent != "opencode" && agent != "workbuddy" && agent != "pi" && agent != "deepseek-harness" {
 		return Config{}, fail
 	}
 	defaults := map[string]string{"openai": "gpt-5.5", "anthropic": "claude-sonnet-4-6", "antigravity": "claude-sonnet-4-6", "gemini": "gemini-2.5-pro", "deepseek": "deepseek-v4-pro", "grok": "grok-4.5", "kimi": "kimi-k2.5", "zhipu": "glm-4.7", "composite": "gpt-5.5"}
@@ -66,9 +66,12 @@ func BuildConfig(agent, platform string, messages bool, baseURL, apiKey, model s
 		case "gemini":
 			protocol = "gemini"
 			endpoint = root + "/v1beta"
-		case "grok":
+		case "grok", "deepseek", "kimi", "zhipu":
 			protocol = "compatible"
 		}
+	}
+	if agent == "workbuddy" || agent == "pi" || agent == "deepseek-harness" {
+		protocol = "openai-completions"
 	}
 	return Config{Version: 1, Agent: agent, APIKey: apiKey, BaseURL: endpoint, Model: model, Protocol: protocol, ProbeURL: root + "/v1/models", MCPEndpoint: root + "/mcp"}, nil
 }

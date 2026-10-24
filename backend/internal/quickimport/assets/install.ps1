@@ -1,6 +1,6 @@
 param(
   [Parameter(Mandatory=$true)][ValidateSet('install','clean')][string]$Action,
-  [Parameter(Mandatory=$true)][ValidateSet('claude','codex','opencode')][string]$Agent,
+  [Parameter(Mandatory=$true)][ValidateSet('claude','codex','opencode','workbuddy','pi','deepseek-harness')][string]$Agent,
   [Parameter(Mandatory=$true)][string]$Server,
   [string]$Ticket
 )
@@ -35,6 +35,7 @@ $download = Join-Path $binaries ([IO.Path]::GetRandomFileName() + '.download')
 $restoreTemp = Join-Path $agentFolder ([IO.Path]::GetRandomFileName() + '.tmp')
 try {
   $asset = $Server.TrimEnd('/') + '/api/v1/quick-import/assets/quick-import-windows-' + $target + '.exe'
+  Write-Host '正在下载并校验连接AI导入工具，请稍候…'
   $headers = @{ 'User-Agent' = 'lianjieai-quick-import/2.0' }
   $checksum = (Invoke-WebRequest -UseBasicParsing -MaximumRedirection 0 -TimeoutSec 30 -Headers $headers -Uri ($asset + '.sha256')).Content.Trim().ToLowerInvariant()
   if ($checksum -notmatch '^[a-f0-9]{64}$') { throw 'Invalid import helper checksum.' }
@@ -43,10 +44,10 @@ try {
     if ((Get-Item -LiteralPath $binary -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Linked import helper refused.' }
   } else {
     Invoke-WebRequest -UseBasicParsing -MaximumRedirection 0 -TimeoutSec 120 -Headers $headers -Uri $asset -OutFile $download
-    if ((Get-FileHash -Algorithm SHA256 -LiteralPath $download).Hash.ToLowerInvariant() -ne $checksum) { throw 'Import helper checksum mismatch. Retry with a new command.' }
+    if ((Get-FileHash -Algorithm SHA256 -LiteralPath $download).Hash.ToLowerInvariant() -ne $checksum) { throw '下载文件校验失败，请返回主站重新生成命令。' }
     Move-Item -LiteralPath $download -Destination $binary -ErrorAction Stop
   }
-  if ((Get-FileHash -Algorithm SHA256 -LiteralPath $binary).Hash.ToLowerInvariant() -ne $checksum) { throw 'Cached import helper checksum mismatch.' }
+  if ((Get-FileHash -Algorithm SHA256 -LiteralPath $binary).Hash.ToLowerInvariant() -ne $checksum) { throw '本地缓存校验失败，请检查恢复目录后重试。' }
   $restore = Join-Path $agentFolder 'restore.ps1'
   if ((Test-Path -LiteralPath $restore) -and ((Get-Item -LiteralPath $restore -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Linked recovery script refused.' }
   $text = "`$ErrorActionPreference = 'Stop'`r`n& (Join-Path `$PSScriptRoot '../bin/$checksum.exe') clean --agent '$Agent'`r`nif (`$LASTEXITCODE -ne 0) { throw 'Cleanup did not complete. Review the message above.' }`r`n"

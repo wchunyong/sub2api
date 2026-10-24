@@ -23,7 +23,7 @@ func QuickImportBootstrap(c *gin.Context) {
 	agent := strings.TrimSuffix(target, ext)
 	clean := strings.HasSuffix(agent, "-clean")
 	agent = strings.TrimSuffix(agent, "-clean")
-	if ext == "" || (agent != "claude" && agent != "codex" && agent != "opencode") {
+	if ext == "" || (agent != "claude" && agent != "codex" && agent != "opencode" && agent != "workbuddy" && agent != "pi" && agent != "deepseek-harness") {
 		c.Status(http.StatusNotFound)
 		return
 	}

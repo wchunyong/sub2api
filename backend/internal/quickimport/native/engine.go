@@ -17,11 +17,12 @@ import (
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
+	"gopkg.in/yaml.v3"
 )
 
 const provider = "sub2api_quick"
 
-var paths = map[string]string{"claude": ".claude/settings.json", "codex": ".codex/config.toml", "opencode": ".config/opencode/opencode.json"}
+var paths = map[string]string{"claude": ".claude/settings.json", "codex": ".codex/config.toml", "opencode": ".config/opencode/opencode.json", "workbuddy": ".workbuddy/models.json", "pi": ".pi/agent/models.json", "deepseek-harness": ".dsh/profiles/web/cordis.patch.yml"}
 
 type Model struct {
 	ID   string `json:"id"`
@@ -229,6 +230,18 @@ func load(text, agent string) (map[string]any, error) {
 	var err error
 	if agent == "codex" {
 		err = toml.Unmarshal([]byte(text), &data)
+	} else if agent == "workbuddy" {
+		entries := []any{}
+		if strings.TrimSpace(text) != "" {
+			err = decodeJSON(text, &entries)
+		}
+		data["entries"] = entries
+	} else if agent == "deepseek-harness" {
+		entries := []any{}
+		if strings.TrimSpace(text) != "" {
+			err = yaml.Unmarshal([]byte(text), &entries)
+		}
+		data["entries"] = entries
 	} else if strings.TrimSpace(text) != "" {
 		err = decodeJSON(text, &data)
 	}
@@ -304,6 +317,14 @@ func render(text, agent string, changes []change) (string, error) {
 		if err := put(desired, c.Path, c.Value); err != nil {
 			return "", err
 		}
+	}
+	if agent == "workbuddy" {
+		b, err := json.MarshalIndent(desired["entries"], "", "  ")
+		return string(b) + "\n", err
+	}
+	if agent == "deepseek-harness" {
+		b, err := yaml.Marshal(desired["entries"])
+		return string(b), err
 	}
 	if agent != "codex" {
 		b, err := json.MarshalIndent(desired, "", "  ")
@@ -502,6 +523,27 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 				"headers": map[string]any{"Authorization": "Bearer " + p.APIKey},
 			})
 		}
+	case "workbuddy":
+		entries := make([]any, 0, 1)
+		for _, m := range normalized {
+			if m.ID != p.Model {
+				continue
+			}
+			entries = append(entries, map[string]any{"id": m.ID, "name": m.Name, "vendor": "lianjieai", "url": base + "/chat/completions", "apiKey": p.APIKey, "maxInputTokens": 128000, "maxOutputTokens": 8192, "supportsToolCall": true, "supportsImages": false})
+		}
+		add([]string{"entries"}, entries)
+	case "pi":
+		entries := make([]any, 0, 1)
+		for _, m := range normalized {
+			if m.ID != p.Model {
+				continue
+			}
+			entries = append(entries, map[string]any{"id": m.ID, "name": m.Name})
+		}
+		add([]string{"$schema"}, "https://pi.dev/schemas/models.schema.json")
+		add([]string{"providers", "lianjieai"}, map[string]any{"baseUrl": base, "api": "openai-completions", "apiKey": p.APIKey, "models": entries})
+	case "deepseek-harness":
+		// The existing profile entries are read and preserved by Install below.
 	}
 	return changes, nil
 }
@@ -581,7 +623,7 @@ func cleanClaudeUserMCPConfig(root string, rec *record) error {
 }
 
 func mcpImageToolsEnabled(p Payload) bool {
-	return p.MCPImageToolsEnabled == nil || *p.MCPImageToolsEnabled
+	return p.MCPImageToolsEnabled != nil && *p.MCPImageToolsEnabled
 }
 
 func resolveMCPEndpoint(p Payload, base string) (string, error) {
@@ -700,6 +742,95 @@ func Install(root string, p Payload) error {
 	original, err := load(before, p.Agent)
 	if err != nil {
 		return err
+	}
+	if p.Agent == "workbuddy" {
+		for i := range changes {
+			if changes[i].Path[0] == "entries" {
+				incoming, _ := changes[i].Value.Value.([]any)
+				ids := map[string]bool{}
+				for _, item := range incoming {
+					if m, ok := item.(map[string]any); ok {
+						if id, ok := m["id"].(string); ok {
+							ids[id] = true
+						}
+					}
+				}
+				if existing, ok := original["entries"].([]any); ok {
+					for _, item := range existing {
+						m, ok := item.(map[string]any)
+						if !ok {
+							incoming = append(incoming, item)
+							continue
+						}
+						id, ok := m["id"].(string)
+						if !ok || !ids[id] {
+							incoming = append(incoming, item)
+						}
+					}
+				}
+				changes[i].Value.Value = incoming
+			}
+		}
+	}
+	if p.Agent == "deepseek-harness" {
+		entries, ok := original["entries"].([]any)
+		if !ok {
+			return errors.New("invalid DeepSeek Harness profile")
+		}
+		modelName := p.Model
+		for _, m := range p.Models {
+			if m.ID == p.Model {
+				modelName = m.Name
+				break
+			}
+		}
+		route := map[string]any{
+			"displayName": "lianjieai",
+			"api":         "openai-completions",
+			"baseURL":     strings.TrimRight(p.BaseURL, "/"),
+			"headers":     map[string]any{"Authorization": "Bearer " + p.APIKey},
+			"models":      []any{map[string]any{"id": p.Model, "name": modelName}},
+		}
+		updated := append([]any{}, entries...)
+		found := false
+		for i, item := range entries {
+			entry, ok := item.(map[string]any)
+			if !ok || (entry["id"] != "llm-pi-ai" && entry["name"] != "@deepseek-ai/dsh-llm-pi-ai") {
+				continue
+			}
+			if found {
+				return errors.New("multiple DeepSeek Harness model providers require manual configuration")
+			}
+			found = true
+			copyEntry := make(map[string]any, len(entry))
+			for key, value := range entry {
+				copyEntry[key] = value
+			}
+			config, ok := entry["config"].(map[string]any)
+			if !ok && entry["config"] != nil {
+				return errors.New("invalid DeepSeek Harness provider configuration")
+			}
+			copyConfig := make(map[string]any, len(config)+1)
+			for key, value := range config {
+				copyConfig[key] = value
+			}
+			providers, ok := config["providers"].(map[string]any)
+			if !ok && config["providers"] != nil {
+				return errors.New("invalid DeepSeek Harness provider list")
+			}
+			copyProviders := make(map[string]any, len(providers)+1)
+			for key, value := range providers {
+				copyProviders[key] = value
+			}
+			copyProviders["lianjieai"] = route
+			copyConfig["providers"] = copyProviders
+			copyEntry["config"] = copyConfig
+			updated[i] = copyEntry
+		}
+		if !found {
+			updated = append(updated, map[string]any{"id": "llm-pi-ai", "config": map[string]any{"providers": map[string]any{"lianjieai": route}}})
+		}
+		changes = append(changes, change{Path: []string{"entries"}, Value: value{Exists: true, Value: updated}})
 	}
 	after, err := render(before, p.Agent, changes)
 	if err != nil {
@@ -882,7 +1013,7 @@ func Clean(root, agent string) error {
 	rec.CleanupPending = true
 	rec.CleanupBefore = current
 	rec.CleanupResult = result
-	rec.CleanupDelete = !rec.Existed && len(restored) == 0
+	rec.CleanupDelete = !rec.Existed && (len(restored) == 0 || (agent == "workbuddy" || agent == "deepseek-harness") && equal(restored["entries"], []any{}))
 	if err = writeJournal(folder, records); err != nil {
 		return err
 	}

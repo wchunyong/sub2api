@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,43 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/quickimport/native"
 )
+
+func TestSixAgentsInstallAndRestoreFromIsolatedInput(t *testing.T) {
+	for _, name := range []string{"CLAUDE_CONFIG_DIR", "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY", "CODEX_HOME", "OPENCODE_CONFIG", "OPENCODE_CONFIG_CONTENT", "XDG_CONFIG_HOME", "PI_CODING_AGENT_DIR", "DSH_HOME"} {
+		t.Setenv(name, "")
+	}
+	for _, agent := range []string{"claude", "codex", "deepseek-harness", "workbuddy", "opencode", "pi"} {
+		t.Run(agent, func(t *testing.T) {
+			root := t.TempDir()
+			payload := native.Payload{Version: 1, Agent: agent, APIKey: "private-test-key", BaseURL: "https://example.test/v1", Model: "selected-model", Models: []native.Model{{ID: "selected-model", Name: "Selected Model"}}}
+			if agent == "claude" {
+				payload.BaseURL = "https://example.test"
+			}
+			if agent == "codex" {
+				payload.CodexManifest = map[string]any{"models": []any{map[string]any{"slug": "selected-model"}}}
+			}
+			body, err := json.Marshal(payload)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var out, stderr bytes.Buffer
+			if code := run([]string{"install", "--agent", agent, "--stdin", "--home", root, "--skip-client-check"}, bytes.NewReader(body), &out, &stderr); code != 0 {
+				t.Fatalf("install failed: %s", stderr.String())
+			}
+			if !strings.Contains(out.String(), "配置已写入") || strings.Contains(out.String(), "private-test-key") {
+				t.Fatalf("wrong install output: %s", out.String())
+			}
+			out.Reset()
+			stderr.Reset()
+			if code := run([]string{"clean", "--agent", agent, "--home", root, "--yes"}, strings.NewReader(""), &out, &stderr); code != 0 {
+				t.Fatalf("cleanup failed: %s", stderr.String())
+			}
+			if !strings.Contains(out.String(), "恢复完成") {
+				t.Fatalf("wrong cleanup output: %s", out.String())
+			}
+		})
+	}
+}
 
 func TestCleanReportsConflictWithoutCredentials(t *testing.T) {
 	root := t.TempDir()

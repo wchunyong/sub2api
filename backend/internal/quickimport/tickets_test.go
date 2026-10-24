@@ -50,10 +50,23 @@ func TestTicketExpiryAndAtomicConsumption(t *testing.T) {
 }
 
 func TestConfigTargets(t *testing.T) {
-	for _, agent := range []string{"claude", "codex", "opencode"} {
+	for _, agent := range []string{"claude", "codex", "opencode", "deepseek-harness", "workbuddy", "pi"} {
 		c, err := BuildConfig(agent, "deepseek", false, "https://example.com/v1", "mock-key", "")
 		if err != nil || c.Agent != agent || c.Model != "deepseek-v4-pro" {
 			t.Fatalf("%s: %#v %v", agent, c, err)
+		}
+		expectedBase := "https://example.com/v1"
+		if agent == "claude" {
+			expectedBase = "https://example.com"
+		}
+		if c.BaseURL != expectedBase {
+			t.Fatalf("%s: wrong base URL: %#v", agent, c)
+		}
+		if agent == "opencode" && c.Protocol != "compatible" {
+			t.Fatalf("DeepSeek OpenCode must use Chat Completions: %#v", c)
+		}
+		if (agent == "deepseek-harness" || agent == "workbuddy" || agent == "pi") && c.Protocol != "openai-completions" {
+			t.Fatalf("%s: wrong protocol: %#v", agent, c)
 		}
 	}
 	if _, err := BuildConfig("claude", "openai", false, "https://example.com", "mock-key", ""); err == nil {

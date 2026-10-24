@@ -217,7 +217,7 @@ def clean_claude_user_mcp(root, record):
 
 
 def mcp_image_tools_enabled(payload):
-    return payload.get('mcp_image_tools_enabled', True) is not False
+    return payload.get('mcp_image_tools_enabled', False) is True
 
 
 def derive_mcp_endpoint(base):

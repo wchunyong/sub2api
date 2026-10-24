@@ -242,6 +242,7 @@ describe('UseKeyModal', () => {
     expect(claudeTab).toBeDefined()
     await claudeTab!.trigger('click')
     await nextTick()
+    await wrapper.get('#claude-model').setValue('grok-4.5')
 
     let codeBlocks = wrapper.findAll('pre code').map((code) => code.text())
     expect(codeBlocks.join('\n')).toContain('ANTHROPIC_BASE_URL="https://example.com"')
@@ -379,7 +380,7 @@ describe('UseKeyModal', () => {
     expect(codeBlocks.join('\n')).toContain('experimental_bearer_token = "sk-grok-codex-test"')
   })
 
-  it('keeps legacy OpenAI Codex config as the default', () => {
+  it('uses environment key authentication in OpenAI Codex config by default', () => {
     const wrapper = mount(UseKeyModal, {
       props: {
         show: true,
@@ -408,19 +409,22 @@ describe('UseKeyModal', () => {
     expect(configToml).not.toContain('model = "gpt-5.4"')
     expect(configToml).not.toContain('model_context_window')
     expect(configToml).not.toContain('model_auto_compact_token_limit')
-    expect(configToml).toContain('requires_openai_auth = true')
+    expect(configToml).toContain('requires_openai_auth = false')
     expect(configToml).not.toContain('experimental_bearer_token')
     expect(configToml).not.toContain('x-openai-actor-authorization')
-    expect(configToml).not.toContain('env_key')
+    expect(configToml).toContain('env_key = "LIANJIEAI_API_KEY"')
     expect(configToml).not.toContain('image_generation')
     expect(configToml).not.toContain('supports_websockets')
     expect(configToml).not.toContain('responses_websockets_v2')
     const features = configToml?.split('[features]\n')[1]?.split('\n[')[0]
     expect(features).toContain('goals = true')
     expect(configToml).not.toContain('model_reasoning_effort = "xhigh"')
-    expect(codeBlocks).toContain('{\n  "OPENAI_API_KEY": "sk-test"\n}')
-    expect(wrapper.text()).toContain('auth.json')
-    expect(wrapper.find('[data-testid="codex-api-key-restart-notice"]').exists()).toBe(false)
+    expect(codeBlocks).toContain('export LIANJIEAI_API_KEY="sk-test"')
+    expect(wrapper.text()).not.toContain('auth.json')
+    expect(wrapper.find('[data-testid="codex-api-key-restart-notice"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="manual-model-required"]').exists()).toBe(true)
+    expect(wrapper.findAll('pre code').length).toBeGreaterThan(0)
+    expect(wrapper.findAll('button').filter(button => button.text().includes('keys.useKeyModal.copy')).every(button => button.attributes('disabled') !== undefined)).toBe(true)
   })
 
   it('normalizes OpenAI Codex and Claude base URLs independently', async () => {
@@ -492,11 +496,11 @@ describe('UseKeyModal', () => {
     expect(apiKeyMode.attributes('aria-checked')).toBe('true')
     expect(configToml).toBeDefined()
     expect(configToml).toContain('requires_openai_auth = false')
-    expect(configToml).toContain('experimental_bearer_token = "sk-test"')
-    expect(configToml).toContain('http_headers = { "x-openai-actor-authorization" = "local-image-extension" }')
+    expect(configToml).not.toContain('experimental_bearer_token')
+    expect(configToml).not.toContain('x-openai-actor-authorization')
     expect(configToml).toContain('model_catalog_url = "https://example.com/v1/models"')
     expect(configToml).not.toContain('model_catalog_json')
-    expect(configToml).not.toContain('env_key')
+    expect(configToml).toContain('env_key = "LIANJIEAI_API_KEY"')
     expect(configToml).not.toContain('image_generation')
     expect(codeBlocks).not.toContain('{\n  "OPENAI_API_KEY": "sk-test"\n}')
     expect(wrapper.text()).not.toContain('auth.json')
@@ -513,9 +517,13 @@ describe('UseKeyModal', () => {
     expect(wrapper.findAll('pre code').map((code) => code.text()).join('\n')).not.toContain(
       'x-openai-actor-authorization'
     )
+    expect(wrapper.findAll('pre code').map((code) => code.text()).join('\n')).toContain(
+      'requires_openai_auth = true'
+    )
+    expect(wrapper.text()).toContain('auth.json')
   })
 
-  it('keeps legacy OpenAI Codex WebSocket config as the default', async () => {
+  it('uses environment key authentication in OpenAI Codex WebSocket config by default', async () => {
     const wrapper = mount(UseKeyModal, {
       props: {
         show: true,
@@ -552,17 +560,17 @@ describe('UseKeyModal', () => {
     expect(configToml).not.toContain('model = "gpt-5.4"')
     expect(configToml).not.toContain('model_context_window')
     expect(configToml).not.toContain('model_auto_compact_token_limit')
-    expect(configToml).toContain('requires_openai_auth = true')
+    expect(configToml).toContain('requires_openai_auth = false')
     expect(configToml).not.toContain('experimental_bearer_token')
     expect(configToml).not.toContain('x-openai-actor-authorization')
-    expect(configToml).not.toContain('env_key')
+    expect(configToml).toContain('env_key = "LIANJIEAI_API_KEY"')
     expect(configToml).not.toContain('image_generation')
     expect(configToml).toContain('supports_websockets = true')
     const features = configToml?.split('[features]\n')[1]?.split('\n[')[0]
     expect(features).toContain('responses_websockets_v2 = true')
     expect(features).toContain('goals = true')
-    expect(codeBlocks).toContain('{\n  "OPENAI_API_KEY": "sk-test"\n}')
-    expect(wrapper.text()).toContain('auth.json')
+    expect(codeBlocks).toContain('export LIANJIEAI_API_KEY="sk-test"')
+    expect(wrapper.text()).not.toContain('auth.json')
   })
 
   it('preserves API Key Mode when switching to OpenAI Codex WebSocket config', async () => {
@@ -603,9 +611,9 @@ describe('UseKeyModal', () => {
     expect(wrapper.get('[data-testid="codex-auth-mode-api-key"]').attributes('aria-checked')).toBe('true')
     expect(configToml).toBeDefined()
     expect(configToml).toContain('requires_openai_auth = false')
-    expect(configToml).toContain('experimental_bearer_token = "sk-test"')
-    expect(configToml).toContain('http_headers = { "x-openai-actor-authorization" = "local-image-extension" }')
-    expect(configToml).not.toContain('env_key')
+    expect(configToml).not.toContain('experimental_bearer_token')
+    expect(configToml).not.toContain('x-openai-actor-authorization')
+    expect(configToml).toContain('env_key = "LIANJIEAI_API_KEY"')
     expect(configToml).not.toContain('image_generation')
     expect(configToml).toContain('supports_websockets = true')
     const features = configToml?.split('[features]\n')[1]?.split('\n[')[0]
@@ -635,20 +643,20 @@ describe('UseKeyModal', () => {
       }
     })
 
-    await wrapper.get('[data-testid="codex-auth-mode-api-key"]').trigger('click')
+    await wrapper.get('[data-testid="codex-auth-mode-legacy"]').trigger('click')
     await wrapper.setProps({ show: false })
     await wrapper.setProps({ show: true })
     await nextTick()
 
-    expect(wrapper.get('[data-testid="codex-auth-mode-legacy"]').attributes('aria-checked')).toBe('true')
-    expect(wrapper.findAll('pre code').map((code) => code.text()).join('\n')).toContain('requires_openai_auth = true')
+    expect(wrapper.get('[data-testid="codex-auth-mode-api-key"]').attributes('aria-checked')).toBe('true')
+    expect(wrapper.findAll('pre code').map((code) => code.text()).join('\n')).toContain('requires_openai_auth = false')
 
-    await wrapper.get('[data-testid="codex-auth-mode-api-key"]').trigger('click')
+    await wrapper.get('[data-testid="codex-auth-mode-legacy"]').trigger('click')
     await wrapper.setProps({ platform: 'gemini' })
     await wrapper.setProps({ platform: 'openai' })
     await nextTick()
 
-    expect(wrapper.get('[data-testid="codex-auth-mode-legacy"]').attributes('aria-checked')).toBe('true')
+    expect(wrapper.get('[data-testid="codex-auth-mode-api-key"]').attributes('aria-checked')).toBe('true')
     expect(wrapper.findAll('pre code').map((code) => code.text()).join('\n')).not.toContain('x-openai-actor-authorization')
   })
 
@@ -864,7 +872,12 @@ describe('UseKeyModal', () => {
     expect(unixConfig).toContain('[model_providers.sub2api]\nname = "Sub2API Composite"\nbase_url = "https://example.com/v1"\nmodel_catalog_url = "https://example.com/v1/models"')
     expect(unixConfig).not.toContain('model_catalog_json')
     expect(unixConfig).toContain('env_key = "SUB2API_API_KEY"')
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://example.com/v1/models',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer sk-composite-test' })
+      })
+    )
 
     await wrapper.get('[data-testid="codex-model-catalog-mode"]').setValue('file')
 
@@ -953,6 +966,40 @@ describe('UseKeyModal', () => {
     }
   )
 
+  it('uses the current key model for DeepSeek OpenCode manual configuration', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ id: 'deepseek-current-model' }] })
+    }))
+    const wrapper = mount(UseKeyModal, {
+      props: {
+        show: true,
+        apiKey: 'sk-deepseek-test',
+        baseUrl: 'https://example.com/v1',
+        platform: 'deepseek',
+        client: 'opencode'
+      },
+      global: {
+        stubs: {
+          BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' },
+          Icon: { template: '<span />' }
+        }
+      }
+    })
+    try {
+      await flushPromises()
+      const config = wrapper.findAll('pre code').map(code => code.text()).find(content => content.includes('"provider"'))!
+      const parsed = JSON.parse(config)
+      expect(parsed.provider.lianjieai.npm).toBe('@ai-sdk/openai-compatible')
+      expect(parsed.provider.lianjieai.options.baseURL).toBe('https://example.com/v1')
+      expect(Object.keys(parsed.provider.lianjieai.models)).toEqual(['deepseek-current-model'])
+      expect(parsed.model).toBe('lianjieai/deepseek-current-model')
+    } finally {
+      wrapper.unmount()
+      vi.unstubAllGlobals()
+    }
+  })
+
   // Scenario: the platform-preferred model remains selected when the downloaded catalog contains it.
   it('keeps the preferred Composite default when it exists in the catalog', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
@@ -1032,7 +1079,8 @@ describe('UseKeyModal', () => {
         expect(configToml).toContain('model = "gpt-5.5"')
         expect(configToml).toContain('[model_providers.OpenAI]\nname = "OpenAI"\nbase_url = "https://example.com/v1"\nmodel_catalog_url = "https://example.com/v1/models"')
         expect(configToml).not.toContain('model_catalog_json')
-        expect(configToml).toContain('requires_openai_auth = true')
+        expect(configToml).toContain('requires_openai_auth = false')
+        expect(configToml).toContain('env_key = "LIANJIEAI_API_KEY"')
         expect(configToml).not.toContain('client_version')
         expect(wrapper.find('[data-testid="codex-model-catalog"]').exists()).toBe(true)
 
@@ -1046,7 +1094,12 @@ describe('UseKeyModal', () => {
         await wrapper.get('[data-testid="codex-model-catalog-mode"]').setValue('remote')
       }
     }
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://example.com/v1/models',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer sk-openai-test' })
+      })
+    )
   })
 
   it.each([1024 * 1024 - 1, 1024 * 1024, 1024 * 1024 + 1])(

@@ -700,6 +700,8 @@ describe('user KeysView column settings', () => {
       await flushPromises()
       expect(keysAPI.create).toHaveBeenCalledOnce()
       expect(vi.mocked(keysAPI.create).mock.calls[0].slice(0, 2)).toEqual(['My key', 5])
+      expect(wrapper.findComponent({ name: 'QuickImportModal' }).props('show')).toBe(false)
+      expect(wrapper.find('[data-tour="key-form-name"]').exists()).toBe(false)
     })
 
     it('defaults to a provider with available groups and disables empty categories', async () => {

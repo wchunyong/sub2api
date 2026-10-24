@@ -1,6 +1,6 @@
 import type { ImportAgent } from './quickImport'
 export type ImportOS = 'windows' | 'unix'
-export function automaticAgent(agent: ImportAgent): boolean { return ['claude', 'codex', 'opencode'].includes(agent) }
+export function automaticAgent(agent: ImportAgent): boolean { return ['claude', 'codex', 'opencode', 'deepseek-harness', 'workbuddy', 'pi'].includes(agent) }
 function checkedAgent(agent: ImportAgent) { if (!automaticAgent(agent)) throw new Error('Unsupported Agent'); return agent }
 const ps = (value: string) => `'${value.replace(/'/g, "''")}'`
 const sh = (value: string) => `'${value.replace(/'/g, `'"'"'`)}'`
