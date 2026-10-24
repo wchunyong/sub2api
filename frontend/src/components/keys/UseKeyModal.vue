@@ -1009,8 +1009,7 @@ export ANTHROPIC_DEFAULT_SONNET_MODEL="${model}"
 export ANTHROPIC_DEFAULT_HAIKU_MODEL="${model}"
 export ANTHROPIC_DEFAULT_FABLE_MODEL="${model}"
 export CLAUDE_CODE_SUBAGENT_MODEL="${model}"
-export ANTHROPIC_CUSTOM_MODEL_OPTION="${model}"
-export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
+export ANTHROPIC_CUSTOM_MODEL_OPTION="${model}"`
       break
     case 'cmd':
       path = 'Command Prompt'
@@ -1022,8 +1021,7 @@ set ANTHROPIC_DEFAULT_SONNET_MODEL=${model}
 set ANTHROPIC_DEFAULT_HAIKU_MODEL=${model}
 set ANTHROPIC_DEFAULT_FABLE_MODEL=${model}
 set CLAUDE_CODE_SUBAGENT_MODEL=${model}
-set ANTHROPIC_CUSTOM_MODEL_OPTION=${model}
-set CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
+set ANTHROPIC_CUSTOM_MODEL_OPTION=${model}`
       break
     case 'powershell':
       path = 'PowerShell'
@@ -1035,8 +1033,7 @@ $env:ANTHROPIC_DEFAULT_SONNET_MODEL="${model}"
 $env:ANTHROPIC_DEFAULT_HAIKU_MODEL="${model}"
 $env:ANTHROPIC_DEFAULT_FABLE_MODEL="${model}"
 $env:CLAUDE_CODE_SUBAGENT_MODEL="${model}"
-$env:ANTHROPIC_CUSTOM_MODEL_OPTION="${model}"
-$env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
+$env:ANTHROPIC_CUSTOM_MODEL_OPTION="${model}"`
       break
     default:
       path = 'Terminal'
@@ -1058,8 +1055,7 @@ $env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "${model}",
     "ANTHROPIC_DEFAULT_FABLE_MODEL": "${model}",
     "CLAUDE_CODE_SUBAGENT_MODEL": "${model}",
-    "ANTHROPIC_CUSTOM_MODEL_OPTION": "${model}",
-    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+    "ANTHROPIC_CUSTOM_MODEL_OPTION": "${model}"
   }
 }`
 
@@ -1083,8 +1079,7 @@ function generateGrokClaudeFiles(baseUrl: string, apiKey: string): FileConfig[] 
     ANTHROPIC_DEFAULT_SONNET_MODEL: model,
     ANTHROPIC_DEFAULT_HAIKU_MODEL: model,
     ANTHROPIC_DEFAULT_FABLE_MODEL: model,
-    CLAUDE_CODE_SUBAGENT_MODEL: model,
-    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+    CLAUDE_CODE_SUBAGENT_MODEL: model
   }
   let path: string
   let content: string

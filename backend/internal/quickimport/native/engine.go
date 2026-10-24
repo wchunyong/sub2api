@@ -563,7 +563,7 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 	add := func(path []string, v any) { changes = append(changes, change{path, value{true, v}}) }
 	switch p.Agent {
 	case "claude":
-		for _, pair := range [][2]string{{"ANTHROPIC_BASE_URL", base}, {"ANTHROPIC_AUTH_TOKEN", p.APIKey}, {"ANTHROPIC_MODEL", p.Model}, {"ANTHROPIC_DEFAULT_OPUS_MODEL", p.Model}, {"ANTHROPIC_DEFAULT_SONNET_MODEL", p.Model}, {"ANTHROPIC_DEFAULT_HAIKU_MODEL", p.Model}, {"ANTHROPIC_DEFAULT_FABLE_MODEL", p.Model}, {"CLAUDE_CODE_SUBAGENT_MODEL", p.Model}, {"ANTHROPIC_CUSTOM_MODEL_OPTION", p.Model}, {"ANTHROPIC_CUSTOM_MODEL_OPTION_NAME", "lianjieai · " + p.Model}, {"ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION", "lianjieai gateway"}, {"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "1"}} {
+		for _, pair := range [][2]string{{"ANTHROPIC_BASE_URL", base}, {"ANTHROPIC_AUTH_TOKEN", p.APIKey}, {"ANTHROPIC_MODEL", p.Model}, {"ANTHROPIC_DEFAULT_OPUS_MODEL", p.Model}, {"ANTHROPIC_DEFAULT_SONNET_MODEL", p.Model}, {"ANTHROPIC_DEFAULT_HAIKU_MODEL", p.Model}, {"ANTHROPIC_DEFAULT_FABLE_MODEL", p.Model}, {"CLAUDE_CODE_SUBAGENT_MODEL", p.Model}, {"ANTHROPIC_CUSTOM_MODEL_OPTION", p.Model}, {"ANTHROPIC_CUSTOM_MODEL_OPTION_NAME", "lianjieai · " + p.Model}, {"ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION", "lianjieai gateway"}} {
 			add([]string{"env", pair[0]}, pair[1])
 		}
 		if p.ClaudeModelPickerSupported {
@@ -777,6 +777,17 @@ func Install(root string, p Payload) error {
 	original, err := load(before, p.Agent)
 	if err != nil {
 		return err
+	}
+	if p.Agent == "claude" && len(records) > 0 {
+		// Earlier installers managed this switch. Remove it on reimport only when
+		// the latest journal still owns the unchanged value; user edits survive.
+		flag := []string{"env", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"}
+		for _, previous := range records[len(records)-1].Changes {
+			if reflect.DeepEqual(previous.Path, flag) && previous.Value.Exists && equal(get(original, flag), previous.Value) {
+				changes = append(changes, change{Path: flag, Value: value{Exists: false}})
+				break
+			}
+		}
 	}
 	if p.Agent == "workbuddy" {
 		for i := range changes {

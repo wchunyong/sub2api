@@ -467,6 +467,89 @@ func TestClaudeImportPinsEveryModelRoute(t *testing.T) {
 			t.Errorf("%s must use the selected model, got %v", name, env[name])
 		}
 	}
+	if _, injected := env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"]; injected {
+		t.Fatal("quick import must not disable Claude Code updates and optional features")
+	}
+}
+
+func TestClaudeReimportRemovesPreviouslyManagedTrafficFlag(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, paths["claude"])
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	oldConfig := `{"env":{"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC":"1","USER_SETTING":"keep"}}`
+	if err := os.WriteFile(path, []byte(oldConfig), 0600); err != nil {
+		t.Fatal(err)
+	}
+	folder := filepath.Join(root, ".sub2api-quick-import", "claude")
+	if err := os.MkdirAll(folder, 0700); err != nil {
+		t.Fatal(err)
+	}
+	flag := []string{"env", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"}
+	oldRecord := record{Agent: "claude", Existed: true, Before: `{"env":{"USER_SETTING":"keep"}}`, After: oldConfig,
+		Changes: []change{{Path: flag, Value: value{Exists: true, Value: "1"}}},
+		Inverse: []change{{Path: flag, Value: value{Exists: false}}}}
+	if err := writeJournal(folder, []record{oldRecord}); err != nil {
+		t.Fatal(err)
+	}
+	p := Payload{Version: 1, Agent: "claude", APIKey: "test-secret", BaseURL: "https://example.test", Model: "claude-test"}
+	if err := Install(root, p); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := load(string(content), "claude")
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := data["env"].(map[string]any)
+	if _, stillPresent := env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"]; stillPresent || env["USER_SETTING"] != "keep" {
+		t.Fatalf("reimport did not remove the managed flag while preserving user settings: %s", content)
+	}
+	if err := Clean(root, "claude"); err != nil {
+		t.Fatal(err)
+	}
+	content, _ = os.ReadFile(path)
+	if string(content) != oldConfig {
+		t.Fatalf("cleanup did not restore the previous configuration: %s", content)
+	}
+}
+
+func TestClaudeReimportPreservesEditedTrafficFlag(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, paths["claude"])
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(`{"env":{"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC":"user-choice"}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	folder := filepath.Join(root, ".sub2api-quick-import", "claude")
+	if err := os.MkdirAll(folder, 0700); err != nil {
+		t.Fatal(err)
+	}
+	flag := []string{"env", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"}
+	if err := writeJournal(folder, []record{{Agent: "claude", Changes: []change{{Path: flag, Value: value{Exists: true, Value: "1"}}}}}); err != nil {
+		t.Fatal(err)
+	}
+	p := Payload{Version: 1, Agent: "claude", APIKey: "test-secret", BaseURL: "https://example.test", Model: "claude-test"}
+	if err := Install(root, p); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := load(string(content), "claude")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := data["env"].(map[string]any)["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"]; got != "user-choice" {
+		t.Fatalf("reimport changed the user's value: %v", got)
+	}
 }
 
 func TestImportCatalogOmitsDedicatedMediaModels(t *testing.T) {
