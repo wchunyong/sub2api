@@ -272,7 +272,7 @@ func Preflight(agent string, checkClient bool) error {
 	}
 	for _, name := range names {
 		if os.Getenv(name) != "" {
-			return fmt.Errorf("检测到 %s 自定义配置变量；一键导入只写默认目录。请先清除该变量并重开终端，或改用手动配置", name)
+			return fmt.Errorf("检测到 %s 环境变量；它可能覆盖一键导入写入的配置。请确认变量用途，清除后重开终端，或改用手动配置", name)
 		}
 	}
 	if !checkClient {
