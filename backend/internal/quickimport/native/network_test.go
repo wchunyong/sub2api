@@ -115,6 +115,41 @@ func TestCodexCatalogCompatibility(t *testing.T) {
 	}
 }
 
+func TestCodexImportUsesDedicatedCatalogWhenGenericListDoesNotContainModel(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		status int
+		body   string
+	}{
+		{"generic list unavailable", http.StatusServiceUnavailable, "unavailable"},
+		{"generic list omits Codex model", http.StatusOK, `{"data":[{"id":"unrelated"}]}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			genericRequests := 0
+			s := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Query().Get("client_version") == "" {
+					genericRequests++
+					w.WriteHeader(tc.status)
+					fmt.Fprint(w, tc.body)
+					return
+				}
+				fmt.Fprint(w, `{"models":[{"slug":"codex-only","display_name":"Codex Only"}]}`)
+			}))
+			defer s.Close()
+			p := Payload{Version: 1, Agent: "codex", APIKey: "test-secret", BaseURL: s.URL, ProbeURL: s.URL + "/models", Model: "codex-only"}
+			if err := (Network{Client: s.Client(), Version: func(string) string { return "0.155.3" }}).SynchronizeModels(&p); err != nil {
+				t.Fatal(err)
+			}
+			if genericRequests != 0 {
+				t.Fatalf("Codex import queried the unrelated generic model list %d times", genericRequests)
+			}
+			if err := Install(t.TempDir(), p); err != nil {
+				t.Fatalf("Codex import rejected a model in its dedicated catalog: %v", err)
+			}
+		})
+	}
+}
+
 func TestNetworkBoundsAndSanitizesResponses(t *testing.T) {
 	for _, test := range []struct {
 		name, body string

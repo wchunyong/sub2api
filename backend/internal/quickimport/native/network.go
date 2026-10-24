@@ -108,34 +108,36 @@ func (n Network) SynchronizeModels(p *Payload) error {
 	if err != nil || !strings.EqualFold(base.Host, probe.Host) {
 		return errors.New("invalid connectivity probe URL")
 	}
-	var result struct {
-		Data json.RawMessage `json:"data"`
-	}
-	if err = n.request(http.MethodGet, p.ProbeURL, p.APIKey, nil, 1024*1024, &result); err != nil {
-		return err
-	}
-	var items []map[string]any
-	if len(result.Data) == 0 || result.Data[0] != '[' || json.Unmarshal(result.Data, &items) != nil {
-		return errors.New("gateway did not return a model list; check the API base URL")
-	}
-	models := []Model{}
-	seen := map[string]bool{}
-	for _, item := range items {
-		id, _ := item["id"].(string)
-		if strings.TrimSpace(id) == "" || len([]rune(id)) > 200 || strings.IndexFunc(id, func(r rune) bool { return r < 32 }) >= 0 || seen[id] {
-			continue
+	if p.Agent != "codex" {
+		var result struct {
+			Data json.RawMessage `json:"data"`
 		}
-		seen[id] = true
-		name, _ := item["name"].(string)
-		if strings.TrimSpace(name) == "" {
-			name, _ = item["display_name"].(string)
+		if err = n.request(http.MethodGet, p.ProbeURL, p.APIKey, nil, 1024*1024, &result); err != nil {
+			return err
 		}
-		if strings.TrimSpace(name) == "" {
-			name = id
+		var items []map[string]any
+		if len(result.Data) == 0 || result.Data[0] != '[' || json.Unmarshal(result.Data, &items) != nil {
+			return errors.New("gateway did not return a model list; check the API base URL")
 		}
-		models = append(models, Model{ID: id, Name: name})
+		models := []Model{}
+		seen := map[string]bool{}
+		for _, item := range items {
+			id, _ := item["id"].(string)
+			if strings.TrimSpace(id) == "" || len([]rune(id)) > 200 || strings.IndexFunc(id, func(r rune) bool { return r < 32 }) >= 0 || seen[id] {
+				continue
+			}
+			seen[id] = true
+			name, _ := item["name"].(string)
+			if strings.TrimSpace(name) == "" {
+				name, _ = item["display_name"].(string)
+			}
+			if strings.TrimSpace(name) == "" {
+				name = id
+			}
+			models = append(models, Model{ID: id, Name: name})
+		}
+		p.Models = models
 	}
-	p.Models = models
 	versionFn := n.Version
 	if versionFn == nil {
 		versionFn = ClientVersion
@@ -157,12 +159,27 @@ func (n Network) SynchronizeModels(p *Payload) error {
 			return errors.New("gateway did not return a Codex model catalog")
 		}
 		found := false
+		models := make([]Model, 0, len(entries))
+		seen := map[string]bool{}
 		for _, entry := range entries {
 			m, ok := entry.(map[string]any)
 			if !ok {
 				return errors.New("invalid Codex model descriptor")
 			}
-			if m["slug"] == p.Model {
+			id, _ := m["slug"].(string)
+			if strings.TrimSpace(id) == "" || len([]rune(id)) > 200 || strings.IndexFunc(id, func(r rune) bool { return r < 32 }) >= 0 || seen[id] {
+				continue
+			}
+			seen[id] = true
+			name, _ := m["display_name"].(string)
+			if strings.TrimSpace(name) == "" {
+				name, _ = m["name"].(string)
+			}
+			if strings.TrimSpace(name) == "" {
+				name = id
+			}
+			models = append(models, Model{ID: id, Name: name})
+			if id == p.Model {
 				found = true
 			}
 			messages, _ := m["model_messages"].(map[string]any)
@@ -180,6 +197,7 @@ func (n Network) SynchronizeModels(p *Payload) error {
 		if !found {
 			return errors.New("selected model is not in the Codex model catalog")
 		}
+		p.Models = models
 		p.CodexManifest = manifest
 	}
 	return nil
