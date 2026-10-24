@@ -265,14 +265,14 @@ func atLeast(version string, min [3]int) bool {
 
 // Preflight preserves the supported clients' default user-config semantics.
 func Preflight(agent string, checkClient bool) error {
-	overrides := map[string][]string{"opencode": {"OPENCODE_CONFIG", "OPENCODE_CONFIG_CONTENT", "XDG_CONFIG_HOME"}, "claude": {"CLAUDE_CONFIG_DIR", "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY"}, "codex": {"CODEX_HOME"}, "pi": {"PI_CODING_AGENT_DIR"}, "workbuddy": {}, "deepseek-harness": {"DSH_HOME"}}
+	overrides := map[string][]string{"opencode": {"OPENCODE_CONFIG", "OPENCODE_CONFIG_CONTENT", "XDG_CONFIG_HOME"}, "claude": {"CLAUDE_CONFIG_DIR", "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY"}, "codex": {"CODEX_HOME"}, "pi": {"PI_CODING_AGENT_DIR"}, "workbuddy": {"WORKBUDDY_CONFIG_DIR", "CODEBUDDY_CONFIG_DIR"}, "deepseek-harness": {"DSH_HOME"}}
 	names, ok := overrides[agent]
 	if !ok {
 		return errors.New("unsupported agent")
 	}
 	for _, name := range names {
 		if os.Getenv(name) != "" {
-			return errors.New("custom configuration environment detected; use manual setup or clear overrides first")
+			return fmt.Errorf("检测到 %s 自定义配置变量；一键导入只写默认目录。请先清除该变量并重开终端，或改用手动配置", name)
 		}
 	}
 	if !checkClient {

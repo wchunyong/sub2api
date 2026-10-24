@@ -188,6 +188,23 @@ func TestPreflightRejectsOverridesEvenForStdin(t *testing.T) {
 	}
 }
 
+func TestWorkBuddyPreflightRejectsCustomConfigDirectory(t *testing.T) {
+	t.Setenv("WORKBUDDY_CONFIG_DIR", "")
+	t.Setenv("CODEBUDDY_CONFIG_DIR", "")
+	for _, name := range []string{"WORKBUDDY_CONFIG_DIR", "CODEBUDDY_CONFIG_DIR"} {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv(name, "custom-workbuddy-config")
+			err := Preflight("workbuddy", false)
+			if err == nil {
+				t.Fatal("WorkBuddy would read a custom directory while the importer writes ~/.workbuddy")
+			}
+			if !strings.Contains(err.Error(), name) || strings.Contains(err.Error(), "custom-workbuddy-config") {
+				t.Fatalf("preflight should name the override without exposing its value: %v", err)
+			}
+		})
+	}
+}
+
 func TestClientVersionWindowsCommandShim(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("Windows command shim")
