@@ -33,11 +33,15 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 	home := flags.String("home", "", "isolated home directory")
 	skip := flags.Bool("skip-client-check", false, "isolated stdin tests only")
 	yes := flags.Bool("yes", false, "confirm recovery")
+	dshProfile := flags.String("dsh-profile", "", "DeepSeek Harness web or desktop profile")
 	if err := flags.Parse(args[1:]); err != nil || flags.NArg() != 0 {
 		return fail("Invalid command options")
 	}
 	if !native.ValidAgent(*agent) {
 		return fail("Choose a supported --agent value")
+	}
+	if *dshProfile != "" && *agent != "deepseek-harness" {
+		return fail("--dsh-profile applies only to DeepSeek Harness")
 	}
 	if *skip && (!*stdin || *home == "" || args[0] != "install") {
 		return fail("--skip-client-check requires install --stdin and --home")
@@ -72,11 +76,24 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 		fmt.Fprintln(out, "恢复完成。请完全退出并重启工具；若曾多次导入，可再次运行以恢复更早的版本。")
 		return 0
 	}
+	profile := ""
+	if *agent == "deepseek-harness" {
+		profile, err = native.ResolveDSHProfile(root, *dshProfile)
+		if errors.Is(err, native.ErrDSHAmbiguousProfile) && *dshProfile == "" && !*stdin {
+			fmt.Fprint(out, "检测到 DeepSeek Harness 网页版和桌面版配置。输入 web 或 desktop 选择你正在使用的版本：")
+			answer, _ := bufio.NewReader(in).ReadString('\n')
+			profile, err = native.ResolveDSHProfile(root, strings.TrimSpace(answer))
+		}
+		if err != nil {
+			return fail("DeepSeek Harness 配置目录未确定；尚未兑换配置码：" + err.Error())
+		}
+		fmt.Fprintf(out, "将配置 DeepSeek Harness 的 %s 版本。\n", profile)
+	}
 	fmt.Fprintf(out, "正在检查 %s 安装状态和本机配置…\n", *agent)
 	if err = native.Preflight(*agent, !*skip); err != nil {
 		return fail("安装或配置检查未通过：" + err.Error())
 	}
-	if err = native.CheckLocalConfig(root, *agent); err != nil {
+	if err = native.CheckLocalConfig(root, *agent, profile); err != nil {
 		return fail("现有本机配置需要先处理；尚未兑换配置码：" + err.Error())
 	}
 	var payload native.Payload
@@ -104,6 +121,7 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 	if err = native.ValidateTransportPayload(payload, *agent); err != nil {
 		return fail(err.Error())
 	}
+	payload.Profile = profile
 	if !*stdin {
 		fmt.Fprintln(out, "正在读取这把 Key 可用的模型并核对所选模型…")
 		if err = network.SynchronizeModels(&payload); err != nil {

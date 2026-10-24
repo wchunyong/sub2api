@@ -48,6 +48,57 @@ func TestSixAgentsInstallAndRestoreFromIsolatedInput(t *testing.T) {
 	}
 }
 
+func TestDeepSeekHarnessDesktopSelectionSurvivesCleanup(t *testing.T) {
+	t.Setenv("DSH_HOME", "")
+	root := t.TempDir()
+	for _, profile := range []string{"web", "desktop"} {
+		if err := os.MkdirAll(filepath.Join(root, ".dsh", "profiles", profile), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	payload := native.Payload{Version: 1, Agent: "deepseek-harness", APIKey: "private-test-key", BaseURL: "https://example.test/v1", Model: "selected-model", Models: []native.Model{{ID: "selected-model"}}}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out, stderr bytes.Buffer
+	args := []string{"install", "--agent", "deepseek-harness", "--dsh-profile", "desktop", "--stdin", "--home", root, "--skip-client-check"}
+	if code := run(args, bytes.NewReader(body), &out, &stderr); code != 0 {
+		t.Fatal(stderr.String())
+	}
+	desktopPatch := filepath.Join(root, ".dsh", "profiles", "desktop", "cordis.patch.yml")
+	if _, err := os.Stat(desktopPatch); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".dsh", "profiles", "web", "cordis.patch.yml")); !os.IsNotExist(err) {
+		t.Fatalf("web profile changed: %v", err)
+	}
+	out.Reset()
+	stderr.Reset()
+	if code := run([]string{"clean", "--agent", "deepseek-harness", "--home", root, "--yes"}, strings.NewReader(""), &out, &stderr); code != 0 {
+		t.Fatal(stderr.String())
+	}
+	if _, err := os.Stat(desktopPatch); !os.IsNotExist(err) {
+		t.Fatalf("desktop patch remains: %v", err)
+	}
+}
+
+func TestDeepSeekHarnessAmbiguousProfileStopsBeforeImport(t *testing.T) {
+	root := t.TempDir()
+	for _, profile := range []string{"web", "desktop"} {
+		if err := os.MkdirAll(filepath.Join(root, ".dsh", "profiles", profile), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var out, stderr bytes.Buffer
+	if run([]string{"install", "--agent", "deepseek-harness", "--home", root}, strings.NewReader("\n"), &out, &stderr) == 0 {
+		t.Fatal("ambiguous profile accepted")
+	}
+	if !strings.Contains(out.String(), "web 或 desktop") || !strings.Contains(stderr.String(), "尚未兑换配置码") {
+		t.Fatalf("unclear profile error: %s %s", out.String(), stderr.String())
+	}
+}
+
 func TestCleanReportsConflictWithoutCredentials(t *testing.T) {
 	root := t.TempDir()
 	if err := native.Install(root, native.Payload{Version: 1, Agent: "codex", APIKey: "private-test-key", BaseURL: "https://example.test/v1", Model: "imported"}); err != nil {

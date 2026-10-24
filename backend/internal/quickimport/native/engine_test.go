@@ -592,6 +592,51 @@ func TestDeepSeekHarnessDoesNotForceDeepSeekCompatOnOpenAI(t *testing.T) {
 	}
 }
 
+func TestDeepSeekHarnessUsesInstalledDesktopProfileAndRestoresIt(t *testing.T) {
+	root := t.TempDir()
+	desktop := filepath.Join(root, ".dsh", "profiles", "desktop")
+	if err := os.MkdirAll(desktop, 0700); err != nil {
+		t.Fatal(err)
+	}
+	p := Payload{Version: 1, Agent: "deepseek-harness", APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "test-model"}
+	if err := Install(root, p); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(desktop, "cordis.patch.yml")
+	content, err := os.ReadFile(path)
+	if err != nil || !strings.Contains(string(content), "test-model") {
+		t.Fatalf("desktop profile missing model: %v %s", err, content)
+	}
+	if _, err := os.Stat(filepath.Join(root, paths["deepseek-harness"])); !os.IsNotExist(err) {
+		t.Fatalf("wrote web profile: %v", err)
+	}
+	if err := Clean(root, "deepseek-harness"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("cleanup left desktop patch: %v", err)
+	}
+}
+
+func TestDeepSeekHarnessBothProfilesRequireExplicitSelection(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"web", "desktop"} {
+		if err := os.MkdirAll(filepath.Join(root, ".dsh", "profiles", name), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := CheckLocalConfig(root, "deepseek-harness"); err == nil {
+		t.Fatal("ambiguous profile accepted")
+	}
+	p := Payload{Version: 1, Agent: "deepseek-harness", Profile: "desktop", APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "test-model"}
+	if err := Install(root, p); err != nil {
+		t.Fatal(err)
+	}
+	if err := Clean(root, "deepseek-harness"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestImportDoesNotInjectImageMCPByDefault(t *testing.T) {
 	for _, agent := range []string{"claude", "codex", "opencode"} {
 		t.Run(agent, func(t *testing.T) {

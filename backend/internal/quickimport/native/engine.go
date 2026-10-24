@@ -23,6 +23,8 @@ import (
 
 const provider = "sub2api_quick"
 
+var ErrDSHAmbiguousProfile = errors.New("both DeepSeek Harness web and desktop profiles exist; choose the one you use")
+
 var paths = map[string]string{"claude": ".claude/settings.json", "codex": ".codex/config.toml", "opencode": ".config/opencode/opencode.json", "workbuddy": ".workbuddy/models.json", "pi": ".pi/agent/models.json", "deepseek-harness": ".dsh/profiles/web/cordis.patch.yml"}
 
 type Model struct {
@@ -43,6 +45,7 @@ type Payload struct {
 	Models                     []Model        `json:"models"`
 	ClaudeModelPickerSupported bool           `json:"claude_model_picker_supported"`
 	CodexManifest              map[string]any `json:"codex_manifest"`
+	Profile                    string         `json:"-"` // Local DeepSeek Harness profile, never supplied by the gateway.
 }
 type value struct {
 	Exists bool `json:"exists"`
@@ -70,6 +73,7 @@ type ownedFile struct {
 }
 type record struct {
 	Agent          string      `json:"agent"`
+	Profile        string      `json:"profile,omitempty"`
 	Existed        bool        `json:"existed"`
 	Before         string      `json:"before_text"`
 	After          string      `json:"after_text"`
@@ -114,10 +118,41 @@ func safePath(root, path string) error {
 	}
 	return nil
 }
-func target(root, agent string) (string, error) {
+func ResolveDSHProfile(root, requested string) (string, error) {
+	if requested != "" {
+		if requested != "web" && requested != "desktop" {
+			return "", errors.New("DeepSeek Harness profile must be web or desktop")
+		}
+		return requested, nil
+	}
+	profiles := filepath.Join(root, ".dsh", "profiles")
+	_, webErr := os.Stat(filepath.Join(profiles, "web"))
+	_, desktopErr := os.Stat(filepath.Join(profiles, "desktop"))
+	if webErr == nil && desktopErr == nil {
+		return "", ErrDSHAmbiguousProfile
+	}
+	if desktopErr == nil {
+		return "desktop", nil
+	}
+	if webErr != nil && !os.IsNotExist(webErr) {
+		return "", webErr
+	}
+	if desktopErr != nil && !os.IsNotExist(desktopErr) {
+		return "", desktopErr
+	}
+	return "web", nil
+}
+func target(root, agent, profile string) (string, error) {
 	p, ok := paths[agent]
 	if !ok {
 		return "", errors.New("unsupported Agent")
+	}
+	if agent == "deepseek-harness" {
+		selected, err := ResolveDSHProfile(root, profile)
+		if err != nil {
+			return "", err
+		}
+		p = filepath.Join(".dsh", "profiles", selected, "cordis.patch.yml")
 	}
 	path := filepath.Join(root, p)
 	return path, safePath(root, path)
@@ -125,12 +160,16 @@ func target(root, agent string) (string, error) {
 
 // CheckLocalConfig catches unsupported local state before a one-time ticket is
 // consumed. Install repeats the checks under its own lock before writing.
-func CheckLocalConfig(root, agent string) error {
+func CheckLocalConfig(root, agent string, profile ...string) error {
 	root, err := filepath.Abs(root)
 	if err != nil {
 		return err
 	}
-	path, err := target(root, agent)
+	selected := ""
+	if len(profile) > 0 {
+		selected = profile[0]
+	}
+	path, err := target(root, agent, selected)
 	if err != nil {
 		return err
 	}
@@ -182,8 +221,8 @@ func claudeUserMCPConfigPath(root string) (string, error) {
 	return path, safePath(root, path)
 }
 func lock(root, agent string) (string, func(), error) {
-	if _, err := target(root, agent); err != nil {
-		return "", nil, err
+	if _, ok := paths[agent]; !ok {
+		return "", nil, errors.New("unsupported Agent")
 	}
 	folder := filepath.Join(root, ".sub2api-quick-import", agent)
 	if err := safePath(root, folder); err != nil {
@@ -727,9 +766,15 @@ func Install(root string, p Payload) error {
 	if err != nil {
 		return err
 	}
-	path, err := target(root, p.Agent)
+	path, err := target(root, p.Agent, p.Profile)
 	if err != nil {
 		return err
+	}
+	if p.Agent == "deepseek-harness" {
+		p.Profile, err = ResolveDSHProfile(root, p.Profile)
+		if err != nil {
+			return err
+		}
 	}
 	if p.Agent == "opencode" {
 		if err := checkOpenCodeJSONC(path); err != nil {
@@ -890,7 +935,7 @@ func Install(root string, p Payload) error {
 	if after == before {
 		return nil
 	}
-	rec := record{Agent: p.Agent, Existed: existed, Before: before, After: after, Changes: changes, Pending: true, Owned: owned}
+	rec := record{Agent: p.Agent, Profile: p.Profile, Existed: existed, Before: before, After: after, Changes: changes, Pending: true, Owned: owned}
 	for _, c := range changes {
 		rec.Inverse = append(rec.Inverse, change{c.Path, get(original, c.Path)})
 	}
@@ -957,10 +1002,6 @@ func Clean(root, agent string) error {
 	if err != nil {
 		return err
 	}
-	path, err := target(root, agent)
-	if err != nil {
-		return err
-	}
 	folder, unlock, err := lock(root, agent)
 	if err != nil {
 		return err
@@ -976,6 +1017,14 @@ func Clean(root, agent string) error {
 	rec := &records[len(records)-1]
 	if rec.Agent != agent {
 		return errors.New("Agent mismatch")
+	}
+	profile := rec.Profile
+	if agent == "deepseek-harness" && profile == "" {
+		profile = "web"
+	} // Older imports always wrote web.
+	path, err := target(root, agent, profile)
+	if err != nil {
+		return err
 	}
 	current, exists, err := readText(path)
 	if err != nil {

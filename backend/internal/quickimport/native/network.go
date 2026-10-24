@@ -291,6 +291,12 @@ func Preflight(agent string, checkClient bool) error {
 			return nil
 		}
 	}
+	if agent == "deepseek-harness" {
+		home, _ := os.UserHomeDir()
+		if _, err := os.Stat(filepath.Join(home, ".dsh", "profiles", "desktop")); err == nil {
+			return nil
+		}
+	}
 	if agent == "opencode" {
 		home, _ := os.UserHomeDir()
 		candidates := []string{"/Applications/OpenCode.app", filepath.Join(home, "Applications", "OpenCode.app")}
