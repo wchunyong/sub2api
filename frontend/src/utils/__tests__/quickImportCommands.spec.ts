@@ -26,9 +26,18 @@ describe('quick import commands', () => {
     const windows = cleanupCommand('windows', 'codex', 'https://example.com')
     expect(windows).toContain('$LASTEXITCODE -eq 0')
     expect(windows).toContain('/setup/codex-clean.ps1')
+    expect(windows).toContain('-ErrorAction Stop')
     const unix = cleanupCommand('unix', 'codex', 'https://example.com')
     expect(unix).toContain('restore.sh"; then :; else')
     expect(unix).toContain('/setup/codex-clean.sh')
+    expect(unix).toContain('-o "$f"')
+    expect(unix).not.toContain('| sh')
+  })
+  it('downloads Unix bootstrap before running it', () => {
+    const command = importCommand('unix', 'pi', 'https://example.com', 'a'.repeat(64))
+    expect(command).toContain('-o "$f"')
+    expect(command).toContain('&& sh "$f"')
+    expect(command).not.toContain('| sh')
   })
   it.skipIf(process.platform !== 'win32')('only downloads an update when local PowerShell recovery fails', () => {
     const root = mkdtempSync(join(tmpdir(), 'quick-clean-test-'))
