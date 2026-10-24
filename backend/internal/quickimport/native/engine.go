@@ -583,7 +583,8 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 			if m.ID != p.Model {
 				continue
 			}
-			entries = append(entries, map[string]any{"id": m.ID, "name": m.Name, "vendor": "lianjieai", "url": base + "/chat/completions", "apiKey": p.APIKey, "maxInputTokens": 128000, "maxOutputTokens": 8192, "supportsToolCall": true, "supportsImages": false})
+			// WorkBuddy must use the full endpoint as-is, without adding a second /chat/completions.
+			entries = append(entries, map[string]any{"id": m.ID, "name": m.Name, "vendor": "Custom", "url": base + "/chat/completions", "apiKey": p.APIKey, "maxInputTokens": 128000, "maxOutputTokens": 8192, "supportsToolCall": true, "supportsImages": false, "useCustomProtocol": true})
 		}
 		add([]string{"entries"}, entries)
 	case "pi":

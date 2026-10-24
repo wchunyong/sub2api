@@ -489,6 +489,9 @@ func TestWorkBuddyFreshImportWritesDesktopArrayAndCleanRemovesIt(t *testing.T) {
 	if err := json.Unmarshal(content, &models); err != nil || len(models) != 1 || models[0]["id"] != "test-model" {
 		t.Fatalf("WorkBuddy desktop requires a model array: %s %v", content, err)
 	}
+	if models[0]["vendor"] != "Custom" || models[0]["useCustomProtocol"] != true || models[0]["url"] != "https://example.test/v1/chat/completions" {
+		t.Fatalf("WorkBuddy must send the exact gateway endpoint without appending a second path: %s", content)
+	}
 	if err := Clean(root, "workbuddy"); err != nil {
 		t.Fatal(err)
 	}
