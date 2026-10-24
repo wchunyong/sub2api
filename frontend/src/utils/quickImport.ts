@@ -9,6 +9,7 @@ export const importAgents: { id: ImportAgent; name: string }[] = [
 export function supportsAgent(agent: ImportAgent, platform: GroupPlatform | null, messages = false): boolean {
   if (!platform || !['openai', 'anthropic', 'antigravity', 'gemini', 'deepseek', 'grok', 'kimi', 'zhipu', 'composite'].includes(platform)) return false
   if (agent === 'codex-ws') return platform === 'openai'
+  if (agent === 'codex') return platform === 'openai' || platform === 'composite'
   if (agent === 'grok') return platform === 'grok'
   if (agent === 'gemini') return platform === 'gemini' || platform === 'antigravity'
   if (agent === 'claude') return platform !== 'gemini' && (platform !== 'openai' || messages)

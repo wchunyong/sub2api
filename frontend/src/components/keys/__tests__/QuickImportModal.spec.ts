@@ -17,13 +17,17 @@ function render(extra = {}) {
 }
 describe('QuickImportModal', () => {
   beforeEach(() => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string) => ({
       ok: true,
-      json: async () => ({ data: [{ id: 'gpt-5.5' }] })
-    }))
+      json: async () => url.includes('client_version=')
+        ? { models: [{ slug: 'gpt-5.5' }] }
+        : { data: [{ id: 'gpt-5.5' }] }
+    })))
   })
-  it.each(['claude', 'codex', 'opencode'])('enables CCS for %s in the same DeepSeek group', async (agent) => {
-    const wrapper = render({ platform: 'deepseek' })
+  it.each([
+    ['claude', 'deepseek'], ['codex', 'openai'], ['opencode', 'deepseek']
+  ])('enables CCS for %s with a compatible key', async (agent, platform) => {
+    const wrapper = render({ platform })
     await wrapper.get(`[data-testid="agent-${agent}"]`).trigger('click')
     await flushPromises()
     expect(wrapper.get('[data-testid="ccs"]').attributes('disabled')).toBeUndefined()
@@ -45,9 +49,28 @@ describe('QuickImportModal', () => {
     wrapper.unmount()
   })
   it('keeps CCS disabled for an inactive key', async () => {
-    const wrapper = render({ active: false, platform: 'deepseek' })
+    const wrapper = render({ active: false, platform: 'openai' })
     await wrapper.get('[data-testid="agent-codex"]').trigger('click')
     expect(wrapper.get('[data-testid="ccs"]').attributes('disabled')).toBeDefined()
+    wrapper.unmount()
+  })
+  it('only offers Codex manifest models, not generic-only models', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string) => ({
+      ok: true,
+      json: async () => url.includes('client_version=')
+        ? { models: [{ slug: 'gpt-codex-supported' }] }
+        : { data: [{ id: 'generic-only' }] }
+    })))
+    const wrapper = render()
+    await wrapper.get('[data-testid="agent-codex"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('#quick-import-model').findAll('option').map(option => option.attributes('value'))).toEqual(['', 'gpt-codex-supported'])
+    expect((wrapper.get('#quick-import-model').element as HTMLSelectElement).value).toBe('gpt-codex-supported')
+    wrapper.unmount()
+  })
+  it('does not offer Codex for groups without a Codex model catalog', () => {
+    const wrapper = render({ platform: 'deepseek' })
+    expect(wrapper.get('[data-testid="agent-codex"]').attributes('disabled')).toBeDefined()
     wrapper.unmount()
   })
   it('clears the copy error on a successful retry', async () => {

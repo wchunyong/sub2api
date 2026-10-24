@@ -351,7 +351,7 @@ describe('UseKeyModal', () => {
     const configToml = codeBlocks.find((content) => content.includes('[model_providers.sub2api]'))
     expect(configToml).toBeDefined()
     expect(configToml).toContain('model_provider = "sub2api"')
-    expect(configToml).toContain('model = "grok-4.5"')
+    expect(configToml).toContain('model = "YOUR_AVAILABLE_MODEL_ID"')
     expect(configToml).toContain('base_url = "https://example.com/v1"')
     expect(configToml).toContain('env_key = "SUB2API_API_KEY"')
     expect(configToml).toContain('wire_api = "responses"')
@@ -404,8 +404,8 @@ describe('UseKeyModal', () => {
     const configToml = codeBlocks.find((content) => content.includes('model_provider = "OpenAI"'))
 
     expect(configToml).toBeDefined()
-    expect(configToml).toContain('model = "gpt-5.5"')
-    expect(configToml).toContain('review_model = "gpt-5.5"')
+    expect(configToml).toContain('model = "YOUR_AVAILABLE_MODEL_ID"')
+    expect(configToml).toContain('review_model = "YOUR_AVAILABLE_MODEL_ID"')
     expect(configToml).not.toContain('model = "gpt-5.4"')
     expect(configToml).not.toContain('model_context_window')
     expect(configToml).not.toContain('model_auto_compact_token_limit')
@@ -555,8 +555,8 @@ describe('UseKeyModal', () => {
     const configToml = codeBlocks.find((content) => content.includes('supports_websockets = true'))
 
     expect(configToml).toBeDefined()
-    expect(configToml).toContain('model = "gpt-5.5"')
-    expect(configToml).toContain('review_model = "gpt-5.5"')
+    expect(configToml).toContain('model = "YOUR_AVAILABLE_MODEL_ID"')
+    expect(configToml).toContain('review_model = "YOUR_AVAILABLE_MODEL_ID"')
     expect(configToml).not.toContain('model = "gpt-5.4"')
     expect(configToml).not.toContain('model_context_window')
     expect(configToml).not.toContain('model_auto_compact_token_limit')
@@ -1076,7 +1076,7 @@ describe('UseKeyModal', () => {
         const configToml = wrapper.findAll('pre code')
           .map((code) => code.text())
           .find((content) => content.includes('model_provider = "OpenAI"'))
-        expect(configToml).toContain('model = "gpt-5.5"')
+        expect(configToml).toContain('model = "YOUR_AVAILABLE_MODEL_ID"')
         expect(configToml).toContain('[model_providers.OpenAI]\nname = "OpenAI"\nbase_url = "https://example.com/v1"\nmodel_catalog_url = "https://example.com/v1/models"')
         expect(configToml).not.toContain('model_catalog_json')
         expect(configToml).toContain('requires_openai_auth = false')
@@ -1095,11 +1095,31 @@ describe('UseKeyModal', () => {
       }
     }
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://example.com/v1/models',
+      'https://example.com/v1/models?client_version=0.158.0',
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: 'Bearer sk-openai-test' })
       })
     )
+  })
+
+  it('uses Codex manifest slugs for the manual model selector', async () => {
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => ({
+      ok: true,
+      json: async () => url.includes('client_version=')
+        ? { models: [{ slug: 'codex-available' }] }
+        : { data: [{ id: 'generic-only' }] }
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const wrapper = mount(UseKeyModal, {
+      props: { show: true, client: 'codex', apiKey: 'sk-test', baseUrl: 'https://example.com/v1', platform: 'openai' },
+      global: { stubs: { BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' }, Icon: { template: '<span />' } } }
+    })
+    await flushPromises()
+    expect(wrapper.get('#manual-model').findAll('option').map(option => option.attributes('value'))).toEqual(['codex-available'])
+    const config = wrapper.findAll('pre code').map(code => code.text()).find(content => content.includes('model_provider = "OpenAI"'))
+    expect(config).toContain('model = "codex-available"')
+    expect(fetchMock).toHaveBeenCalledWith('https://example.com/v1/models?client_version=0.158.0', expect.any(Object))
+    wrapper.unmount()
   })
 
   it.each([1024 * 1024 - 1, 1024 * 1024, 1024 * 1024 + 1])(

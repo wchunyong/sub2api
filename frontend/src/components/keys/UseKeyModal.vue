@@ -294,7 +294,7 @@ import { saveAs } from 'file-saver'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
-import { buildCodexModelCatalogUrl, fetchCodexModelsManifest } from '@/api/codex'
+import { buildCodexModelCatalogUrl, buildCodexModelsManifestUrl, fetchCodexModelsManifest } from '@/api/codex'
 import type { GroupPlatform } from '@/types'
 import {
   findCodexCatalogModel,
@@ -443,14 +443,20 @@ watch(() => [props.show, props.baseUrl, props.apiKey, activeClientTab.value], as
   const controller = new AbortController()
   manualModelsController = controller
   try {
-    const response = await fetch(buildCodexModelCatalogUrl(props.baseUrl), {
+    const codexClient = activeClientTab.value === 'codex' || activeClientTab.value === 'codex-ws'
+    const response = await fetch(codexClient ? buildCodexModelsManifestUrl(props.baseUrl) : buildCodexModelCatalogUrl(props.baseUrl), {
       headers: { Authorization: `Bearer ${props.apiKey}`, Accept: 'application/json' },
       cache: 'no-store', signal: controller.signal
     })
     if (!response.ok) return
-    const body = await response.json() as { data?: Array<{ id?: string }> }
-    if (controller.signal.aborted || !Array.isArray(body.data)) return
-    manualModels.value = [...new Set(body.data.map(item => item.id).filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9_.:/-]+$/.test(id)))]
+    const body: unknown = await response.json()
+    if (controller.signal.aborted) return
+    const names = codexClient
+      ? parseCodexCatalogModels(JSON.stringify(body)).map(item => item.slug)
+      : typeof body === 'object' && body !== null && 'data' in body && Array.isArray(body.data)
+        ? body.data.map((item: { id?: string }) => item?.id)
+        : []
+    manualModels.value = [...new Set(names.filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9_.:/-]+$/.test(id)))]
     const family = props.platform === 'openai' ? /gpt|codex/i : props.platform === 'anthropic' ? /claude/i : props.platform === 'deepseek' ? /deepseek/i : /./
     selectedManualModel.value = manualModels.value.find(id => family.test(id)) || manualModels.value[0] || ''
   } catch { /* Manual model entry remains available. */ }
@@ -789,7 +795,7 @@ function selectCodexCatalogModel(preferredModel: string): string {
     return selected
   }
   if (codexCatalogModelSlugs.value.includes(preferredModel)) return preferredModel
-  return codexCatalogModelSlugs.value[0] || preferredModel
+  return codexCatalogModelSlugs.value[0] || 'YOUR_AVAILABLE_MODEL_ID'
 }
 
 function codexReasoningEffortTomlLine(modelSlug: string): string {

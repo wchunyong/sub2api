@@ -61,6 +61,8 @@ import { importAgents, supportsAgent, supportsCcs, type ImportAgent } from '@/ut
 import { buildCcSwitchImportDeeplink, CC_SWITCH_USAGE_SCRIPT } from '@/utils/ccswitchImport'
 import { automaticAgent, cleanupCommand, importCommand, type ImportOS } from '@/utils/quickImportCommands'
 import { createImportTicket, importServer } from '@/api/quickImport'
+import { buildCodexModelsManifestUrl } from '@/api/codex'
+import { parseCodexCatalogModels } from '@/utils/codexCatalogConfig'
 import { useClipboard } from '@/composables/useClipboard'
 const props = withDefaults(defineProps<{ show: boolean; keyId: number; keyName?: string; apiKey: string; baseUrl: string; platform: GroupPlatform | null; allowMessagesDispatch?: boolean; hideCcs?: boolean; active?: boolean; claudeCodeOnly?: boolean }>(), { active: true })
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -92,11 +94,17 @@ watch([agent, () => props.show, () => props.apiKey, () => props.baseUrl], async 
   modelLoading.value = true
   try {
     const root = (props.baseUrl || window.location.origin).replace(/\/v1\/?$/, '').replace(/\/+$/, '')
-    const response = await fetch(`${root}/v1/models`, { headers: { Authorization: `Bearer ${props.apiKey}`, Accept: 'application/json' }, cache: 'no-store', signal: controller.signal })
+    const codex = agent.value === 'codex'
+    const response = await fetch(codex ? buildCodexModelsManifestUrl(root) : `${root}/v1/models`, { headers: { Authorization: `Bearer ${props.apiKey}`, Accept: 'application/json' }, cache: 'no-store', signal: controller.signal })
     if (!response.ok) return
-    const body = await response.json() as { data?: Array<{ id?: string }> }
-    if (controller.signal.aborted || !Array.isArray(body.data)) return
-    modelChoices.value = [...new Set(body.data.map(item => item.id).filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9_.:/-]+$/.test(id)))]
+    const body: unknown = await response.json()
+    if (controller.signal.aborted) return
+    const names = codex
+      ? parseCodexCatalogModels(JSON.stringify(body)).map(item => item.slug)
+      : typeof body === 'object' && body !== null && 'data' in body && Array.isArray(body.data)
+        ? body.data.map((item: { id?: string }) => item?.id)
+        : []
+    modelChoices.value = [...new Set(names.filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9_.:/-]+$/.test(id)))]
     const family = agent.value === 'claude' ? /claude|deepseek|glm|kimi/i : agent.value === 'codex' ? /gpt|codex/i : /gpt|claude|deepseek|glm|kimi/i
     selectedModel.value = modelChoices.value.find(model => family.test(model)) || modelChoices.value[0] || ''
   } catch { /* Manual model entry remains available. */ }
