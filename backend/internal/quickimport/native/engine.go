@@ -42,7 +42,7 @@ type Payload struct {
 	Protocol                   string         `json:"protocol"`
 	ProbeURL                   string         `json:"probe_url"`
 	MCPEndpoint                string         `json:"mcp_endpoint"`
-	MCPImageToolsEnabled       *bool          `json:"mcp_image_tools_enabled"`
+	MCPImageToolsEnabled       *bool          `json:"mcp_image_tools_enabled"` // Ignored by one-click installers; kept for transport compatibility.
 	Models                     []Model        `json:"models"`
 	ClaudeModelPickerSupported bool           `json:"claude_model_picker_supported"`
 	CodexManifest              map[string]any `json:"codex_manifest"`
@@ -530,10 +530,6 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.ForceQuery || !(u.Scheme == "https" || (u.Scheme == "http" && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1"))) {
 		return nil, errors.New("HTTPS gateway required")
 	}
-	mcpEndpoint, err := resolveMCPEndpoint(p, base)
-	if err != nil {
-		return nil, err
-	}
 	models := p.Models
 	if models == nil {
 		models = []Model{{ID: p.Model, Name: p.Model}}
@@ -577,27 +573,12 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 			}
 			add([]string{"modelPicker"}, map[string]any{"options": options, "replaceBuiltInOptions": true})
 		}
-		if mcpImageToolsEnabled(p) {
-			add([]string{"mcpServers", "lianjieai-image"}, map[string]any{
-				"type":    "http",
-				"url":     mcpEndpoint,
-				"headers": map[string]any{"Authorization": "Bearer " + p.APIKey},
-			})
-		}
 	case "codex":
 		add([]string{"model"}, p.Model)
 		add([]string{"model_provider"}, provider)
 		add([]string{"model_providers", provider}, map[string]any{"name": "lianjieai", "base_url": base, "wire_api": "responses", "experimental_bearer_token": p.APIKey, "requires_openai_auth": false})
 		if catalogPath != "" {
 			add([]string{"model_catalog_json"}, catalogPath)
-		}
-		if mcpImageToolsEnabled(p) {
-			add([]string{"mcp_servers", "lianjieai_image"}, map[string]any{
-				"url":                 mcpEndpoint,
-				"http_headers":        map[string]any{"Authorization": "Bearer " + p.APIKey},
-				"startup_timeout_sec": 20,
-				"tool_timeout_sec":    300,
-			})
 		}
 	case "opencode":
 		protocol := p.Protocol
@@ -614,17 +595,6 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 		}
 		add([]string{"provider", provider}, map[string]any{"npm": npm, "name": "lianjieai", "options": map[string]any{"baseURL": base, "apiKey": p.APIKey}, "models": models})
 		add([]string{"model"}, provider+"/"+p.Model)
-		if mcpImageToolsEnabled(p) {
-			changes = append(changes, change{Path: []string{"mcp", "sub2api_image"}, Value: value{Exists: false}})
-			changes = append(changes, change{Path: []string{"mcp", "servers", "sub2api_image"}, Value: value{Exists: false}})
-			// OpenCode v2 places each server under mcp.servers.
-			add([]string{"mcp", "servers", "lianjieai_image"}, map[string]any{
-				"type":    "remote",
-				"url":     mcpEndpoint,
-				"oauth":   false,
-				"headers": map[string]any{"Authorization": "Bearer " + p.APIKey},
-			})
-		}
 	case "workbuddy":
 		entries := make([]any, 0, 1)
 		for _, m := range normalized {
@@ -729,42 +699,6 @@ func cleanClaudeUserMCPConfig(root string, rec *record) error {
 	return nil
 }
 
-func mcpImageToolsEnabled(p Payload) bool {
-	return p.MCPImageToolsEnabled != nil && *p.MCPImageToolsEnabled
-}
-
-func resolveMCPEndpoint(p Payload, base string) (string, error) {
-	endpoint := strings.TrimSpace(p.MCPEndpoint)
-	if endpoint == "" && mcpImageToolsEnabled(p) {
-		endpoint = deriveMCPEndpoint(base)
-	}
-	if endpoint == "" {
-		return "", nil
-	}
-	u, err := url.Parse(endpoint)
-	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.ForceQuery ||
-		!(u.Scheme == "https" || (u.Scheme == "http" && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1"))) {
-		return "", errors.New("invalid MCP endpoint")
-	}
-	return strings.TrimRight(endpoint, "/"), nil
-}
-
-func deriveMCPEndpoint(base string) string {
-	u, err := url.Parse(strings.TrimRight(base, "/"))
-	if err != nil {
-		return ""
-	}
-	path := strings.TrimRight(u.Path, "/")
-	if path == "/v1" {
-		path = ""
-	} else if strings.HasSuffix(path, "/v1") {
-		path = strings.TrimSuffix(path, "/v1")
-	}
-	u.Path = strings.TrimRight(path, "/") + "/mcp"
-	u.RawQuery = ""
-	u.Fragment = ""
-	return u.String()
-}
 func ownedPath(root, folder string, item ownedFile) (string, error) {
 	path := filepath.Join(root, filepath.FromSlash(strings.ReplaceAll(item.Path, `\`, "/")))
 	if filepath.Dir(path) != folder || !regexp.MustCompile(`^models-[a-f0-9]{32}\.json$`).MatchString(filepath.Base(path)) {

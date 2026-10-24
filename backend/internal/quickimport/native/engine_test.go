@@ -39,6 +39,55 @@ func TestLegacyPythonJournal(t *testing.T) {
 	}
 }
 
+func TestCleanLegacyClaudeImageMCPRecord(t *testing.T) {
+	root := t.TempDir()
+	before := `{"env":{"existing":"keep"}}`
+	server := map[string]any{"type": "http", "url": "https://example.test/mcp", "headers": map[string]any{"Authorization": "Bearer test-secret"}}
+	added := change{Path: []string{"mcpServers", "lianjieai-image"}, Value: value{Exists: true, Value: server}}
+	after, err := render(before, "claude", []change{added})
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, paths["claude"])
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(after), 0600); err != nil {
+		t.Fatal(err)
+	}
+	userConfig := filepath.Join(root, ".claude.json")
+	userText, err := render(`{"other":"keep"}`, "claude", []change{added})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(userConfig, []byte(userText), 0600); err != nil {
+		t.Fatal(err)
+	}
+	folder := filepath.Join(root, ".sub2api-quick-import", "claude")
+	if err := os.MkdirAll(folder, 0700); err != nil {
+		t.Fatal(err)
+	}
+	rec := record{Agent: "claude", Existed: true, Before: before, After: after, Changes: []change{added}, Inverse: []change{{Path: added.Path, Value: value{Exists: false}}}}
+	if err := writeJournal(folder, []record{rec}); err != nil {
+		t.Fatal(err)
+	}
+	if err := Clean(root, "claude"); err != nil {
+		t.Fatal(err)
+	}
+	settings, err := os.ReadFile(path)
+	if err != nil || string(settings) != before {
+		t.Fatalf("legacy settings were not restored: %v %s", err, settings)
+	}
+	userAfter, err := os.ReadFile(userConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	userData, err := load(string(userAfter), "claude")
+	if err != nil || get(userData, []string{"mcpServers", "lianjieai-image"}).Exists || get(userData, []string{"other"}).Value != "keep" {
+		t.Fatalf("legacy user MCP cleanup lost unrelated settings: %v %s", err, userAfter)
+	}
+}
+
 func TestNewImportsUseLianjieAIProviderID(t *testing.T) {
 	for _, agent := range []string{"codex", "opencode"} {
 		t.Run(agent, func(t *testing.T) {
@@ -541,73 +590,6 @@ func TestCheckLocalConfigRejectsUnsupportedFilesBeforeTicketExchange(t *testing.
 	}
 }
 
-func TestInstallRegistersImageMCPOnlyWhenEnabled(t *testing.T) {
-	enabled := true
-	for _, agent := range []string{"claude", "codex", "opencode"} {
-		t.Run(agent, func(t *testing.T) {
-			root := t.TempDir()
-			p := Payload{Version: 1, Agent: agent, APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "test-model", MCPImageToolsEnabled: &enabled}
-			if err := Install(root, p); err != nil {
-				t.Fatal(err)
-			}
-			text, err := os.ReadFile(filepath.Join(root, paths[agent]))
-			if err != nil {
-				t.Fatal(err)
-			}
-			data, err := load(string(text), agent)
-			if err != nil {
-				t.Fatal(err)
-			}
-			switch agent {
-			case "codex":
-				server := get(data, []string{"mcp_servers", "lianjieai_image"}).Value.(map[string]any)
-				if server["url"] != "https://example.test/mcp" {
-					t.Fatalf("bad Codex MCP server: %#v", server)
-				}
-				headers := server["http_headers"].(map[string]any)
-				if headers["Authorization"] != "Bearer test-secret" {
-					t.Fatalf("bad Codex MCP auth header: %#v", headers)
-				}
-			case "opencode":
-				server := get(data, []string{"mcp", "servers", "lianjieai_image"}).Value.(map[string]any)
-				if server["url"] != "https://example.test/mcp" || server["oauth"] != false {
-					t.Fatalf("bad OpenCode MCP server: %#v", server)
-				}
-			case "claude":
-				server := get(data, []string{"mcpServers", "lianjieai-image"}).Value.(map[string]any)
-				if server["url"] != "https://example.test/mcp" {
-					t.Fatalf("bad Claude MCP server: %#v", server)
-				}
-				claudeUserMCP, err := os.ReadFile(filepath.Join(root, ".claude.json"))
-				if err != nil {
-					t.Fatal(err)
-				}
-				claudeUserData, err := load(string(claudeUserMCP), "claude")
-				if err != nil {
-					t.Fatal(err)
-				}
-				userServer := get(claudeUserData, []string{"mcpServers", "lianjieai-image"}).Value.(map[string]any)
-				if userServer["url"] != "https://example.test/mcp" {
-					t.Fatalf("bad Claude user MCP server: %#v", userServer)
-				}
-			}
-			if err := Clean(root, agent); err != nil {
-				t.Fatal(err)
-			}
-			after, _ := os.ReadFile(filepath.Join(root, paths[agent]))
-			if strings.Contains(string(after), "sub2api_image") || strings.Contains(string(after), "test-secret") {
-				t.Fatalf("cleanup left MCP data: %s", after)
-			}
-			if agent == "claude" {
-				claudeUserMCP, _ := os.ReadFile(filepath.Join(root, ".claude.json"))
-				if strings.Contains(string(claudeUserMCP), "sub2api-image") || strings.Contains(string(claudeUserMCP), "test-secret") {
-					t.Fatalf("cleanup left Claude user MCP data: %s", claudeUserMCP)
-				}
-			}
-		})
-	}
-}
-
 func TestImportNewAgentsPreservesExistingConfigurationAndRestores(t *testing.T) {
 	for _, tc := range []struct{ agent, before, expected string }{
 		{"workbuddy", `[{"id":"existing-model","url":"https://other.test/v1/chat/completions"}]`, `"url": "https://example.test/v1/chat/completions"`},
@@ -783,7 +765,40 @@ func TestImportDoesNotInjectImageMCPByDefault(t *testing.T) {
 	}
 }
 
-func TestInstallUsesCurrentOpenCodeMCPShape(t *testing.T) {
+func TestImportNeverInjectsImageMCPEvenWithLegacyOptIn(t *testing.T) {
+	enabled := true
+	for _, agent := range []string{"claude", "codex", "deepseek-harness", "workbuddy", "opencode", "pi"} {
+		t.Run(agent, func(t *testing.T) {
+			root := t.TempDir()
+			p := Payload{Version: 1, Agent: agent, APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "test-model", MCPEndpoint: "https://example.test/mcp", MCPImageToolsEnabled: &enabled}
+			if agent == "deepseek-harness" {
+				p.Profile = "web"
+				path := filepath.Join(root, paths[agent])
+				if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte("[]\n"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := Install(root, p); err != nil {
+				t.Fatal(err)
+			}
+			content, err := os.ReadFile(filepath.Join(root, paths[agent]))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(string(content), "/mcp") || strings.Contains(string(content), "lianjieai_image") || strings.Contains(string(content), "lianjieai-image") {
+				t.Fatalf("one-click import injected image MCP: %s", content)
+			}
+			if _, err := os.Stat(filepath.Join(root, ".claude.json")); agent == "claude" && !os.IsNotExist(err) {
+				t.Fatalf("Claude user MCP file was created: %v", err)
+			}
+		})
+	}
+}
+
+func TestImportPreservesExistingOpenCodeMCPWithoutAddingOne(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, paths["opencode"])
 	legacy := `{"mcp":{"sub2api_image":{"type":"remote","url":"https://legacy.example/mcp","headers":{"Authorization":"Bearer old-secret"}}}}`
@@ -806,11 +821,11 @@ func TestInstallUsesCurrentOpenCodeMCPShape(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !get(data, []string{"mcp", "servers", "lianjieai_image"}).Exists {
-		t.Fatalf("current OpenCode MCP shape missing: %s", text)
+	if get(data, []string{"mcp", "servers", "lianjieai_image"}).Exists {
+		t.Fatalf("one-click import added image MCP: %s", text)
 	}
-	if get(data, []string{"mcp", "sub2api_image"}).Exists {
-		t.Fatalf("legacy direct OpenCode MCP shape was not removed: %s", text)
+	if !get(data, []string{"mcp", "sub2api_image"}).Exists {
+		t.Fatalf("one-click import changed an existing MCP: %s", text)
 	}
 }
 
