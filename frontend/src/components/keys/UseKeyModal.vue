@@ -115,6 +115,7 @@
         <div v-if="activeClientTab === 'claude'" class="rounded-lg border border-gray-200 p-3 dark:border-dark-700">
           <label for="claude-model" class="mb-1 block text-sm font-medium">{{ t('keys.useKeyModal.claudeModelLabel') }}</label>
           <select v-if="claudeModels.length" id="claude-model" v-model="selectedClaudeModel" class="input w-full">
+            <option value="">{{ t('keys.quickImport.chooseModel') }}</option>
             <option v-for="model in claudeModels" :key="model" :value="model">{{ model }}</option>
           </select>
           <input v-else id="claude-model" v-model.trim="selectedClaudeModel" class="input w-full" :placeholder="t('keys.useKeyModal.claudeModelPlaceholder')" />
@@ -123,6 +124,7 @@
         <div v-if="activeClientTab === 'codex' || activeClientTab === 'codex-ws' || activeClientTab === 'opencode'" class="rounded-lg border border-gray-200 p-3 dark:border-dark-700">
           <label for="manual-model" class="mb-1 block text-sm font-medium">{{ t('keys.quickImport.model') }}</label>
           <select v-if="manualModels.length" id="manual-model" v-model="selectedManualModel" class="input w-full">
+            <option value="">{{ t('keys.quickImport.chooseModel') }}</option>
             <option v-for="model in manualModels" :key="model" :value="model">{{ model }}</option>
           </select>
           <input v-else id="manual-model" v-model.trim="selectedManualModel" class="input w-full" :placeholder="t('keys.quickImport.modelPlaceholder')" />
@@ -340,13 +342,21 @@ const { copyToClipboard: clipboardCopy } = useClipboard()
 const copiedIndex = ref<number | null>(null)
 const claudeModels = ref<string[]>([])
 const selectedClaudeModel = ref('')
+const claudeModelsLoading = ref(false)
 let claudeModelsController: AbortController | null = null
 const manualModels = ref<string[]>([])
 const selectedManualModel = ref('')
+const manualModelsLoading = ref(false)
 let manualModelsController: AbortController | null = null
 const manualModelReady = computed(() => {
   const model = activeClientTab.value === 'claude' ? selectedClaudeModel.value : selectedManualModel.value
-  return !['claude', 'codex', 'codex-ws', 'opencode'].includes(activeClientTab.value) || /^[A-Za-z0-9_.:/-]+$/.test(model)
+  const loading = activeClientTab.value === 'claude' ? claudeModelsLoading.value : manualModelsLoading.value
+  if (!['claude', 'codex', 'codex-ws', 'opencode'].includes(activeClientTab.value)) return true
+  if (loading || !/^[A-Za-z0-9_.:/-]+$/.test(model)) return false
+  if (['codex', 'codex-ws'].includes(activeClientTab.value) && codexCatalogModelSlugs.value.length) {
+    return codexCatalogModelSlugs.value.includes(model)
+  }
+  return true
 })
 const activeTab = ref<string>('unix')
 const activeClientTab = ref<string>('claude')
@@ -429,9 +439,11 @@ watch(() => [props.show, props.baseUrl, props.apiKey, activeClientTab.value], as
   claudeModelsController?.abort()
   claudeModels.value = []
   selectedClaudeModel.value = ''
+  claudeModelsLoading.value = false
   if (!props.show || activeClientTab.value !== 'claude' || !props.apiKey) return
   const controller = new AbortController()
   claudeModelsController = controller
+  claudeModelsLoading.value = true
   try {
     const response = await fetch(buildCodexModelCatalogUrl(props.baseUrl), {
       headers: { Authorization: `Bearer ${props.apiKey}`, Accept: 'application/json' },
@@ -442,17 +454,20 @@ watch(() => [props.show, props.baseUrl, props.apiKey, activeClientTab.value], as
     if (controller.signal.aborted || !Array.isArray(body.data)) return
     const names = body.data.map(item => item.id).filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9_.:/-]+$/.test(id))
     claudeModels.value = [...new Set(names)]
-    selectedClaudeModel.value = claudeModels.value.find(id => /claude|deepseek|glm|kimi|grok|mini|max/i.test(id)) || claudeModels.value[0] || ''
+    if (claudeModels.value.length) selectedClaudeModel.value = ''
   } catch { /* Manual entry remains available when model discovery fails. */ }
+  finally { if (claudeModelsController === controller) claudeModelsLoading.value = false }
 }, { immediate: true })
 
 watch(() => [props.show, props.baseUrl, props.apiKey, activeClientTab.value], async () => {
   manualModelsController?.abort()
   manualModels.value = []
   selectedManualModel.value = ''
+  manualModelsLoading.value = false
   if (!props.show || !['codex', 'codex-ws', 'opencode'].includes(activeClientTab.value) || !props.apiKey) return
   const controller = new AbortController()
   manualModelsController = controller
+  manualModelsLoading.value = true
   try {
     const codexClient = activeClientTab.value === 'codex' || activeClientTab.value === 'codex-ws'
     const response = await fetch(codexClient ? buildCodexModelsManifestUrl(props.baseUrl) : buildCodexModelCatalogUrl(props.baseUrl), {
@@ -468,9 +483,9 @@ watch(() => [props.show, props.baseUrl, props.apiKey, activeClientTab.value], as
         ? body.data.map((item: { id?: string }) => item?.id)
         : []
     manualModels.value = [...new Set(names.filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9_.:/-]+$/.test(id)))]
-    const family = props.platform === 'openai' ? /gpt|codex/i : props.platform === 'anthropic' ? /claude/i : props.platform === 'deepseek' ? /deepseek/i : /./
-    selectedManualModel.value = manualModels.value.find(id => family.test(id)) || manualModels.value[0] || ''
+    if (manualModels.value.length) selectedManualModel.value = ''
   } catch { /* Manual model entry remains available. */ }
+  finally { if (manualModelsController === controller) manualModelsLoading.value = false }
 }, { immediate: true })
 
 watch(() => props.show, (show) => {
@@ -800,13 +815,12 @@ const codexCatalogModelSlugs = computed(() =>
   parseCodexCatalogModels(codexModelManifestContent.value).map((model) => model.slug)
 )
 
-function selectCodexCatalogModel(preferredModel: string): string {
+function selectCodexCatalogModel(): string {
   const selected = selectedManualModel.value
   if (/^[A-Za-z0-9_.:/-]+$/.test(selected) && (!codexCatalogModelSlugs.value.length || codexCatalogModelSlugs.value.includes(selected))) {
     return selected
   }
-  if (codexCatalogModelSlugs.value.includes(preferredModel)) return preferredModel
-  return codexCatalogModelSlugs.value[0] || 'YOUR_AVAILABLE_MODEL_ID'
+  return 'YOUR_AVAILABLE_MODEL_ID'
 }
 
 function codexReasoningEffortTomlLine(modelSlug: string): string {
@@ -1143,7 +1157,7 @@ function generateOpenAIFiles(baseUrl: string, apiKey: string): FileConfig[] {
   const isWindows = activeTab.value === 'windows'
   const configDir = isWindows ? '%userprofile%\\.codex' : '~/.codex'
 
-  const model = selectCodexCatalogModel('gpt-5.5')
+  const model = selectCodexCatalogModel()
   const reasoningEffortLine = codexReasoningEffortTomlLine(model)
 
   // config.toml content
@@ -1363,7 +1377,7 @@ function generateGrokCodexFiles(baseUrl: string, apiKey: string): FileConfig[] {
   const shell = activeTab.value
   const isWindowsPath = shell === 'windows' || shell === 'cmd' || shell === 'powershell'
   const configDir = isWindowsPath ? '%userprofile%\\.codex' : '~/.codex'
-  const model = selectCodexCatalogModel('grok-4.5')
+  const model = selectCodexCatalogModel()
 
   let envPath: string
   let envContent: string
@@ -1431,21 +1445,7 @@ function generateRoutedCodexFiles(
 ): FileConfig[] {
   const isWindows = activeTab.value === 'windows'
   const configDir = isWindows ? '%userprofile%\\.codex' : '~/.codex'
-  const preferredModels: Partial<Record<GroupPlatform, string>> = {
-    openai: 'gpt-5.5',
-    anthropic: 'claude-sonnet-4-6',
-    gemini: 'gemini-2.5-pro',
-    antigravity: 'claude-sonnet-4-6',
-    grok: 'grok-4.5',
-    kimi: 'kimi-k2.5',
-    zhipu: 'glm-4.7',
-    deepseek: 'deepseek-v4-pro',
-    minimax: 'MiniMax-M3',
-    opencode_go: 'glm-5.3',
-    composite: 'gpt-5.5'
-  }
-  const preferredModel = preferredModels[platform] || ''
-  const model = selectCodexCatalogModel(preferredModel)
+  const model = selectCodexCatalogModel()
   const labels: Record<GroupPlatform, string> = {
     anthropic: 'Anthropic',
     openai: 'OpenAI',
@@ -1498,7 +1498,7 @@ supports_websockets = false${codexModelCatalogMode.value === 'remote' ? '\n\n[fe
 function generateOpenAIWsFiles(baseUrl: string, apiKey: string): FileConfig[] {
   const isWindows = activeTab.value === 'windows'
   const configDir = isWindows ? '%userprofile%\\.codex' : '~/.codex'
-  const model = selectCodexCatalogModel('gpt-5.5')
+  const model = selectCodexCatalogModel()
   const reasoningEffortLine = codexReasoningEffortTomlLine(model)
 
   // config.toml content with WebSocket v2

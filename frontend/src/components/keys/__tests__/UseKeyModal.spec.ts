@@ -776,6 +776,7 @@ describe('UseKeyModal', () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
+      json: async () => ({ data: manifest.models.map(model => ({ id: model.slug })) }),
       text: async () => JSON.stringify(manifest)
     })
     vi.stubGlobal('fetch', fetchMock)
@@ -832,6 +833,9 @@ describe('UseKeyModal', () => {
     )
     expect(wrapper.get('[data-testid="codex-model-catalog"]').text())
       .toContain('keys.useKeyModal.codexModelCatalog.download')
+
+    expect(wrapper.get('[data-testid="manual-model-required"]').exists()).toBe(true)
+    await wrapper.get('#manual-model').setValue('claude-opus-4-8')
 
     const loadedUnixConfig = wrapper.findAll('pre code')
       .map((code) => code.text())
@@ -923,6 +927,8 @@ describe('UseKeyModal', () => {
     })
     try {
       await flushPromises()
+      expect(wrapper.get('[data-testid="manual-model-required"]').exists()).toBe(true)
+      await wrapper.get('#manual-model').setValue('deepseek-current-model')
       const config = wrapper.findAll('pre code').map(code => code.text()).find(content => content.includes('"provider"'))!
       const parsed = JSON.parse(config)
       expect(parsed.provider.lianjieai.npm).toBe('@ai-sdk/openai-compatible')
@@ -935,8 +941,8 @@ describe('UseKeyModal', () => {
     }
   })
 
-  // Scenario: the platform-preferred model remains selected when the downloaded catalog contains it.
-  it('keeps the preferred Composite default when it exists in the catalog', async () => {
+  // Scenario: a downloaded catalog does not silently choose a model for the user.
+  it('requires explicit Composite model selection after loading the catalog', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -974,6 +980,9 @@ describe('UseKeyModal', () => {
     await codexTab!.trigger('click')
     await wrapper.get('[data-testid="codex-model-catalog-fetch"]').trigger('click')
     await flushPromises()
+
+    expect(wrapper.get('[data-testid="manual-model-required"]').exists()).toBe(true)
+    await wrapper.get('#manual-model').setValue('gpt-5.5')
 
     const config = wrapper.findAll('pre code')
       .map((code) => code.text())
@@ -1050,10 +1059,49 @@ describe('UseKeyModal', () => {
       global: { stubs: { BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' }, Icon: { template: '<span />' } } }
     })
     await flushPromises()
-    expect(wrapper.get('#manual-model').findAll('option').map(option => option.attributes('value'))).toEqual(['codex-available'])
+    expect(wrapper.get('#manual-model').findAll('option').map(option => option.attributes('value'))).toEqual(['', 'codex-available'])
+    expect((wrapper.get('#manual-model').element as HTMLSelectElement).value).toBe('')
+    expect(wrapper.get('[data-testid="manual-model-required"]').exists()).toBe(true)
+    await wrapper.get('#manual-model').setValue('codex-available')
     const config = wrapper.findAll('pre code').map(code => code.text()).find(content => content.includes('model_provider = "OpenAI"'))
     expect(config).toContain('model = "codex-available"')
     expect(fetchMock).toHaveBeenCalledWith('https://example.com/v1/models?client_version=0.158.0', expect.any(Object))
+    wrapper.unmount()
+  })
+
+  it('blocks copying a Codex model that disappears from the downloaded catalog', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ models: [{ slug: 'catalog-model' }] }),
+      text: async () => JSON.stringify({ models: [{ slug: 'different-model' }] })
+    })))
+    const wrapper = mount(UseKeyModal, {
+      props: { show: true, client: 'codex', apiKey: 'sk-test', baseUrl: 'https://example.com/v1', platform: 'openai' },
+      global: { stubs: { BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' }, Icon: { template: '<span />' } } }
+    })
+    await flushPromises()
+    await wrapper.get('#manual-model').setValue('catalog-model')
+    expect(wrapper.find('[data-testid="manual-model-required"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="codex-model-catalog-fetch"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="manual-model-required"]').exists()).toBe(true)
+    expect(wrapper.findAll('button').filter(button => button.text().includes('keys.useKeyModal.copy')).every(button => button.attributes('disabled') !== undefined)).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('requires an explicit Claude Code model before copying manual settings', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [{ id: 'gpt-image-1' }, { id: 'claude-sonnet-example' }] }) }))
+    const wrapper = mount(UseKeyModal, {
+      props: { show: true, client: 'claude', apiKey: 'sk-test', baseUrl: 'https://example.com', platform: 'anthropic' },
+      global: { stubs: { BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' }, Icon: { template: '<span />' } } }
+    })
+    await flushPromises()
+    expect(wrapper.get('#claude-model').findAll('option').map(option => option.attributes('value'))).toEqual(['', 'gpt-image-1', 'claude-sonnet-example'])
+    expect((wrapper.get('#claude-model').element as HTMLSelectElement).value).toBe('')
+    expect(wrapper.get('[data-testid="manual-model-required"]').exists()).toBe(true)
+    await wrapper.get('#claude-model').setValue('claude-sonnet-example')
+    expect(wrapper.find('[data-testid="manual-model-required"]').exists()).toBe(false)
     wrapper.unmount()
   })
 

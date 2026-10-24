@@ -82,7 +82,7 @@ const copied = ref<'import' | 'clean' | ''>('')
 const modelChoices = ref<string[]>([])
 const selectedModel = ref('')
 const modelLoading = ref(false)
-const validModel = computed(() => /^[A-Za-z0-9_.:/-]+$/.test(selectedModel.value))
+const validModel = computed(() => !modelLoading.value && /^[A-Za-z0-9_.:/-]+$/.test(selectedModel.value))
 let modelController: AbortController | undefined
 watch([agent, () => props.show, () => props.apiKey, () => props.baseUrl], async () => {
   modelController?.abort()
@@ -106,8 +106,7 @@ watch([agent, () => props.show, () => props.apiKey, () => props.baseUrl], async 
         ? body.data.map((item: { id?: string }) => item?.id)
         : []
     modelChoices.value = [...new Set(names.filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9_.:/-]+$/.test(id)))]
-    const family = agent.value === 'claude' ? /claude|deepseek|glm|kimi/i : agent.value === 'codex' ? /gpt|codex/i : /gpt|claude|deepseek|glm|kimi/i
-    selectedModel.value = modelChoices.value.find(model => family.test(model)) || modelChoices.value[0] || ''
+    if (modelChoices.value.length) selectedModel.value = ''
   } catch { /* Manual model entry remains available. */ }
   finally {
     if (modelController === controller) modelLoading.value = false
