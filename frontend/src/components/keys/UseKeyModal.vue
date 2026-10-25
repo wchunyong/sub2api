@@ -123,16 +123,26 @@
           <textarea v-else id="claude-model" v-model="manualClaudeModels" class="input w-full" rows="3" :disabled="claudeOnlyNonChatModels" :placeholder="t('keys.useKeyModal.claudeModelPlaceholder')" />
           <p class="mt-1 text-xs text-gray-500">{{ t(claudeOnlyNonChatModels ? 'keys.quickImport.modelNoChatAvailable' : claudeModels.length ? 'keys.useKeyModal.claudeModelHint' : 'keys.useKeyModal.claudeModelFallback') }}</p>
         </div>
-        <div v-if="activeClientTab === 'codex' || activeClientTab === 'codex-ws' || activeClientTab === 'opencode'" class="rounded-lg border border-gray-200 p-3 dark:border-dark-700">
-          <label for="manual-model" class="mb-1 block text-sm font-medium">{{ t('keys.quickImport.model') }}</label>
-          <select v-if="manualModels.length" id="manual-model" v-model="selectedManualModel" class="input w-full">
-            <option value="">{{ t('keys.quickImport.chooseModel') }}</option>
-            <option v-for="model in manualModels" :key="model" :value="model">{{ model }}</option>
-          </select>
-          <input v-else id="manual-model" v-model.trim="selectedManualModel" class="input w-full" :disabled="manualOnlyNonChatModels" :placeholder="t('keys.quickImport.modelPlaceholder')" />
-          <p class="mt-1 text-xs text-gray-500">{{ t(manualOnlyNonChatModels ? 'keys.quickImport.modelNoChatAvailable' : manualModels.length ? 'keys.quickImport.modelFromKey' : 'keys.quickImport.modelUnavailable') }}</p>
+        <div v-if="manualModelClients.includes(activeClientTab)" class="rounded-lg border border-gray-200 p-3 dark:border-dark-700">
+          <p class="mb-2 text-sm font-medium">{{ t('keys.useKeyModal.manualModelsLabel') }}</p>
+          <div v-if="manualModels.length" data-testid="manual-model-list" class="max-h-48 space-y-2 overflow-y-auto">
+            <label v-for="model in manualModels" :key="model" class="flex items-center gap-2 text-sm">
+              <input v-model="selectedManualModels" type="checkbox" :value="model" />
+              <span class="break-all">{{ model }}</span>
+            </label>
+          </div>
+          <textarea v-else id="manual-model" v-model="manualModelsText" class="input w-full" rows="3" :disabled="manualOnlyNonChatModels" :placeholder="t('keys.useKeyModal.claudeModelPlaceholder')" />
+          <p class="mt-1 text-xs text-gray-500">{{ t(manualOnlyNonChatModels ? 'keys.quickImport.modelNoChatAvailable' : manualModels.length ? 'keys.useKeyModal.manualModelsHint' : 'keys.useKeyModal.claudeModelFallback') }}</p>
         </div>
         <p v-if="!manualModelReady" class="text-sm text-amber-700 dark:text-amber-300" data-testid="manual-model-required">{{ t(currentOnlyNonChatModels ? 'keys.quickImport.modelNoChatAvailable' : manualModelIsNonChat ? 'keys.quickImport.modelNotChat' : 'keys.useKeyModal.selectModelBeforeCopy') }}</p>
+
+        <div v-if="activeClientTab === 'deepseek-harness'" class="rounded-lg border border-gray-200 p-3 dark:border-dark-700">
+          <label for="harness-profile" class="mb-1 block text-sm font-medium">{{ t('keys.useKeyModal.harnessProfile') }}</label>
+          <select id="harness-profile" v-model="harnessProfile" class="input w-full">
+            <option value="web">Web</option>
+            <option value="desktop">Desktop</option>
+          </select>
+        </div>
 
         <!-- OS/Shell Tabs -->
         <div v-if="showShellTabs" class="overflow-x-auto border-b border-gray-200 dark:border-dark-700">
@@ -192,7 +202,7 @@
                 </button>
               </div>
               <!-- Code Content -->
-              <pre class="p-4 text-sm font-mono text-gray-100 overflow-x-auto"><code v-if="file.highlighted" v-html="file.highlighted"></code><code v-else v-text="file.content"></code></pre>
+              <pre class="p-4 text-sm font-mono text-gray-100 overflow-x-auto"><code v-text="file.content"></code></pre>
             </div>
           </div>
         </div>
@@ -219,7 +229,7 @@
                 :aria-label="t('keys.useKeyModal.codexModelCatalog.mode')"
                 class="input mt-2 text-sm"
               >
-                <option value="remote" :disabled="codexModelCatalogOversized">{{ t('keys.useKeyModal.codexModelCatalog.remote') }}</option>
+                <option value="remote" :disabled="codexModelCatalogOversized || codexSubsetSelected">{{ t('keys.useKeyModal.codexModelCatalog.remote') }}</option>
                 <option value="file">{{ t('keys.useKeyModal.codexModelCatalog.local') }}</option>
               </select>
               <p v-if="codexModelCatalogOversized" class="mt-2 text-xs text-amber-700 dark:text-amber-300">
@@ -258,7 +268,7 @@
             v-if="codexModelManifestState === 'ready'"
             class="border-t border-gray-200 px-4 py-2 text-xs text-emerald-700 dark:border-dark-700 dark:text-emerald-300"
           >
-            {{ t('keys.useKeyModal.codexModelCatalog.modelsCount', { count: codexModelManifestModelCount }) }}
+            {{ t('keys.useKeyModal.codexModelCatalog.modelsCount', { count: codexSubsetSelected ? manualSelectedModels.length : codexModelManifestModelCount }) }}
           </p>
           <p
             v-else-if="codexModelManifestState === 'error'"
@@ -333,7 +343,6 @@ interface FileConfig {
   path: string
   content: string
   hint?: string  // Optional hint message for this file
-  highlighted?: string
 }
 
 const props = defineProps<Props>()
@@ -350,33 +359,43 @@ const manualClaudeModels = ref('')
 const claudeModelsLoading = ref(false)
 let claudeModelsController: AbortController | null = null
 const manualModels = ref<string[]>([])
+const codexDiscoveredManifestContent = ref('')
 const manualOnlyNonChatModels = ref(false)
-const selectedManualModel = ref('')
+const selectedManualModels = ref<string[]>([])
+const manualModelsText = ref('')
 const manualModelsLoading = ref(false)
 let manualModelsController: AbortController | null = null
+const manualModelClients = ['codex', 'codex-ws', 'opencode', 'deepseek-harness', 'workbuddy', 'pi']
 const currentOnlyNonChatModels = computed(() => activeClientTab.value === 'claude' ? claudeOnlyNonChatModels.value : manualOnlyNonChatModels.value)
 const claudeSelectedModels = computed(() => claudeModels.value.length
   ? selectedClaudeModels.value
   : [...new Set(manualClaudeModels.value.split(/[\s,]+/).filter(Boolean))])
+const manualSelectedModels = computed(() => manualModels.value.length
+  ? selectedManualModels.value
+  : [...new Set(manualModelsText.value.split(/[\s,]+/).filter(Boolean))])
+const codexSubsetSelected = computed(() =>
+  ['codex', 'codex-ws'].includes(activeClientTab.value) &&
+  manualModels.value.length > 0 && selectedManualModels.value.length < manualModels.value.length
+)
 const manualModelIsNonChat = computed(() => activeClientTab.value === 'claude'
   ? claudeSelectedModels.value.some(isClearlyNonChatModel)
-  : isClearlyNonChatModel(selectedManualModel.value))
+  : manualSelectedModels.value.some(isClearlyNonChatModel))
 const manualModelReady = computed(() => {
   const loading = activeClientTab.value === 'claude' ? claudeModelsLoading.value : manualModelsLoading.value
-  if (!['claude', 'codex', 'codex-ws', 'opencode'].includes(activeClientTab.value)) return true
+  if (activeClientTab.value !== 'claude' && !manualModelClients.includes(activeClientTab.value)) return true
   if (loading || currentOnlyNonChatModels.value || manualModelIsNonChat.value) return false
   if (activeClientTab.value === 'claude') {
     return claudeSelectedModels.value.length > 0 && claudeSelectedModels.value.every(model => /^[A-Za-z0-9_.:/-]+$/.test(model))
   }
-  const model = selectedManualModel.value
-  if (!/^[A-Za-z0-9_.:/-]+$/.test(model)) return false
+  if (!manualSelectedModels.value.length || !manualSelectedModels.value.every(model => /^[A-Za-z0-9_.:/-]+$/.test(model))) return false
   if (['codex', 'codex-ws'].includes(activeClientTab.value) && codexCatalogModelSlugs.value.length) {
-    return codexCatalogModelSlugs.value.includes(model)
+    return manualSelectedModels.value.every(model => codexCatalogModelSlugs.value.includes(model))
   }
   return true
 })
 const activeTab = ref<string>('unix')
 const activeClientTab = ref<string>('claude')
+const harnessProfile = ref<'web' | 'desktop'>('web')
 type CodexAuthMode = 'legacy' | 'api-key'
 const codexAuthMode = ref<CodexAuthMode>('api-key')
 type CodexModelManifestState = 'idle' | 'loading' | 'ready' | 'error'
@@ -481,11 +500,14 @@ watch(() => [props.show, props.baseUrl, props.apiKey, activeClientTab.value], as
 
 watch(() => [props.show, props.baseUrl, props.apiKey, activeClientTab.value], async () => {
   manualModelsController?.abort()
+  codexModelCatalogMode.value = 'remote'
   manualModels.value = []
+  codexDiscoveredManifestContent.value = ''
   manualOnlyNonChatModels.value = false
-  selectedManualModel.value = ''
+  selectedManualModels.value = []
+  manualModelsText.value = ''
   manualModelsLoading.value = false
-  if (!props.show || !['codex', 'codex-ws', 'opencode'].includes(activeClientTab.value) || !props.apiKey) return
+  if (!props.show || !manualModelClients.includes(activeClientTab.value) || !props.apiKey) return
   const controller = new AbortController()
   manualModelsController = controller
   manualModelsLoading.value = true
@@ -498,6 +520,7 @@ watch(() => [props.show, props.baseUrl, props.apiKey, activeClientTab.value], as
     if (!response.ok) return
     const body: unknown = await response.json()
     if (controller.signal.aborted) return
+    if (codexClient) codexDiscoveredManifestContent.value = JSON.stringify(body)
     const names = codexClient
       ? parseCodexCatalogModels(JSON.stringify(body)).map(item => item.slug)
       : typeof body === 'object' && body !== null && 'data' in body && Array.isArray(body.data)
@@ -506,10 +529,14 @@ watch(() => [props.show, props.baseUrl, props.apiKey, activeClientTab.value], as
     const validNames = names.filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9_.:/-]+$/.test(id))
     manualModels.value = [...new Set(validNames.filter(id => !isClearlyNonChatModel(id)))]
     manualOnlyNonChatModels.value = validNames.length > 0 && manualModels.value.length === 0
-    if (manualModels.value.length) selectedManualModel.value = ''
+    selectedManualModels.value = [...manualModels.value]
   } catch { /* Manual model entry remains available. */ }
   finally { if (manualModelsController === controller) manualModelsLoading.value = false }
 }, { immediate: true })
+
+watch(codexSubsetSelected, (subset) => {
+  if (subset) codexModelCatalogMode.value = 'file'
+})
 
 watch(() => props.show, (show) => {
   if (show) {
@@ -651,7 +678,7 @@ const clientTabs = computed((): TabConfig[] => {
   }
 })
 
-// Shell tabs (3 types for environment variable based configs)
+// Operating-system tabs for file paths.
 const shellTabs: TabConfig[] = [
   { id: 'unix', label: 'macOS / Linux', icon: AppleIcon },
   { id: 'cmd', label: 'Windows CMD', icon: WindowsIcon },
@@ -673,7 +700,7 @@ const showCodexAuthMode = computed(() =>
 
 const currentTabs = computed(() => {
   if (!showShellTabs.value) return []
-  if (activeClientTab.value === 'codex' || activeClientTab.value === 'codex-ws' || activeClientTab.value === 'grok' || activeClientTab.value === 'claude') {
+  if (['codex', 'codex-ws', 'grok', 'gemini', 'claude', 'deepseek-harness', 'workbuddy', 'pi'].includes(activeClientTab.value)) {
     return openaiTabs
   }
   return shellTabs
@@ -830,9 +857,9 @@ async function loadCodexModelManifest() {
 }
 
 function downloadCodexModelManifest() {
-  if (!codexModelManifestContent.value) return
+  if (!selectedCodexManifestContent.value) return
   saveAs(
-    new Blob([codexModelManifestContent.value], { type: 'application/json;charset=utf-8' }),
+    new Blob([selectedCodexManifestContent.value], { type: 'application/json;charset=utf-8' }),
     'codex-models.json'
   )
 }
@@ -840,9 +867,31 @@ function downloadCodexModelManifest() {
 const codexCatalogModelSlugs = computed(() =>
   parseCodexCatalogModels(codexModelManifestContent.value).map((model) => model.slug)
 )
+const selectedCodexManifestContent = computed(() => {
+  const source = codexModelManifestContent.value || codexDiscoveredManifestContent.value
+  if (!source) return ''
+  try {
+    const parsed = JSON.parse(source) as { models?: Array<{ slug?: string }>; [key: string]: unknown }
+    if (!Array.isArray(parsed.models)) return ''
+    const selected = manualSelectedModels.value
+    const models = selected.length || manualModels.value.length
+      ? parsed.models.filter(model => typeof model.slug === 'string' && selected.includes(model.slug))
+      : parsed.models
+    return JSON.stringify({ ...parsed, models }, null, 2)
+  } catch { return '' }
+})
+
+function withCodexCatalogFile(files: FileConfig[]): FileConfig[] {
+  if (codexModelCatalogMode.value !== 'file' || !selectedCodexManifestContent.value) return files
+  return [...files, {
+    path: codexModelCatalogPath.value,
+    content: selectedCodexManifestContent.value,
+    hint: t('keys.useKeyModal.manualMergeHint')
+  }]
+}
 
 function selectCodexCatalogModel(): string {
-  const selected = selectedManualModel.value
+  const selected = manualSelectedModels.value[0] || ''
   if (/^[A-Za-z0-9_.:/-]+$/.test(selected) && (!codexCatalogModelSlugs.value.length || codexCatalogModelSlugs.value.includes(selected))) {
     return selected
   }
@@ -854,22 +903,6 @@ function codexReasoningEffortTomlLine(modelSlug: string): string {
     selectCodexConfigReasoningEffort(findCodexCatalogModel(codexModelManifestContent.value, modelSlug))
   )
 }
-
-const escapeHtml = (value: string) => value
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;')
-  .replace(/'/g, '&#39;')
-
-const wrapToken = (className: string, value: string) =>
-  `<span class="${className}">${escapeHtml(value)}</span>`
-
-const keyword = (value: string) => wrapToken('text-emerald-300', value)
-const variable = (value: string) => wrapToken('text-sky-200', value)
-const operator = (value: string) => wrapToken('text-slate-400', value)
-const string = (value: string) => wrapToken('text-amber-200', value)
-const comment = (value: string) => wrapToken('text-slate-500', value)
 
 // Syntax highlighting helpers
 // Generate file configs based on platform and active tab
@@ -891,6 +924,10 @@ const currentFiles = computed((): FileConfig[] => {
     const trimmed = baseRoot.replace(/\/+$/, '')
     return trimmed.endsWith('/v1beta') ? trimmed : `${trimmed}/v1beta`
   })()
+
+  if (activeClientTab.value === 'deepseek-harness') return [generateHarnessConfig(apiBase, apiKey)]
+  if (activeClientTab.value === 'workbuddy') return [generateWorkBuddyConfig(apiBase, apiKey)]
+  if (activeClientTab.value === 'pi') return [generatePiConfig(apiBase, apiKey)]
 
   if (activeClientTab.value === 'opencode') {
     switch (props.platform) {
@@ -921,18 +958,18 @@ const currentFiles = computed((): FileConfig[] => {
         return generateAnthropicFiles(baseRoot, apiKey)
       }
       if (activeClientTab.value === 'codex-ws') {
-        return generateOpenAIWsFiles(apiBase, apiKey)
+        return withCodexCatalogFile(generateOpenAIWsFiles(apiBase, apiKey))
       }
       // Codex appends /responses directly and does not add /v1.
-      return generateOpenAIFiles(apiBase, apiKey)
+      return withCodexCatalogFile(generateOpenAIFiles(apiBase, apiKey))
     case 'gemini':
       if (activeClientTab.value === 'codex') {
-        return generateRoutedCodexFiles(apiBase, apiKey, 'gemini')
+        return withCodexCatalogFile(generateRoutedCodexFiles(apiBase, apiKey, 'gemini'))
       }
       return [generateGeminiCliContent(baseUrl, apiKey)]
     case 'antigravity':
       if (activeClientTab.value === 'codex') {
-        return generateRoutedCodexFiles(apiBase, apiKey, 'antigravity')
+        return withCodexCatalogFile(generateRoutedCodexFiles(apiBase, apiKey, 'antigravity'))
       }
       if (activeClientTab.value === 'gemini') {
         return [generateGeminiCliContent(`${baseUrl}/antigravity`, apiKey)]
@@ -943,27 +980,27 @@ const currentFiles = computed((): FileConfig[] => {
         return generateAnthropicFiles(baseRoot, apiKey)
       }
       if (activeClientTab.value === 'codex') {
-        return generateGrokCodexFiles(apiBase, apiKey)
+        return withCodexCatalogFile(generateGrokCodexFiles(apiBase, apiKey))
       }
       return generateGrokFiles(apiBase, apiKey)
     case 'deepseek':
       if (activeClientTab.value === 'codex') {
-        return generateRoutedCodexFiles(apiBase, apiKey, 'deepseek')
+        return withCodexCatalogFile(generateRoutedCodexFiles(apiBase, apiKey, 'deepseek'))
       }
       return generateAnthropicFiles(baseRoot, apiKey)
     case 'minimax':
       if (activeClientTab.value === 'codex') {
-        return generateRoutedCodexFiles(apiBase, apiKey, 'minimax')
+        return withCodexCatalogFile(generateRoutedCodexFiles(apiBase, apiKey, 'minimax'))
       }
       return generateAnthropicFiles(baseRoot, apiKey)
     case 'composite':
       if (activeClientTab.value === 'codex') {
-        return generateRoutedCodexFiles(apiBase, apiKey, 'composite')
+        return withCodexCatalogFile(generateRoutedCodexFiles(apiBase, apiKey, 'composite'))
       }
       return generateAnthropicFiles(baseRoot, apiKey)
     default:
       if (activeClientTab.value === 'codex' && props.platform) {
-        return generateRoutedCodexFiles(apiBase, apiKey, props.platform)
+        return withCodexCatalogFile(generateRoutedCodexFiles(apiBase, apiKey, props.platform))
       }
       return generateAnthropicFiles(baseRoot, apiKey)
   }
@@ -1041,49 +1078,54 @@ function generateAnthropicFiles(baseUrl: string, apiKey: string): FileConfig[] {
   ]
 }
 
+function generateHarnessConfig(baseUrl: string, apiKey: string): FileConfig {
+  const isWindows = activeTab.value === 'windows'
+  const dir = isWindows ? `%USERPROFILE%\\.dsh\\profiles\\${harnessProfile.value}` : `~/.dsh/profiles/${harnessProfile.value}`
+  const models = manualSelectedModels.value.map(id => `            - id: ${JSON.stringify(id)}\n              name: ${JSON.stringify(id)}`).join('\n')
+  const compatibility = props.platform === 'deepseek'
+    ? '\n          compat:\n            supportsDeveloperRole: false\n            maxTokensField: max_tokens'
+    : ''
+  return {
+    path: joinConfigPath(dir, 'cordis.patch.yml', isWindows),
+    content: `entries:\n  - id: llm-pi-ai\n    config:\n      providers:\n        lianjieai:\n          displayName: 连接AI\n          api: openai-completions\n          baseURL: ${JSON.stringify(baseUrl)}\n          headers:\n            Authorization: ${JSON.stringify(`Bearer ${apiKey}`)}\n          models:\n${models}${compatibility}\n`,
+    hint: t('keys.useKeyModal.manualMergeHint')
+  }
+}
+
+function generateWorkBuddyConfig(baseUrl: string, apiKey: string): FileConfig {
+  const isWindows = activeTab.value === 'windows'
+  const path = isWindows ? '%USERPROFILE%\\.workbuddy\\models.json' : '~/.workbuddy/models.json'
+  const entries = manualSelectedModels.value.map(id => ({
+    id,
+    name: `连接AI · ${id}`,
+    vendor: 'Custom',
+    url: `${baseUrl}/chat/completions`,
+    apiKey,
+    supportsToolCall: true,
+    supportsImages: false,
+    useCustomProtocol: true
+  }))
+  return { path, content: JSON.stringify(entries, null, 2), hint: t('keys.useKeyModal.manualMergeHint') }
+}
+
+function generatePiConfig(baseUrl: string, apiKey: string): FileConfig {
+  const isWindows = activeTab.value === 'windows'
+  const path = isWindows ? '%USERPROFILE%\\.pi\\agent\\models.json' : '~/.pi/agent/models.json'
+  return {
+    path,
+    content: JSON.stringify({
+      $schema: 'https://pi.dev/schemas/models.schema.json',
+      providers: { lianjieai: { baseUrl, api: 'openai-completions', apiKey, models: manualSelectedModels.value.map(id => ({ id, name: id })) } }
+    }, null, 2),
+    hint: t('keys.useKeyModal.manualMergeHint')
+  }
+}
+
 function generateGeminiCliContent(baseUrl: string, apiKey: string): FileConfig {
   const model = 'gemini-2.0-flash'
-  const modelComment = t('keys.useKeyModal.gemini.modelComment')
-  let path: string
-  let content: string
-  let highlighted: string
-
-  switch (activeTab.value) {
-    case 'unix':
-      path = 'Terminal'
-      content = `export GOOGLE_GEMINI_BASE_URL="${baseUrl}"
-export GEMINI_API_KEY="${apiKey}"
-export GEMINI_MODEL="${model}"  # ${modelComment}`
-      highlighted = `${keyword('export')} ${variable('GOOGLE_GEMINI_BASE_URL')}${operator('=')}${string(`"${baseUrl}"`)}
-${keyword('export')} ${variable('GEMINI_API_KEY')}${operator('=')}${string(`"${apiKey}"`)}
-${keyword('export')} ${variable('GEMINI_MODEL')}${operator('=')}${string(`"${model}"`)}  ${comment(`# ${modelComment}`)}`
-      break
-    case 'cmd':
-      path = 'Command Prompt'
-      content = `set GOOGLE_GEMINI_BASE_URL=${baseUrl}
-set GEMINI_API_KEY=${apiKey}
-set GEMINI_MODEL=${model}`
-      highlighted = `${keyword('set')} ${variable('GOOGLE_GEMINI_BASE_URL')}${operator('=')}${string(baseUrl)}
-${keyword('set')} ${variable('GEMINI_API_KEY')}${operator('=')}${string(apiKey)}
-${keyword('set')} ${variable('GEMINI_MODEL')}${operator('=')}${string(model)}
-${comment(`REM ${modelComment}`)}`
-      break
-    case 'powershell':
-      path = 'PowerShell'
-      content = `$env:GOOGLE_GEMINI_BASE_URL="${baseUrl}"
-$env:GEMINI_API_KEY="${apiKey}"
-$env:GEMINI_MODEL="${model}"  # ${modelComment}`
-      highlighted = `${keyword('$env:')}${variable('GOOGLE_GEMINI_BASE_URL')}${operator('=')}${string(`"${baseUrl}"`)}
-${keyword('$env:')}${variable('GEMINI_API_KEY')}${operator('=')}${string(`"${apiKey}"`)}
-${keyword('$env:')}${variable('GEMINI_MODEL')}${operator('=')}${string(`"${model}"`)}  ${comment(`# ${modelComment}`)}`
-      break
-    default:
-      path = 'Terminal'
-      content = ''
-      highlighted = ''
-  }
-
-  return { path, content, highlighted }
+  const path = activeTab.value === 'unix' ? '~/.gemini/.env' : '%USERPROFILE%\\.gemini\\.env'
+  const content = `GOOGLE_GEMINI_BASE_URL=${JSON.stringify(baseUrl)}\nGEMINI_API_KEY=${JSON.stringify(apiKey)}\nGEMINI_MODEL=${JSON.stringify(model)}`
+  return { path, content, hint: t('keys.useKeyModal.manualMergeHint') }
 }
 
 function generateOpenAIFiles(baseUrl: string, apiKey: string): FileConfig[] {
@@ -1105,7 +1147,7 @@ windows_wsl_setup_acknowledged = true
 name = "OpenAI"
 base_url = "${baseUrl}"
 ${codexModelCatalogMode.value === 'remote' ? `model_catalog_url = "${escapeTomlBasicString(buildCodexModelCatalogUrl(baseUrl))}"\n` : ''}wire_api = "responses"
-${generateCodexProviderAuthConfig()}
+${generateCodexProviderAuthConfig(apiKey)}
 
 [features]
 ${codexModelCatalogMode.value === 'remote' ? 'api_key_model_discovery = true\n' : ''}goals = true`
@@ -1113,10 +1155,10 @@ ${codexModelCatalogMode.value === 'remote' ? 'api_key_model_discovery = true\n' 
   return buildOpenAICodexFileConfigs(configDir, configContent, apiKey)
 }
 
-function generateCodexProviderAuthConfig(): string {
+function generateCodexProviderAuthConfig(apiKey: string): string {
   if (codexAuthMode.value === 'api-key') {
     return `requires_openai_auth = false
-env_key = "LIANJIEAI_API_KEY"`
+experimental_bearer_token = "${escapeTomlBasicString(apiKey)}"`
   }
 
   return 'requires_openai_auth = true'
@@ -1135,15 +1177,7 @@ function buildOpenAICodexFileConfigs(
     }
   ]
 
-  if (codexAuthMode.value === 'api-key') {
-    files.unshift({
-      path: activeTab.value === 'windows' ? 'PowerShell' : 'Terminal',
-      content: activeTab.value === 'windows'
-        ? `$env:LIANJIEAI_API_KEY="${apiKey}"`
-        : `export LIANJIEAI_API_KEY="${apiKey}"`,
-      hint: t('keys.useKeyModal.openai.apiKeyEnvHint')
-    })
-  } else {
+  if (codexAuthMode.value === 'legacy') {
     files.push({
       path: `${configDir}/auth.json`,
       content: JSON.stringify({ OPENAI_API_KEY: apiKey }, null, 2)
@@ -1163,30 +1197,9 @@ function escapeTomlBasicString(value: string): string {
 }
 
 function generateGrokFiles(baseUrl: string, apiKey: string): FileConfig[] {
-  // Prefer unix/cmd/powershell when shell tabs are shown; fall back to windows tab.
   const shell = activeTab.value
   const isWindowsPath = shell === 'windows' || shell === 'cmd' || shell === 'powershell'
   const configDir = isWindowsPath ? '%userprofile%\\.grok' : '~/.grok'
-
-  let envPath: string
-  let envContent: string
-  switch (shell) {
-    case 'cmd':
-      envPath = 'Command Prompt'
-      envContent = `set GROK_MODELS_BASE_URL=${baseUrl}
-set XAI_API_KEY=${apiKey}`
-      break
-    case 'powershell':
-    case 'windows':
-      envPath = 'PowerShell'
-      envContent = `$env:GROK_MODELS_BASE_URL="${baseUrl}"
-$env:XAI_API_KEY="${apiKey}"`
-      break
-    default:
-      envPath = 'Terminal'
-      envContent = `export GROK_MODELS_BASE_URL="${baseUrl}"
-export XAI_API_KEY="${apiKey}"`
-  }
 
   // Shape follows Grok Build user guide (~/.grok/docs + custom-models) and production-ready Sub2API setups.
   // Text models only (Responses). Image/video: Imagine model IDs on media endpoints / feature overrides.
@@ -1200,8 +1213,7 @@ export XAI_API_KEY="${apiKey}"`
 # If omitted, Grok Build defaults to chat_completions (/v1/chat/completions).
 # Keep api_backend = "responses" on every model entry.
 #
-# Prefer env_key over hardcoding api_key (never commit secrets).
-# Also export GROK_MODELS_BASE_URL + XAI_API_KEY in the shell block above.
+# This file contains the API key. Keep it in the user config directory.
 
 # Global inference / catalog endpoints (same role as env GROK_MODELS_BASE_URL).
 # When models_base_url is set, Grok uses API-key Bearer auth (no grok login required).
@@ -1212,7 +1224,7 @@ xai_api_base_url = "${baseUrl}"             # public xAI API base override for g
 cli_chat_proxy_base_url = "${baseUrl}"      # CLI chat-proxy base (env: GROK_CLI_CHAT_PROXY_BASE_URL)
 
 # Prefer API key when using a custom gateway (matches Sub2API).
-# Requires XAI_API_KEY env or per-model env_key / api_key.
+# Each model entry carries this key directly.
 [auth]
 preferred_method = "api_key"
 
@@ -1222,7 +1234,7 @@ name = "Grok 4.5"                           # shown in /model picker
 description = "Grok 4.5 via Sub2API (Responses)"
 # base_url inherits from [endpoints].models_base_url; override only if needed:
 # base_url = "${baseUrl}"
-env_key = "XAI_API_KEY"                     # or: api_key = "${apiKey}"  (not recommended)
+api_key = "${escapeTomlBasicString(apiKey)}"
 api_backend = "responses"                   # chat_completions | responses | messages
 context_window = 500000                     # drives auto-compaction timing
 # Optional sampling (global defaults can live under [models] instead):
@@ -1236,7 +1248,7 @@ supports_backend_search = true
 model = "grok-build-0.1"
 name = "Grok Build"
 description = "Coding / agent sessions (xAI recommends grok-build* for coding)"
-env_key = "XAI_API_KEY"
+api_key = "${escapeTomlBasicString(apiKey)}"
 api_backend = "responses"
 context_window = 256000
 supports_backend_search = true
@@ -1246,7 +1258,7 @@ supports_backend_search = true
 model = "grok-4.20-multi-agent-0309"
 name = "Grok 4.20 Multi Agent (text / web_search)"
 description = "Text multi-agent; use for web_search sub-agent, not image/video"
-env_key = "XAI_API_KEY"
+api_key = "${escapeTomlBasicString(apiKey)}"
 api_backend = "responses"
 context_window = 1000000
 supports_backend_search = true
@@ -1254,7 +1266,7 @@ supports_backend_search = true
 [model."grok-4.3"]
 model = "grok-4.3"
 name = "Grok 4.3"
-env_key = "XAI_API_KEY"
+api_key = "${escapeTomlBasicString(apiKey)}"
 api_backend = "responses"
 context_window = 1000000
 supports_backend_search = true
@@ -1263,7 +1275,7 @@ supports_backend_search = true
 # [model."grok"]
 # model = "grok-4.5"
 # name = "Grok"
-# env_key = "XAI_API_KEY"
+# api_key = "${escapeTomlBasicString(apiKey)}"
 # api_backend = "responses"
 # context_window = 1000000
 # supports_backend_search = true
@@ -1294,40 +1306,20 @@ image_edit_model_override = "grok-imagine-edit"
 # remote_fetch = true                         # set false for air-gapped / pure-gateway catalogs
 # lsp_tools = false`
 
-  return [
-    { path: envPath, content: envContent },
-    {
-      path: joinConfigPath(configDir, 'config.toml', isWindowsPath),
-      content: configContent,
-      hint: t('keys.useKeyModal.grok.configTomlHint')
-    }
-  ]
+  return [{
+    path: joinConfigPath(configDir, 'config.toml', isWindowsPath),
+    content: configContent,
+    hint: t('keys.useKeyModal.grok.configTomlHint')
+  }]
 }
 
 function generateGrokCodexFiles(baseUrl: string, apiKey: string): FileConfig[] {
-  // Codex config reference: wire_api = "responses" only; prefer env_key over experimental_bearer_token.
+  // Codex config reference: wire_api = "responses" only.
   // Non-OpenAI gateways should set supports_websockets = false (HTTP/SSE).
   const shell = activeTab.value
   const isWindowsPath = shell === 'windows' || shell === 'cmd' || shell === 'powershell'
   const configDir = isWindowsPath ? '%userprofile%\\.codex' : '~/.codex'
   const model = selectCodexCatalogModel()
-
-  let envPath: string
-  let envContent: string
-  switch (shell) {
-    case 'cmd':
-      envPath = 'Command Prompt'
-      envContent = `set SUB2API_API_KEY=${apiKey}`
-      break
-    case 'powershell':
-    case 'windows':
-      envPath = 'PowerShell'
-      envContent = `$env:SUB2API_API_KEY="${apiKey}"`
-      break
-    default:
-      envPath = 'Terminal'
-      envContent = `export SUB2API_API_KEY="${apiKey}"`
-  }
 
   const configContent = `# Codex CLI → Sub2API Grok group
 # Docs: Codex config reference (model_providers.*, wire_api = "responses")
@@ -1348,10 +1340,7 @@ ${codexLocalCatalogToml.value}# Optional:
 [model_providers.sub2api]
 name = "Sub2API Grok"
 base_url = "${baseUrl}"
-${codexModelCatalogMode.value === 'remote' ? `model_catalog_url = "${escapeTomlBasicString(buildCodexModelCatalogUrl(baseUrl))}"\n` : ''}# Prefer env_key (variable NAME). Do not combine with experimental_bearer_token.
-env_key = "SUB2API_API_KEY"
-# Fallback only if you cannot set env (discouraged — keeps secret on disk):
-# experimental_bearer_token = "${apiKey}"
+${codexModelCatalogMode.value === 'remote' ? `model_catalog_url = "${escapeTomlBasicString(buildCodexModelCatalogUrl(baseUrl))}"\n` : ''}experimental_bearer_token = "${escapeTomlBasicString(apiKey)}"
 wire_api = "responses"
 # API-key providers: do not require ChatGPT OAuth login
 requires_openai_auth = false
@@ -1361,14 +1350,11 @@ supports_websockets = false
 ${codexModelCatalogMode.value === 'remote' ? '[features]\napi_key_model_discovery = true\n\n# Optional:' : '# Optional:\n# [features]'}
 # goals = true`
 
-  return [
-    { path: envPath, content: envContent },
-    {
-      path: joinConfigPath(configDir, 'config.toml', isWindowsPath),
-      content: configContent,
-      hint: t('keys.useKeyModal.grok.codexConfigTomlHint')
-    }
-  ]
+  return [{
+    path: joinConfigPath(configDir, 'config.toml', isWindowsPath),
+    content: configContent,
+    hint: t('keys.useKeyModal.grok.codexConfigTomlHint')
+  }]
 }
 
 function generateRoutedCodexFiles(
@@ -1396,10 +1382,6 @@ function generateRoutedCodexFiles(
     composite: 'Composite'
   }
   const label = labels[platform]
-  const envContent = isWindows
-    ? `$env:SUB2API_API_KEY="${apiKey}"`
-    : `export SUB2API_API_KEY="${apiKey}"`
-
   const configContent = `# Codex CLI -> Sub2API ${label} group
 model_provider = "sub2api"
 model = "${model}"
@@ -1409,23 +1391,20 @@ ${codexLocalCatalogToml.value}
 [model_providers.sub2api]
 name = "Sub2API ${label}"
 base_url = "${baseUrl}"
-${codexModelCatalogMode.value === 'remote' ? `model_catalog_url = "${escapeTomlBasicString(buildCodexModelCatalogUrl(baseUrl))}"\n` : ''}env_key = "SUB2API_API_KEY"
+${codexModelCatalogMode.value === 'remote' ? `model_catalog_url = "${escapeTomlBasicString(buildCodexModelCatalogUrl(baseUrl))}"\n` : ''}experimental_bearer_token = "${escapeTomlBasicString(apiKey)}"
 wire_api = "responses"
 requires_openai_auth = false
 supports_websockets = false${codexModelCatalogMode.value === 'remote' ? '\n\n[features]\napi_key_model_discovery = true' : ''}`
 
-  return [
-    { path: isWindows ? 'PowerShell' : 'Terminal', content: envContent },
-    {
-      path: joinConfigPath(configDir, 'config.toml', isWindows),
-      content: configContent,
-      hint: t(
-        platform === 'deepseek' || platform === 'minimax' || platform === 'composite'
-          ? `keys.useKeyModal.${platform}.codexConfigTomlHint`
-          : 'keys.useKeyModal.routedCodex.configTomlHint'
-      )
-    }
-  ]
+  return [{
+    path: joinConfigPath(configDir, 'config.toml', isWindows),
+    content: configContent,
+    hint: t(
+      platform === 'deepseek' || platform === 'minimax' || platform === 'composite'
+        ? `keys.useKeyModal.${platform}.codexConfigTomlHint`
+        : 'keys.useKeyModal.routedCodex.configTomlHint'
+    )
+  }]
 }
 
 function generateOpenAIWsFiles(baseUrl: string, apiKey: string): FileConfig[] {
@@ -1447,7 +1426,7 @@ name = "OpenAI"
 base_url = "${baseUrl}"
 ${codexModelCatalogMode.value === 'remote' ? `model_catalog_url = "${escapeTomlBasicString(buildCodexModelCatalogUrl(baseUrl))}"\n` : ''}wire_api = "responses"
 supports_websockets = true
-${generateCodexProviderAuthConfig()}
+${generateCodexProviderAuthConfig(apiKey)}
 
 [features]
 ${codexModelCatalogMode.value === 'remote' ? 'api_key_model_discovery = true\n' : ''}responses_websockets_v2 = true
@@ -2099,13 +2078,14 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
     provider[platform].name = '连接AI'
   }
 
-  const chosen = /^[A-Za-z0-9_.:/-]+$/.test(selectedManualModel.value) ? selectedManualModel.value : ''
-  if (chosen && !platform.startsWith('antigravity-')) {
-    const existing = provider[platform].models?.[chosen]
-    provider[platform].models = { [chosen]: existing ?? { name: chosen } }
+  const chosenModels = manualSelectedModels.value.filter(id => /^[A-Za-z0-9_.:/-]+$/.test(id) && !isClearlyNonChatModel(id))
+  if (chosenModels.length) {
+    const existingModels = provider[platform].models || {}
+    provider[platform].models = Object.fromEntries(chosenModels.map(id => [id, existingModels[id] ?? { name: id }]))
   } else if (platform === 'lianjieai') {
     provider[platform].models = { YOUR_AVAILABLE_MODEL_ID: { name: '请替换为该 Key 可用的模型 ID' } }
   }
+  const chosen = chosenModels[0] || ''
 
   const agent =
     platform === 'openai'
@@ -2126,7 +2106,7 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
   const content = JSON.stringify(
     {
       provider,
-      ...(chosen && !platform.startsWith('antigravity-') ? { model: `${platform}/${chosen}` } : {}),
+      ...(chosen ? { model: `${platform}/${chosen}` } : {}),
       ...(agent ? { agent } : {}),
       $schema: 'https://opencode.ai/config.json'
     },

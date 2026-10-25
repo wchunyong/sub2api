@@ -90,6 +90,7 @@ describe('QuickImportModal', () => {
         await wrapper.get(`[data-testid="agent-${agent}"]`).trigger('click')
         expect(wrapper.find('[data-testid="auto"]').exists()).toBe(false)
         expect(assign).not.toHaveBeenCalled()
+        expect(wrapper.text()).toContain('keys.quickImport.ccsSingleModelNotice')
         await wrapper.get('[data-testid="ccs-model-select"]').setValue('second-chat')
         await wrapper.get('[data-testid="ccs-inline-submit"]').trigger('click')
         const params = new URL(assign.mock.lastCall?.[0]).searchParams
@@ -191,14 +192,17 @@ describe('QuickImportModal', () => {
     await wrapper.get('[data-testid="manual"]').trigger('click')
     expect(wrapper.get('[data-testid="manual-client"]').text()).toBe('opencode')
   })
-  it('opens the configured documentation for agents with a separate manual guide', async () => {
+  it('shows in-page manual configuration for WorkBuddy, Pi, and DeepSeek Harness', async () => {
     const open = vi.spyOn(window, 'open').mockImplementation(() => null)
     try {
-      const wrapper = render({ docUrl: 'https://guide.example.com/zh/' })
-      await wrapper.get('[data-testid="agent-workbuddy"]').trigger('click')
-      await wrapper.get('[data-testid="manual"]').trigger('click')
-      expect(open).toHaveBeenCalledWith('https://guide.example.com/zh/agent/workbuddy', '_blank', 'noopener,noreferrer')
-      wrapper.unmount()
+      for (const agent of ['workbuddy', 'pi', 'deepseek-harness']) {
+        const wrapper = render({ docUrl: 'https://guide.example.com/zh/' })
+        await wrapper.get(`[data-testid="agent-${agent}"]`).trigger('click')
+        await wrapper.get('[data-testid="manual"]').trigger('click')
+        expect(wrapper.get('[data-testid="manual-client"]').text()).toBe(agent)
+        wrapper.unmount()
+      }
+      expect(open).not.toHaveBeenCalled()
     } finally {
       open.mockRestore()
     }
