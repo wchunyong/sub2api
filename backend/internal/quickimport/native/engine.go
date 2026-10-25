@@ -16,12 +16,17 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/quickimport"
 	"github.com/pelletier/go-toml/v2"
+	"gopkg.in/yaml.v3"
 )
 
-const provider = "sub2api_quick"
+const provider = "lianjieai_quick"
+const legacyProvider = "sub2api_quick"
 
-var paths = map[string]string{"claude": ".claude/settings.json", "codex": ".codex/config.toml", "opencode": ".config/opencode/opencode.json"}
+var ErrDSHAmbiguousProfile = errors.New("both DeepSeek Harness web and desktop profiles exist; choose the one you use")
+
+var paths = map[string]string{"claude": ".claude/settings.json", "codex": ".codex/config.toml", "opencode": ".config/opencode/opencode.json", "workbuddy": ".workbuddy/models.json", "pi": ".pi/agent/models.json", "deepseek-harness": ".dsh/profiles/web/cordis.patch.yml"}
 
 type Model struct {
 	ID   string `json:"id"`
@@ -30,16 +35,18 @@ type Model struct {
 type Payload struct {
 	Version                    int            `json:"version"`
 	Agent                      string         `json:"agent"`
+	Platform                   string         `json:"platform"`
 	APIKey                     string         `json:"api_key"`
 	BaseURL                    string         `json:"base_url"`
 	Model                      string         `json:"model"`
 	Protocol                   string         `json:"protocol"`
 	ProbeURL                   string         `json:"probe_url"`
 	MCPEndpoint                string         `json:"mcp_endpoint"`
-	MCPImageToolsEnabled       *bool          `json:"mcp_image_tools_enabled"`
+	MCPImageToolsEnabled       *bool          `json:"mcp_image_tools_enabled"` // Ignored by one-click installers; kept for transport compatibility.
 	Models                     []Model        `json:"models"`
 	ClaudeModelPickerSupported bool           `json:"claude_model_picker_supported"`
 	CodexManifest              map[string]any `json:"codex_manifest"`
+	Profile                    string         `json:"-"` // Local DeepSeek Harness profile, never supplied by the gateway.
 }
 type value struct {
 	Exists bool `json:"exists"`
@@ -67,6 +74,7 @@ type ownedFile struct {
 }
 type record struct {
 	Agent          string      `json:"agent"`
+	Profile        string      `json:"profile,omitempty"`
 	Existed        bool        `json:"existed"`
 	Before         string      `json:"before_text"`
 	After          string      `json:"after_text"`
@@ -111,13 +119,108 @@ func safePath(root, path string) error {
 	}
 	return nil
 }
-func target(root, agent string) (string, error) {
+func ResolveDSHProfile(root, requested string) (string, error) {
+	if requested != "" {
+		if requested != "web" && requested != "desktop" {
+			return "", errors.New("DeepSeek Harness profile must be web or desktop")
+		}
+		return requested, nil
+	}
+	profiles := filepath.Join(root, ".dsh", "profiles")
+	webInfo, webErr := os.Stat(filepath.Join(profiles, "web"))
+	desktopInfo, desktopErr := os.Stat(filepath.Join(profiles, "desktop"))
+	if webErr == nil && !webInfo.IsDir() {
+		return "", errors.New("DeepSeek Harness web profile path is not a directory")
+	}
+	if desktopErr == nil && !desktopInfo.IsDir() {
+		return "", errors.New("DeepSeek Harness desktop profile path is not a directory")
+	}
+	if webErr == nil && desktopErr == nil {
+		return "", ErrDSHAmbiguousProfile
+	}
+	if desktopErr == nil {
+		return "desktop", nil
+	}
+	if webErr != nil && !os.IsNotExist(webErr) {
+		return "", webErr
+	}
+	if desktopErr != nil && !os.IsNotExist(desktopErr) {
+		return "", desktopErr
+	}
+	return "web", nil
+}
+func target(root, agent, profile string) (string, error) {
 	p, ok := paths[agent]
 	if !ok {
 		return "", errors.New("unsupported Agent")
 	}
+	if agent == "deepseek-harness" {
+		selected, err := ResolveDSHProfile(root, profile)
+		if err != nil {
+			return "", err
+		}
+		p = filepath.Join(".dsh", "profiles", selected, "cordis.patch.yml")
+	}
 	path := filepath.Join(root, p)
 	return path, safePath(root, path)
+}
+
+// CheckLocalConfig catches unsupported local state before a one-time ticket is
+// consumed. Install repeats the checks under its own lock before writing.
+func CheckLocalConfig(root, agent string, profile ...string) error {
+	root, err := filepath.Abs(root)
+	if err != nil {
+		return err
+	}
+	selected := ""
+	if len(profile) > 0 {
+		selected = profile[0]
+	}
+	path, err := target(root, agent, selected)
+	if err != nil {
+		return err
+	}
+	if agent == "opencode" {
+		if err := checkOpenCodeJSONC(path); err != nil {
+			return err
+		}
+	}
+	text, _, err := readText(path)
+	if err != nil {
+		return err
+	}
+	if _, err := load(text, agent); err != nil {
+		return err
+	}
+	folder := filepath.Join(root, ".sub2api-quick-import", agent)
+	if err := safePath(root, folder); err != nil {
+		return err
+	}
+	records, err := readJournal(folder)
+	if err != nil {
+		return err
+	}
+	return checkPending(records)
+}
+
+func checkOpenCodeJSONC(path string) error {
+	overlay, exists, err := readText(strings.TrimSuffix(path, ".json") + ".jsonc")
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return nil
+	}
+	data, err := load(overlay, "opencode")
+	if err != nil || strings.TrimSpace(overlay) == "" {
+		return errors.New("existing OpenCode JSONC configuration requires manual configuration")
+	}
+	for key := range data {
+		if key != "$schema" {
+			return errors.New("existing OpenCode JSONC configuration requires manual configuration")
+		}
+	}
+	return nil
 }
 
 func claudeUserMCPConfigPath(root string) (string, error) {
@@ -125,8 +228,8 @@ func claudeUserMCPConfigPath(root string) (string, error) {
 	return path, safePath(root, path)
 }
 func lock(root, agent string) (string, func(), error) {
-	if _, err := target(root, agent); err != nil {
-		return "", nil, err
+	if _, ok := paths[agent]; !ok {
+		return "", nil, errors.New("unsupported Agent")
 	}
 	folder := filepath.Join(root, ".sub2api-quick-import", agent)
 	if err := safePath(root, folder); err != nil {
@@ -229,6 +332,18 @@ func load(text, agent string) (map[string]any, error) {
 	var err error
 	if agent == "codex" {
 		err = toml.Unmarshal([]byte(text), &data)
+	} else if agent == "workbuddy" {
+		entries := []any{}
+		if strings.TrimSpace(text) != "" {
+			err = decodeJSON(text, &entries)
+		}
+		data["entries"] = entries
+	} else if agent == "deepseek-harness" {
+		entries := []any{}
+		if strings.TrimSpace(text) != "" {
+			err = yaml.Unmarshal([]byte(text), &entries)
+		}
+		data["entries"] = entries
 	} else if strings.TrimSpace(text) != "" {
 		err = decodeJSON(text, &data)
 	}
@@ -305,6 +420,14 @@ func render(text, agent string, changes []change) (string, error) {
 			return "", err
 		}
 	}
+	if agent == "workbuddy" {
+		b, err := json.MarshalIndent(desired["entries"], "", "  ")
+		return string(b) + "\n", err
+	}
+	if agent == "deepseek-harness" {
+		b, err := yaml.Marshal(desired["entries"])
+		return string(b), err
+	}
 	if agent != "codex" {
 		b, err := json.MarshalIndent(desired, "", "  ")
 		return string(b) + "\n", err
@@ -329,8 +452,8 @@ func render(text, agent string, changes []change) (string, error) {
 		} else {
 			tableName := ""
 			switch {
-			case reflect.DeepEqual(c.Path, []string{"model_providers", provider}):
-				tableName = "model_providers." + provider
+			case reflect.DeepEqual(c.Path, []string{"model_providers", provider}), reflect.DeepEqual(c.Path, []string{"model_providers", legacyProvider}):
+				tableName = "model_providers." + c.Path[1]
 			case reflect.DeepEqual(c.Path, []string{"mcp_servers", "lianjieai_image"}):
 				tableName = "mcp_servers.lianjieai_image"
 			default:
@@ -407,10 +530,6 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.ForceQuery || !(u.Scheme == "https" || (u.Scheme == "http" && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1"))) {
 		return nil, errors.New("HTTPS gateway required")
 	}
-	mcpEndpoint, err := resolveMCPEndpoint(p, base)
-	if err != nil {
-		return nil, err
-	}
 	models := p.Models
 	if models == nil {
 		models = []Model{{ID: p.Model, Name: p.Model}}
@@ -425,7 +544,7 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 				valid = false
 			}
 		}
-		if !valid || seen[m.ID] {
+		if !valid || seen[m.ID] || quickimport.IsClearlyNonChatModel(m.ID) {
 			continue
 		}
 		seen[m.ID] = true
@@ -444,7 +563,7 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 	add := func(path []string, v any) { changes = append(changes, change{path, value{true, v}}) }
 	switch p.Agent {
 	case "claude":
-		for _, pair := range [][2]string{{"ANTHROPIC_BASE_URL", base}, {"ANTHROPIC_AUTH_TOKEN", p.APIKey}, {"ANTHROPIC_MODEL", p.Model}, {"ANTHROPIC_CUSTOM_MODEL_OPTION", p.Model}, {"ANTHROPIC_CUSTOM_MODEL_OPTION_NAME", "lianjieai · " + p.Model}, {"ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION", "lianjieai gateway"}} {
+		for _, pair := range [][2]string{{"ANTHROPIC_BASE_URL", base}, {"ANTHROPIC_AUTH_TOKEN", p.APIKey}, {"ANTHROPIC_MODEL", p.Model}, {"ANTHROPIC_DEFAULT_OPUS_MODEL", p.Model}, {"ANTHROPIC_DEFAULT_SONNET_MODEL", p.Model}, {"ANTHROPIC_DEFAULT_HAIKU_MODEL", p.Model}, {"ANTHROPIC_DEFAULT_FABLE_MODEL", p.Model}, {"CLAUDE_CODE_SUBAGENT_MODEL", p.Model}, {"ANTHROPIC_CUSTOM_MODEL_OPTION", p.Model}, {"ANTHROPIC_CUSTOM_MODEL_OPTION_NAME", "lianjieai · " + p.Model}, {"ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION", "lianjieai gateway"}} {
 			add([]string{"env", pair[0]}, pair[1])
 		}
 		if p.ClaudeModelPickerSupported {
@@ -454,27 +573,12 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 			}
 			add([]string{"modelPicker"}, map[string]any{"options": options, "replaceBuiltInOptions": true})
 		}
-		if mcpImageToolsEnabled(p) {
-			add([]string{"mcpServers", "lianjieai-image"}, map[string]any{
-				"type":    "http",
-				"url":     mcpEndpoint,
-				"headers": map[string]any{"Authorization": "Bearer " + p.APIKey},
-			})
-		}
 	case "codex":
 		add([]string{"model"}, p.Model)
 		add([]string{"model_provider"}, provider)
 		add([]string{"model_providers", provider}, map[string]any{"name": "lianjieai", "base_url": base, "wire_api": "responses", "experimental_bearer_token": p.APIKey, "requires_openai_auth": false})
 		if catalogPath != "" {
 			add([]string{"model_catalog_json"}, catalogPath)
-		}
-		if mcpImageToolsEnabled(p) {
-			add([]string{"mcp_servers", "lianjieai_image"}, map[string]any{
-				"url":                 mcpEndpoint,
-				"http_headers":        map[string]any{"Authorization": "Bearer " + p.APIKey},
-				"startup_timeout_sec": 20,
-				"tool_timeout_sec":    300,
-			})
 		}
 	case "opencode":
 		protocol := p.Protocol
@@ -491,17 +595,32 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 		}
 		add([]string{"provider", provider}, map[string]any{"npm": npm, "name": "lianjieai", "options": map[string]any{"baseURL": base, "apiKey": p.APIKey}, "models": models})
 		add([]string{"model"}, provider+"/"+p.Model)
-		if mcpImageToolsEnabled(p) {
-			changes = append(changes, change{Path: []string{"mcp", "sub2api_image"}, Value: value{Exists: false}})
-			changes = append(changes, change{Path: []string{"mcp", "servers", "sub2api_image"}, Value: value{Exists: false}})
-			// OpenCode v2 places each server under mcp.servers.
-			add([]string{"mcp", "servers", "lianjieai_image"}, map[string]any{
-				"type":    "remote",
-				"url":     mcpEndpoint,
-				"oauth":   false,
-				"headers": map[string]any{"Authorization": "Bearer " + p.APIKey},
-			})
+	case "workbuddy":
+		entries := make([]any, 0, 1)
+		for _, m := range normalized {
+			if m.ID != p.Model {
+				continue
+			}
+			// WorkBuddy must use the full endpoint as-is, without adding a second /chat/completions.
+			name := m.Name
+			if !strings.HasPrefix(name, "连接AI · ") {
+				name = "连接AI · " + name
+			}
+			entries = append(entries, map[string]any{"id": m.ID, "name": name, "vendor": "Custom", "url": base + "/chat/completions", "apiKey": p.APIKey, "supportsToolCall": true, "supportsImages": false, "useCustomProtocol": true})
 		}
+		add([]string{"entries"}, entries)
+	case "pi":
+		entries := make([]any, 0, 1)
+		for _, m := range normalized {
+			if m.ID != p.Model {
+				continue
+			}
+			entries = append(entries, map[string]any{"id": m.ID, "name": m.Name})
+		}
+		add([]string{"$schema"}, "https://pi.dev/schemas/models.schema.json")
+		add([]string{"providers", "lianjieai"}, map[string]any{"baseUrl": base, "api": "openai-completions", "apiKey": p.APIKey, "models": entries})
+	case "deepseek-harness":
+		// The existing profile entries are read and preserved by Install below.
 	}
 	return changes, nil
 }
@@ -580,42 +699,6 @@ func cleanClaudeUserMCPConfig(root string, rec *record) error {
 	return nil
 }
 
-func mcpImageToolsEnabled(p Payload) bool {
-	return p.MCPImageToolsEnabled == nil || *p.MCPImageToolsEnabled
-}
-
-func resolveMCPEndpoint(p Payload, base string) (string, error) {
-	endpoint := strings.TrimSpace(p.MCPEndpoint)
-	if endpoint == "" && mcpImageToolsEnabled(p) {
-		endpoint = deriveMCPEndpoint(base)
-	}
-	if endpoint == "" {
-		return "", nil
-	}
-	u, err := url.Parse(endpoint)
-	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.ForceQuery ||
-		!(u.Scheme == "https" || (u.Scheme == "http" && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1"))) {
-		return "", errors.New("invalid MCP endpoint")
-	}
-	return strings.TrimRight(endpoint, "/"), nil
-}
-
-func deriveMCPEndpoint(base string) string {
-	u, err := url.Parse(strings.TrimRight(base, "/"))
-	if err != nil {
-		return ""
-	}
-	path := strings.TrimRight(u.Path, "/")
-	if path == "/v1" {
-		path = ""
-	} else if strings.HasSuffix(path, "/v1") {
-		path = strings.TrimSuffix(path, "/v1")
-	}
-	u.Path = strings.TrimRight(path, "/") + "/mcp"
-	u.RawQuery = ""
-	u.Fragment = ""
-	return u.String()
-}
 func ownedPath(root, folder string, item ownedFile) (string, error) {
 	path := filepath.Join(root, filepath.FromSlash(strings.ReplaceAll(item.Path, `\`, "/")))
 	if filepath.Dir(path) != folder || !regexp.MustCompile(`^models-[a-f0-9]{32}\.json$`).MatchString(filepath.Base(path)) {
@@ -628,25 +711,19 @@ func Install(root string, p Payload) error {
 	if err != nil {
 		return err
 	}
-	path, err := target(root, p.Agent)
+	path, err := target(root, p.Agent, p.Profile)
 	if err != nil {
 		return err
 	}
-	if p.Agent == "opencode" {
-		overlay, exists, e := readText(strings.TrimSuffix(path, ".json") + ".jsonc")
-		if e != nil {
-			return e
+	if p.Agent == "deepseek-harness" {
+		p.Profile, err = ResolveDSHProfile(root, p.Profile)
+		if err != nil {
+			return err
 		}
-		if exists {
-			data, e := load(overlay, "opencode")
-			if e != nil || strings.TrimSpace(overlay) == "" {
-				return errors.New("existing OpenCode JSONC configuration requires manual configuration")
-			}
-			for k := range data {
-				if k != "$schema" {
-					return errors.New("existing OpenCode JSONC configuration requires manual configuration")
-				}
-			}
+	}
+	if p.Agent == "opencode" {
+		if err := checkOpenCodeJSONC(path); err != nil {
+			return err
 		}
 	}
 	folder, unlock, err := lock(root, p.Agent)
@@ -701,6 +778,112 @@ func Install(root string, p Payload) error {
 	if err != nil {
 		return err
 	}
+	if p.Agent == "claude" && len(records) > 0 {
+		// Earlier installers managed this switch. Remove it on reimport only when
+		// the latest journal still owns the unchanged value; user edits survive.
+		flag := []string{"env", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"}
+		for _, previous := range records[len(records)-1].Changes {
+			if reflect.DeepEqual(previous.Path, flag) && previous.Value.Exists && equal(get(original, flag), previous.Value) {
+				changes = append(changes, change{Path: flag, Value: value{Exists: false}})
+				break
+			}
+		}
+	}
+	if p.Agent == "workbuddy" {
+		for i := range changes {
+			if changes[i].Path[0] == "entries" {
+				incoming, _ := changes[i].Value.Value.([]any)
+				ids := map[string]bool{}
+				for _, item := range incoming {
+					if m, ok := item.(map[string]any); ok {
+						if id, ok := m["id"].(string); ok {
+							ids[id] = true
+						}
+					}
+				}
+				if existing, ok := original["entries"].([]any); ok {
+					for _, item := range existing {
+						m, ok := item.(map[string]any)
+						if !ok {
+							incoming = append(incoming, item)
+							continue
+						}
+						id, ok := m["id"].(string)
+						if !ok || !ids[id] {
+							incoming = append(incoming, item)
+						}
+					}
+				}
+				changes[i].Value.Value = incoming
+			}
+		}
+	}
+	if p.Agent == "deepseek-harness" {
+		entries, ok := original["entries"].([]any)
+		if !ok {
+			return errors.New("invalid DeepSeek Harness profile")
+		}
+		modelName := p.Model
+		for _, m := range p.Models {
+			if m.ID == p.Model {
+				modelName = m.Name
+				break
+			}
+		}
+		route := map[string]any{
+			"displayName": "lianjieai",
+			"api":         "openai-completions",
+			"baseURL":     strings.TrimRight(p.BaseURL, "/"),
+			"headers":     map[string]any{"Authorization": "Bearer " + p.APIKey},
+			"models":      []any{map[string]any{"id": p.Model, "name": modelName}},
+		}
+		if p.Platform == "deepseek" {
+			route["compat"] = map[string]any{
+				"supportsDeveloperRole": false,
+				"maxTokensField":        "max_tokens",
+			}
+		}
+		updated := append([]any{}, entries...)
+		found := false
+		for i, item := range entries {
+			entry, ok := item.(map[string]any)
+			if !ok || (entry["id"] != "llm-pi-ai" && entry["name"] != "@deepseek-ai/dsh-llm-pi-ai") {
+				continue
+			}
+			if found {
+				return errors.New("multiple DeepSeek Harness model providers require manual configuration")
+			}
+			found = true
+			copyEntry := make(map[string]any, len(entry))
+			for key, value := range entry {
+				copyEntry[key] = value
+			}
+			config, ok := entry["config"].(map[string]any)
+			if !ok && entry["config"] != nil {
+				return errors.New("invalid DeepSeek Harness provider configuration")
+			}
+			copyConfig := make(map[string]any, len(config)+1)
+			for key, value := range config {
+				copyConfig[key] = value
+			}
+			providers, ok := config["providers"].(map[string]any)
+			if !ok && config["providers"] != nil {
+				return errors.New("invalid DeepSeek Harness provider list")
+			}
+			copyProviders := make(map[string]any, len(providers)+1)
+			for key, value := range providers {
+				copyProviders[key] = value
+			}
+			copyProviders["lianjieai"] = route
+			copyConfig["providers"] = copyProviders
+			copyEntry["config"] = copyConfig
+			updated[i] = copyEntry
+		}
+		if !found {
+			updated = append(updated, map[string]any{"id": "llm-pi-ai", "config": map[string]any{"providers": map[string]any{"lianjieai": route}}})
+		}
+		changes = append(changes, change{Path: []string{"entries"}, Value: value{Exists: true, Value: updated}})
+	}
 	after, err := render(before, p.Agent, changes)
 	if err != nil {
 		return err
@@ -708,7 +891,7 @@ func Install(root string, p Payload) error {
 	if after == before {
 		return nil
 	}
-	rec := record{Agent: p.Agent, Existed: existed, Before: before, After: after, Changes: changes, Pending: true, Owned: owned}
+	rec := record{Agent: p.Agent, Profile: p.Profile, Existed: existed, Before: before, After: after, Changes: changes, Pending: true, Owned: owned}
 	for _, c := range changes {
 		rec.Inverse = append(rec.Inverse, change{c.Path, get(original, c.Path)})
 	}
@@ -775,10 +958,6 @@ func Clean(root, agent string) error {
 	if err != nil {
 		return err
 	}
-	path, err := target(root, agent)
-	if err != nil {
-		return err
-	}
 	folder, unlock, err := lock(root, agent)
 	if err != nil {
 		return err
@@ -794,6 +973,14 @@ func Clean(root, agent string) error {
 	rec := &records[len(records)-1]
 	if rec.Agent != agent {
 		return errors.New("Agent mismatch")
+	}
+	profile := rec.Profile
+	if agent == "deepseek-harness" && profile == "" {
+		profile = "web"
+	} // Older imports always wrote web.
+	path, err := target(root, agent, profile)
+	if err != nil {
+		return err
 	}
 	current, exists, err := readText(path)
 	if err != nil {
@@ -853,7 +1040,7 @@ func Clean(root, agent string) error {
 	}
 	for _, c := range rec.Changes {
 		if !equal(get(data, c.Path), c.Value) {
-			if agent == "codex" && reflect.DeepEqual(c.Path, []string{"model"}) && data["model_provider"] == provider {
+			if agent == "codex" && reflect.DeepEqual(c.Path, []string{"model"}) && (data["model_provider"] == provider || data["model_provider"] == legacyProvider) {
 				if selected, ok := data["model"].(string); ok && strings.TrimSpace(selected) != "" {
 					continue
 				}
@@ -861,7 +1048,7 @@ func Clean(root, agent string) error {
 			field := "managed configuration"
 			if agent == "codex" {
 				switch strings.Join(c.Path, ".") {
-				case "model", "model_provider", "model_catalog_json", "model_providers.sub2api_quick", "mcp_servers.lianjieai_image":
+				case "model", "model_provider", "model_catalog_json", "model_providers.lianjieai_quick", "model_providers.sub2api_quick", "mcp_servers.lianjieai_image":
 					field = strings.Join(c.Path, ".")
 				}
 			}
@@ -882,7 +1069,7 @@ func Clean(root, agent string) error {
 	rec.CleanupPending = true
 	rec.CleanupBefore = current
 	rec.CleanupResult = result
-	rec.CleanupDelete = !rec.Existed && len(restored) == 0
+	rec.CleanupDelete = !rec.Existed && (len(restored) == 0 || (agent == "workbuddy" || agent == "deepseek-harness") && equal(restored["entries"], []any{}))
 	if err = writeJournal(folder, records); err != nil {
 		return err
 	}

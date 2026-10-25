@@ -10,6 +10,7 @@ export interface CcSwitchImportConfig {
   app: string
   endpoint: string
   model?: string
+  apiFormat?: 'anthropic' | 'openai_chat' | 'openai_responses' | 'gemini_native'
 }
 
 export interface CcSwitchImportDeeplinkInput {
@@ -20,6 +21,7 @@ export interface CcSwitchImportDeeplinkInput {
   apiKey: string
   usageScript: string
   agent?: ImportAgent
+  model?: string
 }
 
 /**
@@ -112,22 +114,42 @@ export function buildCcSwitchImportDeeplink(input: CcSwitchImportDeeplinkInput):
   if (config.model) {
     entries.splice(2, 0, ['model', config.model])
   }
+  if (config.apiFormat) {
+    entries.push(['apiFormat', config.apiFormat])
+  }
+  if (input.agent === 'claude' && input.platform !== 'anthropic' && input.model) {
+    entries.push(['haikuModel', input.model], ['sonnetModel', input.model], ['opusModel', input.model])
+  }
 
   return `ccswitch://v1/import?${new URLSearchParams(entries).toString()}`
 }
 
 function resolveSelectedAgentConfig(input: CcSwitchImportDeeplinkInput): CcSwitchImportConfig | undefined {
   if (input.agent === 'codex' || input.agent === 'opencode') {
+    const root = withoutTrailingSlashes(input.baseUrl).replace(/\/v1$/, '')
+    const openCodeFormat = input.platform === 'anthropic' || input.platform === 'antigravity'
+      ? 'anthropic' : input.platform === 'gemini'
+        ? 'gemini_native' : input.platform === 'openai'
+          ? 'openai_responses' : 'openai_chat'
+    const endpoint = input.agent === 'opencode' && input.platform === 'antigravity'
+      ? `${root}/antigravity/v1`
+      : input.agent === 'opencode' && input.platform === 'gemini'
+        ? `${root}/v1beta`
+        : withV1Endpoint(input.baseUrl)
     return {
       app: input.agent,
-      endpoint: withV1Endpoint(input.baseUrl),
-      ...(input.agent === 'codex' && input.platform === 'openai' ? { model: OPENAI_CC_SWITCH_CODEX_MODEL } : {})
+      endpoint,
+      model: input.model || (input.agent === 'codex' && input.platform === 'openai' ? OPENAI_CC_SWITCH_CODEX_MODEL : undefined),
+      apiFormat: input.agent === 'codex' ? 'openai_responses' : openCodeFormat
     }
   }
   if (input.agent === 'claude') {
+    const root = withoutTrailingSlashes(input.baseUrl).replace(/\/v1$/, '')
     return {
       app: 'claude',
-      endpoint: input.platform === 'antigravity' ? `${input.baseUrl.replace(/\/+$/, '')}/antigravity` : input.baseUrl
+      endpoint: input.platform === 'antigravity' ? `${root}/antigravity` : root,
+      model: input.model,
+      apiFormat: 'anthropic'
     }
   }
 }

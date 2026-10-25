@@ -171,6 +171,13 @@ export default {
       copyClean: '复制清理命令',
       ccsHint: '通过 CC Switch 管理配置',
       manualHint: '查看密钥与配置说明',
+      chooseModel: '请选择模型',
+      modelPlaceholder: '填写当前密钥可用的完整模型 ID',
+      modelLoading: '正在读取这把密钥可用的模型…',
+      modelFromKey: '模型列表来自当前密钥；请按目标工具选择支持的编程模型。',
+      modelUnavailable: '无法读取模型列表。请到模型页确认当前密钥可用的完整模型 ID。',
+      modelNotChat: '这个 ID 对应生图、语音、视频或向量模型，不能用于编程助手；请选择对话模型。',
+      modelNoChatAvailable: '这把 Key 的列表里没有适合编程助手的对话模型，请更换分组或创建能访问对话模型的 Key。',
       directHint: '自动适配当前系统 · 复制后粘贴到终端执行',
       importCopied: '已复制导入命令，请在 5 分钟内粘贴到终端执行。',
       cleanCopied: '已复制清理命令，请在原导入环境的终端执行。',
@@ -180,7 +187,7 @@ export default {
       cleanHint: '仅撤销所选 Agent 最近一次由本工具导入的配置。保留其他 Agent 和后续修改；终端将请求确认。无需网站在线或有效密钥。',
       runtimeHint: '无需 Python。首次执行会下载并校验导入工具。脚本会备份原配置并合并写入，完成后重启客户端。',
       system: '操作系统',
-      model: '模型（可选）',
+      model: '模型（必选）',
       modelHint: '留空使用当前分组默认模型',
       generating: '正在生成…',
       generate: '生成配置命令',
@@ -209,6 +216,11 @@ export default {
     useKey: '使用密钥',
     useKeyModal: {
       title: '使用 API 密钥',
+      claudeModelLabel: 'Claude Code 模型 ID',
+      claudeModelPlaceholder: '从当前密钥可用模型中填写完整 ID',
+      claudeModelHint: '列表来自当前密钥的 /v1/models；确认所选模型支持 Claude Code 的 Messages 接口。',
+      claudeModelFallback: '无法读取模型列表时，请从主站模型页复制当前密钥可用的完整模型 ID。不要保留占位符。',
+      selectModelBeforeCopy: '请先选择或输入这把 Key 可用的模型 ID，然后复制配置。',
       description: '将以下环境变量添加到您的终端配置文件或直接在终端中运行。',
       copy: '复制',
       copied: '已复制',
@@ -220,10 +232,11 @@ export default {
       openai: {
         description: '将以下配置文件添加到 Codex CLI 配置目录中。',
         authModeTitle: 'Codex 认证模式',
-        authModeDescription: '兼容模式保留旧版 Codex 配置；API Key Mode 用于授权客户端图片执行器。',
-        authModeLegacy: '兼容模式',
-        authModeApiKey: 'API Key Mode',
-        authModeApiKeyRestartNotice: '保存此配置后，必须完全退出并重启 Codex Desktop 或 CLI，然后新建 task，让客户端重新构建工具注册表。',
+        authModeDescription: '推荐从环境变量读取连接AI Key；旧版 auth.json 方式仅供已有配置迁移。',
+        authModeLegacy: 'auth.json 兼容',
+        authModeApiKey: 'API Key（推荐）',
+        authModeApiKeyRestartNotice: '先设置 LIANJIEAI_API_KEY，再完全退出并重启 Codex。桌面 App 需要用户级环境变量；当前终端里的临时变量只对从该终端启动的程序有效。',
+        apiKeyEnvHint: '此命令只在当前终端会话中生效。桌面 App 请将变量设为操作系统用户级环境变量，并完全重启 App。',
         configTomlHint: '请确保以下内容位于 config.toml 文件的开头部分',
         note: '请确保配置目录存在。macOS/Linux 用户可运行 mkdir -p ~/.codex 创建目录。',
         noteWindows:
@@ -278,13 +291,13 @@ export default {
           '设置 $env:SUB2API_API_KEY，将 config.toml 保存到 %USERPROFILE%\\.codex。优先 env_key，勿提交密钥。'
       },
       deepseek: {
-        description: '通过当前 DeepSeek 分组配置 Claude Code、Codex 或 OpenCode。',
+        description: '使用当前 DeepSeek 分组和 API Key 配置所选工具。',
         codexDescription: '使用 API Key 配置 Codex，并通过当前 DeepSeek 分组发送请求。',
         codexConfigTomlHint: '保存 config.toml 后重启 Codex，客户端会加载远程目录。使用本地文件模式时，还需下载目录并保存到配置中的路径。',
         codexNote: '启动 Codex 前先导出 SUB2API_API_KEY。下载的目录只包含模型元数据，不包含 API Key。'
       },
       minimax: {
-        description: '通过当前 MiniMax 分组配置 Claude Code、Codex 或 OpenCode。',
+        description: '使用当前 MiniMax 分组和 API Key 配置所选工具。',
         codexDescription: '使用 API Key 配置 Codex，并通过当前 MiniMax 分组发送请求。',
         codexConfigTomlHint: '保存 config.toml 后重启 Codex，客户端会加载远程目录。使用本地文件模式时，还需下载目录并保存到配置中的路径。',
         codexNote: '启动 Codex 前先导出 SUB2API_API_KEY。下载的目录只包含模型元数据，不包含 API Key。'

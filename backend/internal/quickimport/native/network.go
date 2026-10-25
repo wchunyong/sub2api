@@ -108,34 +108,36 @@ func (n Network) SynchronizeModels(p *Payload) error {
 	if err != nil || !strings.EqualFold(base.Host, probe.Host) {
 		return errors.New("invalid connectivity probe URL")
 	}
-	var result struct {
-		Data json.RawMessage `json:"data"`
-	}
-	if err = n.request(http.MethodGet, p.ProbeURL, p.APIKey, nil, 1024*1024, &result); err != nil {
-		return err
-	}
-	var items []map[string]any
-	if len(result.Data) == 0 || result.Data[0] != '[' || json.Unmarshal(result.Data, &items) != nil {
-		return errors.New("gateway did not return a model list; check the API base URL")
-	}
-	models := []Model{}
-	seen := map[string]bool{}
-	for _, item := range items {
-		id, _ := item["id"].(string)
-		if strings.TrimSpace(id) == "" || len([]rune(id)) > 200 || strings.IndexFunc(id, func(r rune) bool { return r < 32 }) >= 0 || seen[id] {
-			continue
+	if p.Agent != "codex" {
+		var result struct {
+			Data json.RawMessage `json:"data"`
 		}
-		seen[id] = true
-		name, _ := item["name"].(string)
-		if strings.TrimSpace(name) == "" {
-			name, _ = item["display_name"].(string)
+		if err = n.request(http.MethodGet, p.ProbeURL, p.APIKey, nil, 1024*1024, &result); err != nil {
+			return err
 		}
-		if strings.TrimSpace(name) == "" {
-			name = id
+		var items []map[string]any
+		if len(result.Data) == 0 || result.Data[0] != '[' || json.Unmarshal(result.Data, &items) != nil {
+			return errors.New("gateway did not return a model list; check the API base URL")
 		}
-		models = append(models, Model{ID: id, Name: name})
+		models := []Model{}
+		seen := map[string]bool{}
+		for _, item := range items {
+			id, _ := item["id"].(string)
+			if strings.TrimSpace(id) == "" || len([]rune(id)) > 200 || strings.IndexFunc(id, func(r rune) bool { return r < 32 }) >= 0 || seen[id] {
+				continue
+			}
+			seen[id] = true
+			name, _ := item["name"].(string)
+			if strings.TrimSpace(name) == "" {
+				name, _ = item["display_name"].(string)
+			}
+			if strings.TrimSpace(name) == "" {
+				name = id
+			}
+			models = append(models, Model{ID: id, Name: name})
+		}
+		p.Models = models
 	}
-	p.Models = models
 	versionFn := n.Version
 	if versionFn == nil {
 		versionFn = ClientVersion
@@ -157,12 +159,27 @@ func (n Network) SynchronizeModels(p *Payload) error {
 			return errors.New("gateway did not return a Codex model catalog")
 		}
 		found := false
+		models := make([]Model, 0, len(entries))
+		seen := map[string]bool{}
 		for _, entry := range entries {
 			m, ok := entry.(map[string]any)
 			if !ok {
 				return errors.New("invalid Codex model descriptor")
 			}
-			if m["slug"] == p.Model {
+			id, _ := m["slug"].(string)
+			if strings.TrimSpace(id) == "" || len([]rune(id)) > 200 || strings.IndexFunc(id, func(r rune) bool { return r < 32 }) >= 0 || seen[id] {
+				continue
+			}
+			seen[id] = true
+			name, _ := m["display_name"].(string)
+			if strings.TrimSpace(name) == "" {
+				name, _ = m["name"].(string)
+			}
+			if strings.TrimSpace(name) == "" {
+				name = id
+			}
+			models = append(models, Model{ID: id, Name: name})
+			if id == p.Model {
 				found = true
 			}
 			messages, _ := m["model_messages"].(map[string]any)
@@ -180,6 +197,7 @@ func (n Network) SynchronizeModels(p *Payload) error {
 		if !found {
 			return errors.New("selected model is not in the Codex model catalog")
 		}
+		p.Models = models
 		p.CodexManifest = manifest
 	}
 	return nil
@@ -245,23 +263,73 @@ func atLeast(version string, min [3]int) bool {
 	return true
 }
 
+// codexClientPresent accepts an initialized shared config directory or a
+// Windows Store desktop package, so App-only users do not need the CLI on PATH.
+func codexClientPresent(home, localAppData string) bool {
+	if home != "" {
+		for _, candidate := range []string{filepath.Join(home, ".codex"), filepath.Join(home, "Applications", "ChatGPT.app")} {
+			if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+				return true
+			}
+		}
+	}
+	if localAppData != "" {
+		matches, _ := filepath.Glob(filepath.Join(localAppData, "Packages", "OpenAI.Codex_*"))
+		for _, candidate := range matches {
+			if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // Preflight preserves the supported clients' default user-config semantics.
 func Preflight(agent string, checkClient bool) error {
-	overrides := map[string][]string{"opencode": {"OPENCODE_CONFIG", "OPENCODE_CONFIG_CONTENT", "XDG_CONFIG_HOME"}, "claude": {"CLAUDE_CONFIG_DIR", "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY"}, "codex": {"CODEX_HOME"}}
+	overrides := map[string][]string{"opencode": {"OPENCODE_CONFIG", "OPENCODE_CONFIG_CONTENT", "XDG_CONFIG_HOME"}, "claude": {"CLAUDE_CONFIG_DIR", "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY"}, "codex": {"CODEX_HOME"}, "pi": {"PI_CODING_AGENT_DIR"}, "workbuddy": {"WORKBUDDY_CONFIG_DIR", "CODEBUDDY_CONFIG_DIR"}, "deepseek-harness": {"DSH_HOME"}}
 	names, ok := overrides[agent]
 	if !ok {
 		return errors.New("unsupported agent")
 	}
 	for _, name := range names {
 		if os.Getenv(name) != "" {
-			return errors.New("custom configuration environment detected; use manual setup or clear overrides first")
+			return fmt.Errorf("检测到 %s 环境变量；它可能覆盖一键导入写入的配置。请确认变量用途，清除后重开终端，或改用手动配置", name)
 		}
 	}
 	if !checkClient {
 		return nil
 	}
-	if _, err := exec.LookPath(agent); err == nil {
+	command := agent
+	if agent == "deepseek-harness" {
+		command = "dsh"
+	}
+	if _, err := exec.LookPath(command); err == nil {
 		return nil
+	}
+	if agent == "codex" {
+		home, _ := os.UserHomeDir()
+		if codexClientPresent(home, os.Getenv("LOCALAPPDATA")) {
+			return nil
+		}
+		if runtime.GOOS == "darwin" {
+			if info, err := os.Stat("/Applications/ChatGPT.app"); err == nil && info.IsDir() {
+				return nil
+			}
+		}
+	}
+	if agent == "workbuddy" {
+		home, _ := os.UserHomeDir()
+		if _, err := os.Stat(filepath.Join(home, ".workbuddy")); err == nil {
+			return nil
+		}
+	}
+	if agent == "deepseek-harness" {
+		home, _ := os.UserHomeDir()
+		for _, profile := range []string{"web", "desktop"} {
+			if info, err := os.Stat(filepath.Join(home, ".dsh", "profiles", profile)); err == nil && info.IsDir() {
+				return nil
+			}
+		}
 	}
 	if agent == "opencode" {
 		home, _ := os.UserHomeDir()
@@ -275,13 +343,16 @@ func Preflight(agent string, checkClient bool) error {
 			}
 		}
 	}
-	instructions := map[string]string{"claude": "https://code.claude.com/docs/en/setup", "codex": "https://developers.openai.com/codex/cli", "opencode": "https://opencode.ai/download"}
+	if agent == "codex" {
+		return errors.New("未检测到 Codex CLI 或桌面 App。请先安装并打开一次 App，或安装 CLI：https://developers.openai.com/codex/cli")
+	}
+	instructions := map[string]string{"claude": "https://code.claude.com/docs/en/setup", "opencode": "https://opencode.ai/download", "pi": "https://pi.dev", "workbuddy": "https://www.workbuddy.cn", "deepseek-harness": "https://github.com/deepseek-ai/deepseek-harness"}
 	return fmt.Errorf("install %s first: %s; reopen the terminal and generate a new command", agent, instructions[agent])
 }
 
 // ValidAgent keeps untrusted agent names out of filesystem paths.
 func ValidAgent(agent string) bool {
-	return agent == "claude" || agent == "codex" || agent == "opencode"
+	return agent == "claude" || agent == "codex" || agent == "opencode" || agent == "workbuddy" || agent == "pi" || agent == "deepseek-harness"
 }
 
 // ValidateTransportPayload runs before a credential can be sent on the network.

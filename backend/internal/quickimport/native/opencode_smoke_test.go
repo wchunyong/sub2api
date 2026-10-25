@@ -43,7 +43,17 @@ func TestOpenCodeNativeSmoke(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, executable, "run", "--format", "json", "Reply IMPORT_OK without using tools.")
+	args := []string{"run", "--format", "json", "Reply IMPORT_OK without using tools."}
+	version, err := exec.CommandContext(ctx, executable, "--version").Output()
+	if err != nil {
+		t.Fatalf("could not inspect OpenCode version: %v", err)
+	}
+	if strings.Contains(string(version), "opencode v2.") {
+		// V2 starts a shared background server by default. A private server keeps
+		// its database and processes inside this temporary test home.
+		args = append([]string{"run", "--standalone"}, args[1:]...)
+	}
+	cmd := exec.CommandContext(ctx, executable, args...)
 	cmd.Dir = root
 	for _, entry := range os.Environ() {
 		key := strings.ToUpper(strings.SplitN(entry, "=", 2)[0])
@@ -52,7 +62,7 @@ func TestOpenCodeNativeSmoke(t *testing.T) {
 		}
 		cmd.Env = append(cmd.Env, entry)
 	}
-	cmd.Env = append(cmd.Env, "HOME="+root, "USERPROFILE="+root, "XDG_CONFIG_HOME="+filepath.Join(root, ".config"), "XDG_DATA_HOME="+filepath.Join(root, ".data"), "XDG_STATE_HOME="+filepath.Join(root, ".state"), "XDG_CACHE_HOME="+filepath.Join(root, ".cache"), "OPENCODE_DISABLE_PROJECT_CONFIG=true", "OPENCODE_DISABLE_AUTOUPDATE=true", `OPENCODE_CONFIG_CONTENT={"permission":{"*":"deny"},"share":"disabled","autoupdate":false,"enabled_providers":["sub2api_quick"]}`)
+	cmd.Env = append(cmd.Env, "HOME="+root, "USERPROFILE="+root, "XDG_CONFIG_HOME="+filepath.Join(root, ".config"), "XDG_DATA_HOME="+filepath.Join(root, ".data"), "XDG_STATE_HOME="+filepath.Join(root, ".state"), "XDG_CACHE_HOME="+filepath.Join(root, ".cache"), "OPENCODE_DISABLE_PROJECT_CONFIG=true", "OPENCODE_DISABLE_AUTOUPDATE=true", `OPENCODE_CONFIG_CONTENT={"permission":{"*":"deny"},"share":"disabled","autoupdate":false,"enabled_providers":["lianjieai_quick"]}`)
 	output, err := cmd.CombinedOutput()
 	if err != nil || !strings.Contains(string(output), "IMPORT_OK") || calls.Load() == 0 {
 		t.Fatalf("OpenCode smoke failed: %v %s", err, output)

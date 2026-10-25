@@ -115,6 +115,41 @@ func TestCodexCatalogCompatibility(t *testing.T) {
 	}
 }
 
+func TestCodexImportUsesDedicatedCatalogWhenGenericListDoesNotContainModel(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		status int
+		body   string
+	}{
+		{"generic list unavailable", http.StatusServiceUnavailable, "unavailable"},
+		{"generic list omits Codex model", http.StatusOK, `{"data":[{"id":"unrelated"}]}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			genericRequests := 0
+			s := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Query().Get("client_version") == "" {
+					genericRequests++
+					w.WriteHeader(tc.status)
+					fmt.Fprint(w, tc.body)
+					return
+				}
+				fmt.Fprint(w, `{"models":[{"slug":"codex-only","display_name":"Codex Only"}]}`)
+			}))
+			defer s.Close()
+			p := Payload{Version: 1, Agent: "codex", APIKey: "test-secret", BaseURL: s.URL, ProbeURL: s.URL + "/models", Model: "codex-only"}
+			if err := (Network{Client: s.Client(), Version: func(string) string { return "0.155.3" }}).SynchronizeModels(&p); err != nil {
+				t.Fatal(err)
+			}
+			if genericRequests != 0 {
+				t.Fatalf("Codex import queried the unrelated generic model list %d times", genericRequests)
+			}
+			if err := Install(t.TempDir(), p); err != nil {
+				t.Fatalf("Codex import rejected a model in its dedicated catalog: %v", err)
+			}
+		})
+	}
+}
+
 func TestNetworkBoundsAndSanitizesResponses(t *testing.T) {
 	for _, test := range []struct {
 		name, body string
@@ -150,6 +185,47 @@ func TestPreflightRejectsOverridesEvenForStdin(t *testing.T) {
 	t.Setenv("CODEX_HOME", "isolated-but-custom")
 	if Preflight("codex", false) == nil {
 		t.Fatal("override accepted")
+	}
+}
+
+func TestWorkBuddyPreflightRejectsCustomConfigDirectory(t *testing.T) {
+	t.Setenv("WORKBUDDY_CONFIG_DIR", "")
+	t.Setenv("CODEBUDDY_CONFIG_DIR", "")
+	for _, name := range []string{"WORKBUDDY_CONFIG_DIR", "CODEBUDDY_CONFIG_DIR"} {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv(name, "custom-workbuddy-config")
+			err := Preflight("workbuddy", false)
+			if err == nil {
+				t.Fatal("WorkBuddy would read a custom directory while the importer writes ~/.workbuddy")
+			}
+			if !strings.Contains(err.Error(), name) || strings.Contains(err.Error(), "custom-workbuddy-config") {
+				t.Fatalf("preflight should name the override without exposing its value: %v", err)
+			}
+		})
+	}
+}
+
+func TestCodexAppOrInitializedConfigIsRecognizedWithoutCLI(t *testing.T) {
+	root := t.TempDir()
+	local := t.TempDir()
+	if codexClientPresent(root, local) {
+		t.Fatal("empty home should not look like a Codex App installation")
+	}
+	packageDir := filepath.Join(local, "Packages", "OpenAI.Codex_2p2nqsd0c76g0")
+	if err := os.MkdirAll(packageDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if !codexClientPresent(root, local) {
+		t.Fatal("Windows Codex desktop package was not recognized")
+	}
+	if codexClientPresent(root, "") {
+		t.Fatal("the Windows package should not affect another location")
+	}
+	if err := os.MkdirAll(filepath.Join(root, ".codex"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if !codexClientPresent(root, "") {
+		t.Fatal("initialized desktop configuration was not recognized")
 	}
 }
 

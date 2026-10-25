@@ -50,11 +50,44 @@ func TestTicketExpiryAndAtomicConsumption(t *testing.T) {
 }
 
 func TestConfigTargets(t *testing.T) {
-	for _, agent := range []string{"claude", "codex", "opencode"} {
-		c, err := BuildConfig(agent, "deepseek", false, "https://example.com/v1", "mock-key", "")
-		if err != nil || c.Agent != agent || c.Model != "deepseek-v4-pro" {
+	for _, agent := range []string{"claude", "opencode", "deepseek-harness", "workbuddy", "pi"} {
+		c, err := BuildConfig(agent, "deepseek", false, "https://example.com/v1", "mock-key", "deepseek-chat")
+		if err != nil || c.Agent != agent || c.Model != "deepseek-chat" || c.Platform != "deepseek" {
 			t.Fatalf("%s: %#v %v", agent, c, err)
 		}
+		expectedBase := "https://example.com/v1"
+		if agent == "claude" {
+			expectedBase = "https://example.com"
+		}
+		if c.BaseURL != expectedBase {
+			t.Fatalf("%s: wrong base URL: %#v", agent, c)
+		}
+		if agent == "opencode" && c.Protocol != "compatible" {
+			t.Fatalf("DeepSeek OpenCode must use Chat Completions: %#v", c)
+		}
+		if (agent == "deepseek-harness" || agent == "workbuddy" || agent == "pi") && c.Protocol != "openai-completions" {
+			t.Fatalf("%s: wrong protocol: %#v", agent, c)
+		}
+	}
+	for _, platform := range []string{"openai", "composite"} {
+		c, err := BuildConfig("codex", platform, false, "https://example.com/v1", "mock-key", "mock-codex-model")
+		if err != nil || c.BaseURL != "https://example.com/v1" || c.Protocol != "openai" {
+			t.Fatalf("Codex %s: %#v %v", platform, c, err)
+		}
+	}
+	if _, err := BuildConfig("codex", "deepseek", false, "https://example.com/v1", "mock-key", "deepseek-chat"); err == nil {
+		t.Fatal("Codex import accepted a group without a Codex model catalog")
+	}
+	if _, err := BuildConfig("workbuddy", "deepseek", false, "https://example.com/v1", "mock-key", ""); err == nil {
+		t.Fatal("missing model silently selected a potentially unavailable default")
+	}
+	for _, model := range []string{"gpt-image-1", "models/gemini-3.1-flash-image", "grok-imagine-image", "text-embedding-3-large"} {
+		if _, err := BuildConfig("workbuddy", "deepseek", false, "https://example.com/v1", "mock-key", model); err == nil {
+			t.Fatalf("non-chat model %q accepted for coding assistant", model)
+		}
+	}
+	if _, err := BuildConfig("workbuddy", "openai", false, "https://example.com/v1", "mock-key", "gpt-audio"); err != nil {
+		t.Fatalf("chat-capable audio model was rejected by a name-only filter: %v", err)
 	}
 	if _, err := BuildConfig("claude", "openai", false, "https://example.com", "mock-key", ""); err == nil {
 		t.Fatal("unsupported messages dispatch accepted")
@@ -62,14 +95,14 @@ func TestConfigTargets(t *testing.T) {
 	if _, err := BuildConfig("chatgpt", "openai", false, "https://example.com", "mock-key", ""); err == nil {
 		t.Fatal("unknown agent accepted")
 	}
-	c, err := BuildConfig("opencode", "gemini", false, "https://example.com/v1", "mock-key", "")
+	c, err := BuildConfig("opencode", "gemini", false, "https://example.com/v1", "mock-key", "gemini-2.5-pro")
 	if err != nil || c.BaseURL != "https://example.com/v1beta" {
 		t.Fatalf("bad gemini endpoint: %#v %v", c, err)
 	}
 	if c.MCPEndpoint != "https://example.com/mcp" {
 		t.Fatalf("bad MCP endpoint for gemini payload: %#v", c)
 	}
-	c, err = BuildConfig("opencode", "antigravity", false, "https://example.com/v1", "mock-key", "")
+	c, err = BuildConfig("opencode", "antigravity", false, "https://example.com/v1", "mock-key", "claude-sonnet-4-5")
 	if err != nil || c.BaseURL != "https://example.com/antigravity/v1" || c.MCPEndpoint != "https://example.com/mcp" {
 		t.Fatalf("bad antigravity payload: %#v %v", c, err)
 	}

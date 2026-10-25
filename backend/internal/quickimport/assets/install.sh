@@ -6,7 +6,7 @@ agent=${2:-}
 server=${3:-}
 ticket=${4:-}
 case "$action" in install|clean) ;; *) echo 'Expected install or clean' >&2; exit 1;; esac
-case "$agent" in claude|codex|opencode) ;; *) echo 'Unsupported Agent' >&2; exit 1;; esac
+case "$agent" in claude|codex|opencode|workbuddy|pi|deepseek-harness) ;; *) echo 'Unsupported Agent' >&2; exit 1;; esac
 case "$server" in https://*) ;; *) echo 'HTTPS server required' >&2; exit 1;; esac
 case "$(uname -s)" in Darwin) target_os=darwin;; Linux) target_os=linux;; *) echo 'Unsupported operating system' >&2; exit 1;; esac
 case "$(uname -m)" in arm64|aarch64) target_arch=arm64;; x86_64|amd64) target_arch=amd64;; *) echo 'Unsupported architecture' >&2; exit 1;; esac
@@ -25,6 +25,7 @@ download=$(mktemp "$recovery/bin/download.XXXXXX")
 restore_temp=$(mktemp "$recovery/$agent/restore.XXXXXX")
 trap 'rm -f "$checksum_file" "$download" "$restore_temp"' EXIT HUP INT TERM
 asset="${server%/}/api/v1/quick-import/assets/quick-import-$target_os-$target_arch"
+echo '正在下载并校验连接AI导入工具，请稍候…'
 curl --fail --silent --show-error --proto '=https' --max-time 30 -A 'lianjieai-quick-import/2.0' "$asset.sha256" -o "$checksum_file"
 checksum=$(tr -d '\r\n' < "$checksum_file")
 case "$checksum" in ''|*[!a-f0-9]*) echo 'Invalid import helper checksum' >&2; exit 1;; esac
@@ -39,11 +40,11 @@ hash_file() {
 }
 if test ! -f "$binary"; then
   curl --fail --silent --show-error --proto '=https' --max-time 120 -A 'lianjieai-quick-import/2.0' "$asset" -o "$download"
-  test "$(hash_file "$download")" = "$checksum" || { echo 'Import helper checksum mismatch' >&2; exit 1; }
+  test "$(hash_file "$download")" = "$checksum" || { echo '下载文件校验失败，请返回主站重新生成命令。' >&2; exit 1; }
   chmod 700 "$download"
   mv "$download" "$binary"
 fi
-test "$(hash_file "$binary")" = "$checksum" || { echo 'Cached import helper checksum mismatch' >&2; exit 1; }
+test "$(hash_file "$binary")" = "$checksum" || { echo '本地缓存校验失败，请检查恢复目录后重试。' >&2; exit 1; }
 test ! -L "$recovery/$agent/restore.sh" || { echo 'Linked recovery script refused' >&2; exit 1; }
 printf '#!/bin/sh\nset -eu\nexec "$(CDPATH= cd -- "$(dirname -- "$0")/../bin" && pwd)/%s" clean --agent %s\n' "$checksum" "$agent" > "$restore_temp"
 chmod 700 "$restore_temp"

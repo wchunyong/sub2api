@@ -314,6 +314,17 @@ describe('user KeysView column settings', () => {
     isCurrentStep.mockReturnValue(false)
   })
 
+  it('opens the key-specific agent and model picker from the CCS row action', async () => {
+    const key = { ...createApiKey(), group: { id: 7, name: 'DeepSeek', platform: 'deepseek' } }
+    listKeys.mockResolvedValueOnce({ items: [key], total: 1, page: 1, page_size: 20, pages: 1 })
+    const wrapper = await mountView()
+    await getButtonByText(wrapper, 'keys.importToCcSwitch').trigger('click')
+    const picker = wrapper.findComponent({ name: 'QuickImportModal' })
+    expect(picker.props('show')).toBe(true)
+    expect(picker.props('keyId')).toBe(key.id)
+    wrapper.unmount()
+  })
+
   it.each([
     { initialStatus: 'quota_exhausted', status: 'active', formStatus: 'active' },
     { initialStatus: 'inactive', status: 'inactive', formStatus: 'inactive' },
@@ -700,6 +711,8 @@ describe('user KeysView column settings', () => {
       await flushPromises()
       expect(keysAPI.create).toHaveBeenCalledOnce()
       expect(vi.mocked(keysAPI.create).mock.calls[0].slice(0, 2)).toEqual(['My key', 5])
+      expect(wrapper.findComponent({ name: 'QuickImportModal' }).props('show')).toBe(false)
+      expect(wrapper.find('[data-tour="key-form-name"]').exists()).toBe(false)
     })
 
     it('defaults to a provider with available groups and disables empty categories', async () => {

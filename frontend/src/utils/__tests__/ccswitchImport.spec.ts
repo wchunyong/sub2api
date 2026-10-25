@@ -13,6 +13,21 @@ function paramsFromDeeplink(deeplink: string): URLSearchParams {
 }
 
 describe('ccswitchImport utils', () => {
+  it.each([
+    ['https://lianjieai.top', 'https://lianjieai.top/v1/usage'],
+    ['https://lianjieai.top/v1', 'https://lianjieai.top/v1/usage'],
+    ['https://lianjieai.top/v1/', 'https://lianjieai.top/v1/usage']
+  ])('queries usage without repeating /v1 for %s', (endpoint, expectedUrl) => {
+    const script = CC_SWITCH_USAGE_SCRIPT
+      .replace('{{baseUrl}}', endpoint)
+      .replace('{{apiKey}}', 'sk-test')
+    const config = Function(`return ${script}`)() as {
+      request: { url: string; headers: { Authorization: string } }
+    }
+    expect(config.request.url).toBe(expectedUrl)
+    expect(config.request.headers.Authorization).toBe('Bearer sk-test')
+  })
+
   it('defaults OpenAI CC Switch imports to the current Codex model', () => {
     expect(OPENAI_CC_SWITCH_CODEX_MODEL).toBe('gpt-5.5')
   })
@@ -39,12 +54,44 @@ describe('ccswitchImport utils', () => {
     }
   })
 
+  it.each([
+    { agent: 'claude', platform: 'deepseek', format: 'anthropic' },
+    { agent: 'codex', platform: 'openai', format: 'openai_responses' },
+    { agent: 'opencode', platform: 'deepseek', format: 'openai_chat' },
+    { agent: 'opencode', platform: 'anthropic', format: 'anthropic' },
+    { agent: 'opencode', platform: 'openai', format: 'openai_responses' }
+  ] as const)('imports selected $agent model with $format protocol', ({ agent, platform, format }) => {
+    const params = paramsFromDeeplink(buildCcSwitchImportDeeplink({
+      ...baseInput, agent, platform, clientType: 'claude', model: 'selected-model-id'
+    }))
+    expect(params.get('model')).toBe('selected-model-id')
+    expect(params.get('apiFormat')).toBe(format)
+    if (agent === 'claude') {
+      expect(params.get('haikuModel')).toBe('selected-model-id')
+      expect(params.get('sonnetModel')).toBe('selected-model-id')
+      expect(params.get('opusModel')).toBe('selected-model-id')
+    }
+  })
+
   it.each(['codex', 'opencode'] as const)('normalizes the selected %s endpoint without duplicating /v1', (agent) => {
     for (const baseUrl of ['https://api.example.com/', 'https://api.example.com/v1', 'https://api.example.com/v1/']) {
       const params = paramsFromDeeplink(buildCcSwitchImportDeeplink({
         ...baseInput, baseUrl, platform: 'deepseek', clientType: 'claude', agent
       }))
       expect(params.get('endpoint')).toBe('https://api.example.com/v1')
+    }
+  })
+
+  it.each([
+    { platform: 'antigravity', endpoint: 'https://api.example.com/antigravity/v1', format: 'anthropic' },
+    { platform: 'gemini', endpoint: 'https://api.example.com/v1beta', format: 'gemini_native' }
+  ] as const)('uses the $platform gateway path for OpenCode in CC Switch', ({ platform, endpoint, format }) => {
+    for (const baseUrl of ['https://api.example.com', 'https://api.example.com/v1']) {
+      const params = paramsFromDeeplink(buildCcSwitchImportDeeplink({
+        ...baseInput, baseUrl, platform, clientType: 'claude', agent: 'opencode', model: 'selected-model-id'
+      }))
+      expect(params.get('endpoint')).toBe(endpoint)
+      expect(params.get('apiFormat')).toBe(format)
     }
   })
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,108 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/quickimport/native"
 )
+
+func TestSixAgentsInstallAndRestoreFromIsolatedInput(t *testing.T) {
+	for _, name := range []string{"CLAUDE_CONFIG_DIR", "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY", "CODEX_HOME", "OPENCODE_CONFIG", "OPENCODE_CONFIG_CONTENT", "XDG_CONFIG_HOME", "PI_CODING_AGENT_DIR", "DSH_HOME"} {
+		t.Setenv(name, "")
+	}
+	steps := map[string]struct{ label, launch string }{
+		"claude":           {"Claude Code", "在项目目录运行 claude"},
+		"codex":            {"Codex", "在项目目录运行 codex，或打开 Codex 桌面 App"},
+		"deepseek-harness": {"DeepSeek Harness", "运行 dsh web"},
+		"workbuddy":        {"WorkBuddy", "打开 WorkBuddy 桌面应用"},
+		"opencode":         {"OpenCode", "在项目目录运行 opencode"},
+		"pi":               {"Pi", "在项目目录运行 pi"},
+	}
+	for agent, step := range steps {
+		t.Run(agent, func(t *testing.T) {
+			root := t.TempDir()
+			payload := native.Payload{Version: 1, Agent: agent, APIKey: "private-test-key", BaseURL: "https://example.test/v1", Model: "selected-model", Models: []native.Model{{ID: "selected-model", Name: "Selected Model"}}}
+			if agent == "claude" {
+				payload.BaseURL = "https://example.test"
+			}
+			if agent == "codex" {
+				payload.CodexManifest = map[string]any{"models": []any{map[string]any{"slug": "selected-model"}}}
+			}
+			body, err := json.Marshal(payload)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var out, stderr bytes.Buffer
+			if code := run([]string{"install", "--agent", agent, "--stdin", "--home", root, "--skip-client-check"}, bytes.NewReader(body), &out, &stderr); code != 0 {
+				t.Fatalf("install failed: %s", stderr.String())
+			}
+			if !strings.Contains(out.String(), step.label+" 配置已写入") || !strings.Contains(out.String(), step.launch) || strings.Contains(out.String(), "private-test-key") {
+				t.Fatalf("wrong install output: %s", out.String())
+			}
+			if agent == "opencode" && !strings.Contains(out.String(), "lianjieai_quick/selected-model") {
+				t.Fatalf("OpenCode model picker hint is missing: %s", out.String())
+			}
+			out.Reset()
+			stderr.Reset()
+			if code := run([]string{"clean", "--agent", agent, "--home", root, "--yes"}, strings.NewReader(""), &out, &stderr); code != 0 {
+				t.Fatalf("cleanup failed: %s", stderr.String())
+			}
+			if !strings.Contains(out.String(), "恢复完成") {
+				t.Fatalf("wrong cleanup output: %s", out.String())
+			}
+		})
+	}
+}
+
+func TestDeepSeekHarnessDesktopSelectionSurvivesCleanup(t *testing.T) {
+	t.Setenv("DSH_HOME", "")
+	root := t.TempDir()
+	for _, profile := range []string{"web", "desktop"} {
+		if err := os.MkdirAll(filepath.Join(root, ".dsh", "profiles", profile), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	payload := native.Payload{Version: 1, Agent: "deepseek-harness", APIKey: "private-test-key", BaseURL: "https://example.test/v1", Model: "selected-model", Models: []native.Model{{ID: "selected-model"}}}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out, stderr bytes.Buffer
+	args := []string{"install", "--agent", "deepseek-harness", "--dsh-profile", "desktop", "--stdin", "--home", root, "--skip-client-check"}
+	if code := run(args, bytes.NewReader(body), &out, &stderr); code != 0 {
+		t.Fatal(stderr.String())
+	}
+	if !strings.Contains(out.String(), "打开 DeepSeek Harness 桌面应用") {
+		t.Fatalf("wrong desktop next step: %s", out.String())
+	}
+	desktopPatch := filepath.Join(root, ".dsh", "profiles", "desktop", "cordis.patch.yml")
+	if _, err := os.Stat(desktopPatch); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".dsh", "profiles", "web", "cordis.patch.yml")); !os.IsNotExist(err) {
+		t.Fatalf("web profile changed: %v", err)
+	}
+	out.Reset()
+	stderr.Reset()
+	if code := run([]string{"clean", "--agent", "deepseek-harness", "--home", root, "--yes"}, strings.NewReader(""), &out, &stderr); code != 0 {
+		t.Fatal(stderr.String())
+	}
+	if _, err := os.Stat(desktopPatch); !os.IsNotExist(err) {
+		t.Fatalf("desktop patch remains: %v", err)
+	}
+}
+
+func TestDeepSeekHarnessAmbiguousProfileStopsBeforeImport(t *testing.T) {
+	root := t.TempDir()
+	for _, profile := range []string{"web", "desktop"} {
+		if err := os.MkdirAll(filepath.Join(root, ".dsh", "profiles", profile), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var out, stderr bytes.Buffer
+	if run([]string{"install", "--agent", "deepseek-harness", "--home", root}, strings.NewReader("\n"), &out, &stderr) == 0 {
+		t.Fatal("ambiguous profile accepted")
+	}
+	if !strings.Contains(out.String(), "web 或 desktop") || !strings.Contains(stderr.String(), "尚未兑换配置码") {
+		t.Fatalf("unclear profile error: %s %s", out.String(), stderr.String())
+	}
+}
 
 func TestCleanReportsConflictWithoutCredentials(t *testing.T) {
 	root := t.TempDir()
@@ -28,7 +131,7 @@ func TestCleanReportsConflictWithoutCredentials(t *testing.T) {
 	if run([]string{"clean", "--agent", "codex", "--home", root, "--yes"}, strings.NewReader(""), &out, &stderr) == 0 {
 		t.Fatal("accepted changed credentials")
 	}
-	if !strings.Contains(stderr.String(), "model_providers.sub2api_quick") {
+	if !strings.Contains(stderr.String(), "model_providers.lianjieai_quick") {
 		t.Fatal("missing conflict field")
 	}
 	if strings.Contains(stderr.String(), "private") {
@@ -99,6 +202,26 @@ func TestStdinDoesNotExposeInvalidPayload(t *testing.T) {
 		t.Fatal("invalid JSON accepted")
 	}
 	if strings.Contains(stderr.String(), "super-secret") {
+		t.Fatal("credential leaked")
+	}
+}
+
+func TestInstallChecksExistingConfigBeforeReadingOneTimePayload(t *testing.T) {
+	t.Setenv("CODEX_HOME", "")
+	root := t.TempDir()
+	path := filepath.Join(root, ".codex", "config.toml")
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("model = ["), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var out, stderr bytes.Buffer
+	code := run([]string{"install", "--agent", "codex", "--stdin", "--home", root, "--skip-client-check"}, strings.NewReader(`{"api_key":"private-test-key"}`), &out, &stderr)
+	if code == 0 || !strings.Contains(stderr.String(), "尚未兑换配置码") || !strings.Contains(stderr.String(), "configuration syntax") {
+		t.Fatalf("missing early config error: %s", stderr.String())
+	}
+	if strings.Contains(stderr.String(), "private-test-key") {
 		t.Fatal("credential leaked")
 	}
 }

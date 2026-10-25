@@ -1132,13 +1132,6 @@
       </div>
     </BaseDialog>
 
-    <BaseDialog :show="!!createdKeyForImport" :title="t('keys.keyCreatedSuccess')" @close="createdKeyForImport = null">
-      <div class="flex gap-3">
-        <button class="btn btn-primary" @click="openUseKeyModal(createdKeyForImport!); createdKeyForImport = null">{{ t('keys.quickImport.title') }}</button>
-        <button class="btn btn-secondary" @click="createdKeyForImport = null">{{ t('keys.quickImport.later') }}</button>
-      </div>
-    </BaseDialog>
-
     <!-- Use Key Modal -->
     <QuickImportModal
       :show="showUseKeyModal"
@@ -1148,6 +1141,7 @@
       :hide-ccs="publicSettings?.hide_ccs_import_button"
       :api-key="selectedKey?.key || ''"
       :base-url="publicSettings?.api_base_url || ''"
+      :doc-url="publicSettings?.doc_url || appStore.docUrl"
       :platform="selectedKey?.group?.platform || null"
       :claude-code-only="selectedKey?.group?.claude_code_only || false"
       :allow-messages-dispatch="selectedKey?.group?.allow_messages_dispatch || false"
@@ -1361,7 +1355,6 @@ const showDeleteDialog = ref(false)
 const showResetQuotaDialog = ref(false)
 const showResetRateLimitDialog = ref(false)
 const showUseKeyModal = ref(false)
-const createdKeyForImport = ref<ApiKey | null>(null)
 const showCcsClientSelect = ref(false)
 const showColumnDropdown = ref(false)
 const pendingCcsRow = ref<ApiKey | null>(null)
@@ -1754,7 +1747,7 @@ const handleSubmit = async () => {
       appStore.showSuccess(t('keys.keyUpdatedSuccess'))
     } else {
       const customKey = formData.value.use_custom_key ? formData.value.custom_key : undefined
-      const createdKey = await keysAPI.create(
+      await keysAPI.create(
         formData.value.name,
         formData.value.group_id,
         customKey,
@@ -1765,7 +1758,6 @@ const handleSubmit = async () => {
         rateLimitData
       )
       appStore.showSuccess(t('keys.keyCreatedSuccess'))
-      createdKeyForImport.value = createdKey
       // Only advance tour if active, on submit step, and creation succeeded
       if (onboardingStore.isCurrentStep('[data-tour="key-form-submit"]')) {
         onboardingStore.nextStep(500)
@@ -1894,6 +1886,13 @@ const resetRateLimitUsage = async () => {
 
 const importToCcswitch = (row: ApiKey) => {
   const platform = row.group?.platform || 'anthropic'
+
+  // The six guided clients need an explicit agent and a model from this Key.
+  // Keep the legacy direct picker for Gemini, Grok and Antigravity groups.
+  if (platform !== 'gemini' && platform !== 'grok' && platform !== 'antigravity') {
+    openUseKeyModal(row)
+    return
+  }
 
   // For antigravity platform, show client selection dialog
   if (platform === 'antigravity') {

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -48,6 +49,10 @@ func (h *QuickImportHandler) Issue(c *gin.Context) {
 		response.BadRequest(c, "Invalid import request")
 		return
 	}
+	if strings.TrimSpace(request.Model) == "" {
+		response.BadRequest(c, "Select a model available to this API key")
+		return
+	}
 	key, ok := h.validKey(c.Request.Context(), request.KeyID, subject.UserID)
 	if !ok || key.Group.ClaudeCodeOnly && request.Agent != "claude" {
 		response.BadRequest(c, "Key is unavailable for import")
@@ -64,6 +69,10 @@ func (h *QuickImportHandler) Issue(c *gin.Context) {
 	}
 	config, err := quickimport.BuildConfig(request.Agent, key.Group.Platform, key.Group.AllowMessagesDispatch, base, key.Key, request.Model)
 	if err != nil {
+		if errors.Is(err, quickimport.ErrNonChatModel) {
+			response.BadRequest(c, "Choose a chat model; media and embedding models cannot configure a coding agent")
+			return
+		}
 		response.BadRequest(c, "Unsupported Agent or group; configure an HTTPS API base URL")
 		return
 	}
@@ -97,6 +106,10 @@ func (h *QuickImportHandler) Exchange(c *gin.Context) {
 	}
 	config, err := quickimport.BuildConfig(ticket.Agent, key.Group.Platform, key.Group.AllowMessagesDispatch, ticket.BaseURL, key.Key, ticket.Model)
 	if err != nil {
+		if errors.Is(err, quickimport.ErrNonChatModel) {
+			response.BadRequest(c, "Choose a chat model; media and embedding models cannot configure a coding agent")
+			return
+		}
 		response.BadRequest(c, "Group no longer supports this Agent")
 		return
 	}
