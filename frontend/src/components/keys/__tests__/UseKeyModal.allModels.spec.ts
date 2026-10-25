@@ -21,13 +21,14 @@ describe('manual import all models', () => {
   afterEach(() => vi.unstubAllGlobals())
 
   it('defaults Codex to all manifest models and embeds the key in config.toml', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ models: [{ slug: 'gpt-first' }, { slug: 'gpt-second' }] }) }))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ models: [{ slug: 'codex-auto-review' }, { slug: 'gpt-first' }, { slug: 'gpt-second' }] }) }))
     const wrapper = render('codex', 'openai')
     await flushPromises()
-    expect(wrapper.get('[data-testid="manual-model-list"]').findAll('input:checked')).toHaveLength(2)
+    expect(wrapper.get('[data-testid="manual-model-list"]').findAll('input:checked')).toHaveLength(3)
     expect(wrapper.find('[data-testid="manual-model-required"]').exists()).toBe(false)
     const config = blocks(wrapper).find(block => block.includes('model_provider = "OpenAI"')) || ''
     expect(config).toContain('model = "gpt-first"')
+    expect(config).not.toContain('model = "codex-auto-review"')
     expect(config).toContain('experimental_bearer_token = "sk-example"')
     expect(config).not.toContain('env_key =')
     expect(wrapper.text()).not.toContain('Terminal')

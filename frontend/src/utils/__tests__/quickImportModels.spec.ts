@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isClearlyNonChatModel, supportsCcs } from '../quickImport'
+import { isClearlyNonChatModel, orderImportModels, supportsCcs } from '../quickImport'
 
 describe('quick import model screening', () => {
   it('removes dedicated media APIs while retaining chat-capable and unknown models', () => {
@@ -9,6 +9,14 @@ describe('quick import model screening', () => {
     expect(isClearlyNonChatModel('deepseek-chat')).toBe(false)
     expect(isClearlyNonChatModel('gpt-audio')).toBe(false)
     expect(isClearlyNonChatModel('custom-model')).toBe(false)
+  })
+
+  it('keeps review-only Codex models available without making them the startup default', () => {
+    expect(orderImportModels(['codex-auto-review', 'gpt-6.1-sol', 'gpt-6-astra'], true))
+      .toEqual(['gpt-6.1-sol', 'gpt-6-astra', 'codex-auto-review'])
+    expect(orderImportModels(['codex-auto-review'], true)).toEqual(['codex-auto-review'])
+    expect(orderImportModels(['codex-auto-review', 'gpt-6.1-sol'], false))
+      .toEqual(['codex-auto-review', 'gpt-6.1-sol'])
   })
 })
 

@@ -14,6 +14,14 @@ export function isClearlyNonChatModel(model: string): boolean {
   return /^(?:gpt-image-|dall-e-|grok-imagine(?:-|$)|imagen-|veo-|sora-|text-embedding-|whisper(?:-|$)|tts-|gpt-transcribe(?:-|$)|gpt-live-transcribe(?:-|$)|gpt-realtime-whisper(?:-|$)|gpt-4o(?:-mini)?-(?:transcribe|tts)(?:-|$)|omni-moderation(?:-|$)|text-moderation(?:-|$))/.test(id) ||
     /^gemini-.*-image(?:-|$)/.test(id) || /^gemini-nano-banana(?:-|$)/.test(id)
 }
+
+// The Codex catalog may include a review-only entry before interactive models.
+// Keep it available, but do not use it as the startup model when another exists.
+export function orderImportModels(models: string[], codex: boolean): string[] {
+  if (!codex) return models
+  const isReviewOnly = (id: string) => /^codex-auto-review(?:-|$)/.test(id.toLowerCase().split('/').pop() || '')
+  return [...models.filter(id => !isReviewOnly(id)), ...models.filter(isReviewOnly)]
+}
 export function supportsAgent(agent: ImportAgent, platform: GroupPlatform | null, messages = false): boolean {
   if (!platform || !['openai', 'anthropic', 'antigravity', 'gemini', 'deepseek', 'grok', 'kimi', 'zhipu', 'composite'].includes(platform)) return false
   if (agent === 'codex-ws') return platform === 'openai'
