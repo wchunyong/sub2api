@@ -125,7 +125,9 @@ func TestExecuteBalanceFulfillmentAddsNewUserGiftOnce(t *testing.T) {
 		SetPaymentType("alipay").SetPaymentTradeNo("trade-welcome-full-1").
 		SetOrderType(payment.OrderTypeBalance).SetStatus(OrderStatusPaid).
 		SetExpiresAt(time.Now().Add(time.Hour)).SetPaidAt(created.Add(30 * time.Minute)).
-		SetClientIP("").SetSrcHost("").SetProviderSnapshot(map[string]any{newUserRechargeCandidateKey: true}).Save(ctx)
+		SetClientIP("").SetSrcHost("").SetProviderSnapshot(map[string]any{
+		newUserRechargeCandidateKey: true, "new_user_recharge_bonus_amount": 5.0,
+	}).Save(ctx)
 	require.NoError(t, err)
 	redeemRepo := &paymentFulfillmentRedeemRepo{}
 	credited := 0.0
@@ -135,12 +137,12 @@ func TestExecuteBalanceFulfillmentAddsNewUserGiftOnce(t *testing.T) {
 	redeemService := NewRedeemService(redeemRepo, userRepo, nil, cache, nil, client, nil, nil)
 	svc := &PaymentService{entClient: client, redeemService: redeemService, userRepo: userRepo}
 	require.NoError(t, svc.ExecuteBalanceFulfillment(ctx, order.ID))
-	require.Equal(t, 30.0, credited)
+	require.Equal(t, 25.0, credited)
 	stored, err := client.PaymentOrder.Get(ctx, order.ID)
 	require.NoError(t, err)
 	require.Equal(t, OrderStatusCompleted, stored.Status)
-	require.Equal(t, 30.0, stored.Amount)
-	require.Equal(t, 10.0, stored.BonusAmount)
+	require.Equal(t, 25.0, stored.Amount)
+	require.Equal(t, 5.0, stored.BonusAmount)
 	require.NoError(t, svc.ExecuteBalanceFulfillment(ctx, order.ID))
-	require.Equal(t, 30.0, credited)
+	require.Equal(t, 25.0, credited)
 }

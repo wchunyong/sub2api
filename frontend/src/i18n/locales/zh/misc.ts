@@ -2,12 +2,12 @@ export default {
   newUserBenefits: {
     kicker: '限时专属', title: '新用户权益，24小时有效',
     description: '从注册完成起 24 小时内领取。两项权益可分别参与。',
-    wechatTitle: '添加客服微信领取 10 元',
+    wechatTitle: '添加客服微信领取 5 元',
     wechatDescription: '添加客服微信并说明新用户权益，由客服核实后手动发放。',
     copyWechat: '复制微信号', copied: '已复制',
-    rechargeTitle: '充 10 元送 10 元',
-    rechargeDescription: '权益期内首笔成功充值满 10 元，额外赠送 10 元余额。',
-    rechargeAction: '去充值', checkoutHint: '权益期内首笔成功充值满 10 元，到账额外赠送 10 元。', closeAfter: '{seconds} 秒后可关闭', expired: '新用户权益已结束。'
+    rechargeTitle: '充 10 元送 5 元',
+    rechargeDescription: '权益期内首笔成功充值满 10 元，额外赠送 5 元余额。',
+    rechargeAction: '去充值', checkoutHint: '权益期内首笔成功充值满 10 元，到账额外赠送 5 元。', closeAfter: '{seconds} 秒后可关闭', expired: '新用户权益已结束。'
   },
   tenYuanActivity: {
     kicker: '限时福利', title: '十元七天乐',
@@ -44,7 +44,8 @@ export default {
   subscriptionProgress: {
     title: '免费额度',
     viewDetails: '免费额度',
-    apiKeyHint: '使用免费额度需单独创建 API Key，并在创建时选择免费分组。',
+    apiKeyHint: '需单独创建API密钥，并配置对应分组。',
+    createKeyAction: '去创建',
     activeCount: '{count} 个有效订阅',
     daily: '每日',
     weekly: '每周',

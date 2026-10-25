@@ -2,12 +2,12 @@ export default {
   newUserBenefits: {
     kicker: 'Limited-time offer', title: 'New User Benefits · Valid for 24 Hours',
     description: 'Claim within 24 hours of registration. Both offers are available separately.',
-    wechatTitle: 'Add support on WeChat for 10 credits',
+    wechatTitle: 'Add support on WeChat for 5 credits',
     wechatDescription: 'Add our support contact and mention the new user offer. Support will verify and credit your account manually.',
     copyWechat: 'Copy WeChat ID', copied: 'Copied',
-    rechargeTitle: 'Recharge 10, get 10 extra',
-    rechargeDescription: 'Your first successful recharge of at least 10 during the benefit period receives 10 extra credits.',
-    rechargeAction: 'Recharge now', checkoutHint: 'Your first successful recharge of at least 10 during the benefit period receives 10 extra credits.', closeAfter: 'Close available in {seconds}s', expired: 'The new user benefit period has ended.'
+    rechargeTitle: 'Recharge 10, get 5 extra',
+    rechargeDescription: 'Your first successful recharge of at least 10 during the benefit period receives 5 extra credits.',
+    rechargeAction: 'Recharge now', checkoutHint: 'Your first successful recharge of at least 10 during the benefit period receives 5 extra credits.', closeAfter: 'Close available in {seconds}s', expired: 'The new user benefit period has ended.'
   },
   tenYuanActivity: {
     kicker: 'Limited benefit', title: 'Ten Yuan Seven Days',
@@ -44,7 +44,8 @@ export default {
   subscriptionProgress: {
     title: 'Free Quota',
     viewDetails: 'Free Quota',
-    apiKeyHint: 'To use the free quota, create a separate API key and select the free group.',
+    apiKeyHint: 'Create a separate API key and select the corresponding group.',
+    createKeyAction: 'Create key',
     activeCount: '{count} active subscription(s)',
     daily: 'Daily',
     weekly: 'Weekly',

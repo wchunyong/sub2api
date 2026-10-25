@@ -1121,12 +1121,15 @@
 <script setup lang="ts">
 	import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 	import { useI18n } from 'vue-i18n'
+	import { useRoute, useRouter } from 'vue-router'
 	import { useAppStore } from '@/stores/app'
 	import { useOnboardingStore } from '@/stores/onboarding'
 	import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
 import { keysAPI, authAPI, usageAPI, userGroupsAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
@@ -1312,6 +1315,13 @@ const filterStatus = ref('')
 const filterGroupId = ref<string | number>('')
 
 const showCreateModal = ref(false)
+watch(() => route.query.create, (create) => {
+  if (create !== '1') return
+  showCreateModal.value = true
+  const query = { ...route.query }
+  delete query.create
+  void router.replace({ name: 'Keys', query })
+}, { immediate: true })
 const showEditModal = ref(false)
 const showDeleteDialog = ref(false)
 const showResetQuotaDialog = ref(false)

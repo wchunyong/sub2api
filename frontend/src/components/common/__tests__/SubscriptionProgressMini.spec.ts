@@ -27,6 +27,8 @@ vi.mock('vue-i18n', async () => {
         ({
           'subscriptionProgress.title': 'Free Quota',
           'subscriptionProgress.viewDetails': 'Free Quota',
+          'subscriptionProgress.apiKeyHint': 'Create a separate API key and select the corresponding group.',
+          'subscriptionProgress.createKeyAction': 'Create key',
           'subscriptionProgress.activeCount': '1 active subscription',
           'subscriptionProgress.daily': 'Daily',
           'subscriptionProgress.daysRemaining': '1 day left',
@@ -73,7 +75,10 @@ describe('SubscriptionProgressMini', () => {
       global: {
         stubs: {
           Icon: { props: ['name'], template: '<span>{{ name }}</span>' },
-          RouterLink: { template: '<a><slot /></a>' },
+          RouterLink: {
+            props: ['to'],
+            template: '<a :data-route-name="to.name" :data-create="to.query.create"><slot /></a>',
+          },
         },
       },
     })
@@ -83,6 +88,9 @@ describe('SubscriptionProgressMini', () => {
     await wrapper.get('button').trigger('click')
 
     expect(wrapper.text()).toContain('Free Quota')
+    expect(wrapper.text()).toContain('Create a separate API key and select the corresponding group.')
+    expect(wrapper.get('a').attributes('data-route-name')).toBe('Keys')
+    expect(wrapper.get('a').attributes('data-create')).toBe('1')
     expect(wrapper.text()).not.toContain('1 active subscription')
     expect(wrapper.text()).not.toContain('View all subscriptions')
   })

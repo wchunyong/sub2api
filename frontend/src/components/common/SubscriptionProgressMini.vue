@@ -160,9 +160,14 @@
           </div>
         </div>
 
-        <p class="border-t border-gray-100 px-3 py-2 text-xs leading-5 text-gray-600 dark:border-dark-700 dark:text-gray-400">
-          {{ t('subscriptionProgress.apiKeyHint') }}
-        </p>
+        <div class="border-t border-gray-100 px-3 py-2 text-xs leading-5 text-gray-600 dark:border-dark-700 dark:text-gray-400">
+          <p>{{ t('subscriptionProgress.apiKeyHint') }}</p>
+          <RouterLink
+            :to="{ name: 'Keys', query: { create: '1' } }"
+            class="mt-1 inline-block font-medium text-primary-600 hover:underline dark:text-primary-400"
+            @click="closeTooltip"
+          >{{ t('subscriptionProgress.createKeyAction') }}</RouterLink>
+        </div>
 
       </div>
     </transition>
@@ -172,6 +177,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
 import Icon from '@/components/icons/Icon.vue'
 import { useSubscriptionStore } from '@/stores'
 import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'

@@ -206,6 +206,7 @@ func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderReq
 			providerSnapshot = map[string]any{}
 		}
 		providerSnapshot[newUserRechargeCandidateKey] = true
+		providerSnapshot[newUserRechargeBonusAmountKey] = newUserRechargeBonusAmount
 	}
 	selectedInstanceID := ""
 	selectedProviderKey := ""
