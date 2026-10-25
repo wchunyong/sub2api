@@ -1098,43 +1098,10 @@
       @cancel="showResetRateLimitDialog = false"
     />
 
-    <!-- CCS Client Selection Dialog for Antigravity -->
-    <BaseDialog
-      :show="showCcsClientSelect"
-      :title="t('keys.ccsClientSelect.title')"
-      width="narrow"
-      @close="closeCcsClientSelect"
-    >
-      <div class="space-y-4">
-        <p class="text-sm text-gray-600 dark:text-gray-400">
-          {{ t('keys.ccsClientSelect.description') }}
-        </p>
-        <div class="grid grid-cols-2 gap-3">
-          <button
-            @click="handleCcsClientSelect('claude')"
-            class="flex flex-col items-center gap-2 rounded-xl border-2 border-gray-200 p-4 transition-all hover:border-primary-500 hover:bg-primary-50 dark:border-dark-600 dark:hover:border-primary-500 dark:hover:bg-primary-900/20"
-          >
-            <Icon name="terminal" size="xl" class="text-gray-600 dark:text-gray-400" />
-            <span class="font-medium text-gray-900 dark:text-white">{{
-              t('keys.ccsClientSelect.claudeCode')
-            }}</span>
-          </button>
-          <button
-            @click="handleCcsClientSelect('gemini')"
-            class="flex flex-col items-center gap-2 rounded-xl border-2 border-gray-200 p-4 transition-all hover:border-primary-500 hover:bg-primary-50 dark:border-dark-600 dark:hover:border-primary-500 dark:hover:bg-primary-900/20"
-          >
-            <Icon name="sparkles" size="xl" class="text-gray-600 dark:text-gray-400" />
-            <span class="font-medium text-gray-900 dark:text-white">{{
-              t('keys.ccsClientSelect.geminiCli')
-            }}</span>
-          </button>
-        </div>
-      </div>
-    </BaseDialog>
-
     <!-- Use Key Modal -->
     <QuickImportModal
       :show="showUseKeyModal"
+      :ccs-only="ccsOnlyMode"
       :key-id="selectedKey?.id || 0"
       :key-name="selectedKey?.name"
       :active="selectedKey?.status === 'active'"
@@ -1184,11 +1151,6 @@ import { maskApiKey } from '@/utils/maskApiKey'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import { platformBadgeLightClass } from '@/utils/platformColors'
 import { KEY_GROUP_PROVIDERS, KEY_GROUP_PROVIDER_ICONS, getKeyGroupProvider, type KeyGroupProvider } from '@/utils/keyGroupProviders'
-import {
-  CC_SWITCH_USAGE_SCRIPT,
-  buildCcSwitchImportDeeplink,
-  type CcSwitchClientType
-} from '@/utils/ccswitchImport'
 
 // Helper to format date for datetime-local input
 const formatDateTimeLocal = (isoDate: string): string => {
@@ -1355,9 +1317,8 @@ const showDeleteDialog = ref(false)
 const showResetQuotaDialog = ref(false)
 const showResetRateLimitDialog = ref(false)
 const showUseKeyModal = ref(false)
-const showCcsClientSelect = ref(false)
+const ccsOnlyMode = ref(false)
 const showColumnDropdown = ref(false)
-const pendingCcsRow = ref<ApiKey | null>(null)
 const selectedKey = ref<ApiKey | null>(null)
 const copiedKeyId = ref<number | null>(null)
 const publicSettings = ref<PublicSettings | null>(null)
@@ -1593,11 +1554,13 @@ const loadPublicSettings = async () => {
 
 const openUseKeyModal = (key: ApiKey) => {
   selectedKey.value = key
+  ccsOnlyMode.value = false
   showUseKeyModal.value = true
 }
 
 const closeUseKeyModal = () => {
   showUseKeyModal.value = false
+  ccsOnlyMode.value = false
   selectedKey.value = null
 }
 
@@ -1885,67 +1848,9 @@ const resetRateLimitUsage = async () => {
 }
 
 const importToCcswitch = (row: ApiKey) => {
-  const platform = row.group?.platform || 'anthropic'
-
-  // The six guided clients need an explicit agent and a model from this Key.
-  // Keep the legacy direct picker for Gemini, Grok and Antigravity groups.
-  if (platform !== 'gemini' && platform !== 'grok' && platform !== 'antigravity') {
-    openUseKeyModal(row)
-    return
-  }
-
-  // For antigravity platform, show client selection dialog
-  if (platform === 'antigravity') {
-    pendingCcsRow.value = row
-    showCcsClientSelect.value = true
-    return
-  }
-
-  // For other platforms, execute directly
-  executeCcsImport(row, platform === 'gemini' ? 'gemini' : 'claude')
-}
-
-const executeCcsImport = (row: ApiKey, clientType: CcSwitchClientType) => {
-  const baseUrl = publicSettings.value?.api_base_url || window.location.origin
-  const platform = row.group?.platform || 'anthropic'
-
-  const usageScript = CC_SWITCH_USAGE_SCRIPT
-  const providerName = (publicSettings.value?.site_name || 'sub2api').trim() || 'sub2api'
-  const deeplink = buildCcSwitchImportDeeplink({
-    baseUrl,
-    platform,
-    clientType,
-    providerName,
-    apiKey: row.key,
-    usageScript
-  })
-
-  try {
-    window.open(deeplink, '_self')
-
-    // Check if the protocol handler worked by detecting if we're still focused
-    setTimeout(() => {
-      if (document.hasFocus()) {
-        // Still focused means the protocol handler likely failed
-        appStore.showError(t('keys.ccSwitchNotInstalled'))
-      }
-    }, 100)
-  } catch (error) {
-    appStore.showError(t('keys.ccSwitchNotInstalled'))
-  }
-}
-
-const handleCcsClientSelect = (clientType: CcSwitchClientType) => {
-  if (pendingCcsRow.value) {
-    executeCcsImport(pendingCcsRow.value, clientType)
-  }
-  showCcsClientSelect.value = false
-  pendingCcsRow.value = null
-}
-
-const closeCcsClientSelect = () => {
-  showCcsClientSelect.value = false
-  pendingCcsRow.value = null
+  selectedKey.value = row
+  ccsOnlyMode.value = true
+  showUseKeyModal.value = true
 }
 
 function formatResetTime(resetAt: string | null): string {

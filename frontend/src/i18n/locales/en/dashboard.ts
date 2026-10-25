@@ -170,7 +170,12 @@ export default {
       copyImport: 'Copy import command',
       copyClean: 'Copy cleanup command',
       ccsHint: 'Manage configuration with CC Switch',
+      ccsDirectHint: 'Click Claude Code or Codex to open CC Switch. Choose one model first for OpenCode or Pi.',
+      ccsSelectOneModel: 'Choose one model for {agent}',
+      ccsOpenFailed: 'Could not open CC Switch. Check that it is installed and allow your browser to open it.',
       manualHint: 'View key and configuration instructions',
+      allModels: 'One-click script imports all compatible models',
+      allModelsHint: 'Loads all compatible chat models in this key group. The first is the startup default and the CC Switch default.',
       chooseModel: 'Choose a model',
       modelPlaceholder: 'Enter a complete model ID available to this key',
       modelLoading: 'Loading models available to this key…',
@@ -216,17 +221,16 @@ export default {
     useKey: 'Use Key',
     useKeyModal: {
       title: 'Use API Key',
-      claudeModelLabel: 'Claude Code model ID',
-      claudeModelPlaceholder: 'Enter a complete model ID available to this key',
-      claudeModelHint: 'Models come from this key’s /v1/models response. Choose one that supports the Messages API.',
-      claudeModelFallback: 'If discovery fails, copy a complete model ID available to this key from the site. Replace the placeholder.',
-      selectModelBeforeCopy: 'Select or enter a model ID available to this key before copying the configuration.',
-      description:
-        'Add the following environment variables to your terminal profile or run directly in terminal to configure API access.',
+      claudeModelLabel: 'Claude Code models (select multiple)',
+      claudeModelPlaceholder: 'Enter one complete model ID available to this key per line',
+      claudeModelHint: 'Models come from this key’s /v1/models response. Select models that support Claude Code Messages. The first selected model is the startup default.',
+      claudeModelFallback: 'If discovery fails, enter one complete model ID available to this key per line.',
+      selectModelBeforeCopy: 'Select or enter at least one model ID available to this key before copying the configuration.',
+      description: 'Write this content to the Claude Code user settings file, then restart Claude Code.',
       copy: 'Copy',
       copied: 'Copied',
       note: 'These environment variables will be active in the current terminal session. For permanent configuration, add them to ~/.bashrc, ~/.zshrc, or the appropriate configuration file.',
-      claudeSettingsHint: 'User-level persistent configuration. Do not commit this file containing your API key to a project repository.',
+      claudeSettingsHint: 'User-level persistent configuration. Back up and merge fields if the file already exists. Do not commit this file containing your API key to a project repository.',
       noGroupTitle: 'Please assign a group first',
       noGroupDescription: 'This API key has not been assigned to a group. Please click the group column in the key list to assign one before viewing the configuration.',
       openai: {
@@ -280,7 +284,7 @@ export default {
         noteWindows:
           'Set GROK_MODELS_BASE_URL and XAI_API_KEY, save the full config.toml as %USERPROFILE%\\.grok\\config.toml, run grok inspect, then /model grok-4.5 (or grok-build-0.1 for coding).',
         claudeNote:
-          'Choose one method: terminal env for this session, or ~/.claude/settings.json for persistence. Do not commit files that contain your API key.',
+          'Save the configuration to the user-level ~/.claude/settings.json (or %USERPROFILE%\\.claude\\settings.json on Windows). Do not commit files containing your API key.',
         codexNote:
           'Export SUB2API_API_KEY, save config.toml under ~/.codex (mkdir -p ~/.codex). Prefer env_key auth; do not commit secrets.',
         codexNoteWindows:

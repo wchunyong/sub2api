@@ -113,12 +113,14 @@
 
         <!-- OS/Shell Tabs -->
         <div v-if="activeClientTab === 'claude'" class="rounded-lg border border-gray-200 p-3 dark:border-dark-700">
-          <label for="claude-model" class="mb-1 block text-sm font-medium">{{ t('keys.useKeyModal.claudeModelLabel') }}</label>
-          <select v-if="claudeModels.length" id="claude-model" v-model="selectedClaudeModel" class="input w-full">
-            <option value="">{{ t('keys.quickImport.chooseModel') }}</option>
-            <option v-for="model in claudeModels" :key="model" :value="model">{{ model }}</option>
-          </select>
-          <input v-else id="claude-model" v-model.trim="selectedClaudeModel" class="input w-full" :disabled="claudeOnlyNonChatModels" :placeholder="t('keys.useKeyModal.claudeModelPlaceholder')" />
+          <p class="mb-2 text-sm font-medium">{{ t('keys.useKeyModal.claudeModelLabel') }}</p>
+          <div v-if="claudeModels.length" class="max-h-48 space-y-2 overflow-y-auto" data-testid="claude-model-list">
+            <label v-for="model in claudeModels" :key="model" class="flex items-center gap-2 text-sm">
+              <input v-model="selectedClaudeModels" type="checkbox" :value="model" />
+              <span class="break-all">{{ model }}</span>
+            </label>
+          </div>
+          <textarea v-else id="claude-model" v-model="manualClaudeModels" class="input w-full" rows="3" :disabled="claudeOnlyNonChatModels" :placeholder="t('keys.useKeyModal.claudeModelPlaceholder')" />
           <p class="mt-1 text-xs text-gray-500">{{ t(claudeOnlyNonChatModels ? 'keys.quickImport.modelNoChatAvailable' : claudeModels.length ? 'keys.useKeyModal.claudeModelHint' : 'keys.useKeyModal.claudeModelFallback') }}</p>
         </div>
         <div v-if="activeClientTab === 'codex' || activeClientTab === 'codex-ws' || activeClientTab === 'opencode'" class="rounded-lg border border-gray-200 p-3 dark:border-dark-700">
@@ -343,7 +345,8 @@ const { copyToClipboard: clipboardCopy } = useClipboard()
 const copiedIndex = ref<number | null>(null)
 const claudeModels = ref<string[]>([])
 const claudeOnlyNonChatModels = ref(false)
-const selectedClaudeModel = ref('')
+const selectedClaudeModels = ref<string[]>([])
+const manualClaudeModels = ref('')
 const claudeModelsLoading = ref(false)
 let claudeModelsController: AbortController | null = null
 const manualModels = ref<string[]>([])
@@ -352,12 +355,21 @@ const selectedManualModel = ref('')
 const manualModelsLoading = ref(false)
 let manualModelsController: AbortController | null = null
 const currentOnlyNonChatModels = computed(() => activeClientTab.value === 'claude' ? claudeOnlyNonChatModels.value : manualOnlyNonChatModels.value)
-const manualModelIsNonChat = computed(() => isClearlyNonChatModel(activeClientTab.value === 'claude' ? selectedClaudeModel.value : selectedManualModel.value))
+const claudeSelectedModels = computed(() => claudeModels.value.length
+  ? selectedClaudeModels.value
+  : [...new Set(manualClaudeModels.value.split(/[\s,]+/).filter(Boolean))])
+const manualModelIsNonChat = computed(() => activeClientTab.value === 'claude'
+  ? claudeSelectedModels.value.some(isClearlyNonChatModel)
+  : isClearlyNonChatModel(selectedManualModel.value))
 const manualModelReady = computed(() => {
-  const model = activeClientTab.value === 'claude' ? selectedClaudeModel.value : selectedManualModel.value
   const loading = activeClientTab.value === 'claude' ? claudeModelsLoading.value : manualModelsLoading.value
   if (!['claude', 'codex', 'codex-ws', 'opencode'].includes(activeClientTab.value)) return true
-  if (loading || currentOnlyNonChatModels.value || !/^[A-Za-z0-9_.:/-]+$/.test(model) || manualModelIsNonChat.value) return false
+  if (loading || currentOnlyNonChatModels.value || manualModelIsNonChat.value) return false
+  if (activeClientTab.value === 'claude') {
+    return claudeSelectedModels.value.length > 0 && claudeSelectedModels.value.every(model => /^[A-Za-z0-9_.:/-]+$/.test(model))
+  }
+  const model = selectedManualModel.value
+  if (!/^[A-Za-z0-9_.:/-]+$/.test(model)) return false
   if (['codex', 'codex-ws'].includes(activeClientTab.value) && codexCatalogModelSlugs.value.length) {
     return codexCatalogModelSlugs.value.includes(model)
   }
@@ -444,7 +456,8 @@ watch(() => [props.show, props.baseUrl, props.apiKey, activeClientTab.value], as
   claudeModelsController?.abort()
   claudeModels.value = []
   claudeOnlyNonChatModels.value = false
-  selectedClaudeModel.value = ''
+  selectedClaudeModels.value = []
+  manualClaudeModels.value = ''
   claudeModelsLoading.value = false
   if (!props.show || activeClientTab.value !== 'claude' || !props.apiKey) return
   const controller = new AbortController()
@@ -461,7 +474,7 @@ watch(() => [props.show, props.baseUrl, props.apiKey, activeClientTab.value], as
     const names = body.data.map(item => item.id).filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9_.:/-]+$/.test(id))
     claudeModels.value = [...new Set(names.filter(id => !isClearlyNonChatModel(id)))]
     claudeOnlyNonChatModels.value = names.length > 0 && claudeModels.value.length === 0
-    if (claudeModels.value.length) selectedClaudeModel.value = ''
+    selectedClaudeModels.value = [...claudeModels.value]
   } catch { /* Manual entry remains available when model discovery fails. */ }
   finally { if (claudeModelsController === controller) claudeModelsLoading.value = false }
 }, { immediate: true })
@@ -660,7 +673,7 @@ const showCodexAuthMode = computed(() =>
 
 const currentTabs = computed(() => {
   if (!showShellTabs.value) return []
-  if (activeClientTab.value === 'codex' || activeClientTab.value === 'codex-ws' || activeClientTab.value === 'grok') {
+  if (activeClientTab.value === 'codex' || activeClientTab.value === 'codex-ws' || activeClientTab.value === 'grok' || activeClientTab.value === 'claude') {
     return openaiTabs
   }
   return shellTabs
@@ -713,6 +726,9 @@ const platformDescription = computed(() => {
 })
 
 const platformNote = computed(() => {
+  if (activeClientTab.value === 'claude') {
+    return t(props.platform === 'grok' ? 'keys.useKeyModal.grok.claudeNote' : 'keys.useKeyModal.claudeSettingsHint')
+  }
   if (activeClientTab.value === 'codex' &&
     props.platform !== 'openai' &&
     props.platform !== 'grok' &&
@@ -924,7 +940,7 @@ const currentFiles = computed((): FileConfig[] => {
       return generateAnthropicFiles(`${baseRoot}/antigravity`, apiKey)
     case 'grok':
       if (activeClientTab.value === 'claude') {
-        return generateGrokClaudeFiles(baseRoot, apiKey)
+        return generateAnthropicFiles(baseRoot, apiKey)
       }
       if (activeClientTab.value === 'codex') {
         return generateGrokCodexFiles(apiBase, apiKey)
@@ -994,83 +1010,11 @@ Invoke-RestMethod -Method Post -Uri "${endpoint}" -Headers $headers -ContentType
 }
 
 function generateAnthropicFiles(baseUrl: string, apiKey: string): FileConfig[] {
-  const model = /^[A-Za-z0-9_.:/-]+$/.test(selectedClaudeModel.value) ? selectedClaudeModel.value : 'YOUR_AVAILABLE_MODEL_ID'
-  let path: string
-  let content: string
-
-  switch (activeTab.value) {
-    case 'unix':
-      path = 'Terminal'
-      content = `export ANTHROPIC_BASE_URL="${baseUrl}"
-export ANTHROPIC_AUTH_TOKEN="${apiKey}"
-export ANTHROPIC_MODEL="${model}"
-export ANTHROPIC_DEFAULT_OPUS_MODEL="${model}"
-export ANTHROPIC_DEFAULT_SONNET_MODEL="${model}"
-export ANTHROPIC_DEFAULT_HAIKU_MODEL="${model}"
-export ANTHROPIC_DEFAULT_FABLE_MODEL="${model}"
-export CLAUDE_CODE_SUBAGENT_MODEL="${model}"
-export ANTHROPIC_CUSTOM_MODEL_OPTION="${model}"`
-      break
-    case 'cmd':
-      path = 'Command Prompt'
-      content = `set ANTHROPIC_BASE_URL=${baseUrl}
-set ANTHROPIC_AUTH_TOKEN=${apiKey}
-set ANTHROPIC_MODEL=${model}
-set ANTHROPIC_DEFAULT_OPUS_MODEL=${model}
-set ANTHROPIC_DEFAULT_SONNET_MODEL=${model}
-set ANTHROPIC_DEFAULT_HAIKU_MODEL=${model}
-set ANTHROPIC_DEFAULT_FABLE_MODEL=${model}
-set CLAUDE_CODE_SUBAGENT_MODEL=${model}
-set ANTHROPIC_CUSTOM_MODEL_OPTION=${model}`
-      break
-    case 'powershell':
-      path = 'PowerShell'
-      content = `$env:ANTHROPIC_BASE_URL="${baseUrl}"
-$env:ANTHROPIC_AUTH_TOKEN="${apiKey}"
-$env:ANTHROPIC_MODEL="${model}"
-$env:ANTHROPIC_DEFAULT_OPUS_MODEL="${model}"
-$env:ANTHROPIC_DEFAULT_SONNET_MODEL="${model}"
-$env:ANTHROPIC_DEFAULT_HAIKU_MODEL="${model}"
-$env:ANTHROPIC_DEFAULT_FABLE_MODEL="${model}"
-$env:CLAUDE_CODE_SUBAGENT_MODEL="${model}"
-$env:ANTHROPIC_CUSTOM_MODEL_OPTION="${model}"`
-      break
-    default:
-      path = 'Terminal'
-      content = ''
-  }
-
-  const vscodeSettingsPath = activeTab.value === 'unix'
+  const models = claudeSelectedModels.value.filter(model => /^[A-Za-z0-9_.:/-]+$/.test(model) && !isClearlyNonChatModel(model))
+  const model = models[0] || 'YOUR_AVAILABLE_MODEL_ID'
+  const settingsPath = activeTab.value === 'unix'
     ? '~/.claude/settings.json'
     : '%USERPROFILE%\\.claude\\settings.json'
-
-  const vscodeContent = `{
-  "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "env": {
-    "ANTHROPIC_BASE_URL": "${baseUrl}",
-    "ANTHROPIC_AUTH_TOKEN": "${apiKey}",
-    "ANTHROPIC_MODEL": "${model}",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "${model}",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "${model}",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "${model}",
-    "ANTHROPIC_DEFAULT_FABLE_MODEL": "${model}",
-    "CLAUDE_CODE_SUBAGENT_MODEL": "${model}",
-    "ANTHROPIC_CUSTOM_MODEL_OPTION": "${model}"
-  }
-}`
-
-  return [
-    { path, content },
-    {
-      path: vscodeSettingsPath,
-      content: vscodeContent,
-      hint: t('keys.useKeyModal.claudeSettingsHint')
-    }
-  ]
-}
-
-function generateGrokClaudeFiles(baseUrl: string, apiKey: string): FileConfig[] {
-  const model = /^[A-Za-z0-9_.:/-]+$/.test(selectedClaudeModel.value) ? selectedClaudeModel.value : 'YOUR_AVAILABLE_MODEL_ID'
   const environment = {
     ANTHROPIC_BASE_URL: baseUrl,
     ANTHROPIC_AUTH_TOKEN: apiKey,
@@ -1081,44 +1025,16 @@ function generateGrokClaudeFiles(baseUrl: string, apiKey: string): FileConfig[] 
     ANTHROPIC_DEFAULT_FABLE_MODEL: model,
     CLAUDE_CODE_SUBAGENT_MODEL: model
   }
-  let path: string
-  let content: string
-
-  switch (activeTab.value) {
-    case 'unix':
-      path = 'Terminal'
-      content = Object.entries(environment)
-        .map(([name, value]) => `export ${name}="${value}"`)
-        .join('\n')
-      break
-    case 'cmd':
-      path = 'Command Prompt'
-      content = Object.entries(environment)
-        .map(([name, value]) => `set ${name}=${value}`)
-        .join('\n')
-      break
-    case 'powershell':
-      path = 'PowerShell'
-      content = Object.entries(environment)
-        .map(([name, value]) => `$env:${name}="${value}"`)
-        .join('\n')
-      break
-    default:
-      path = 'Terminal'
-      content = ''
-  }
-
-  const settingsPath = activeTab.value === 'unix'
-    ? '~/.claude/settings.json'
-    : '%USERPROFILE%\\.claude\\settings.json'
-
   return [
-    { path, content },
     {
       path: settingsPath,
       content: JSON.stringify({
         $schema: 'https://json.schemastore.org/claude-code-settings.json',
-        env: environment
+        env: environment,
+        modelPicker: {
+          options: models.map(id => ({ model: id, label: id })),
+          replaceBuiltInOptions: true
+        }
       }, null, 2),
       hint: t('keys.useKeyModal.claudeSettingsHint')
     }

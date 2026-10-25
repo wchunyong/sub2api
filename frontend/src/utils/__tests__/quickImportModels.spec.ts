@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isClearlyNonChatModel } from '../quickImport'
+import { isClearlyNonChatModel, supportsCcs } from '../quickImport'
 
 describe('quick import model screening', () => {
   it('removes dedicated media APIs while retaining chat-capable and unknown models', () => {
@@ -9,5 +9,18 @@ describe('quick import model screening', () => {
     expect(isClearlyNonChatModel('deepseek-chat')).toBe(false)
     expect(isClearlyNonChatModel('gpt-audio')).toBe(false)
     expect(isClearlyNonChatModel('custom-model')).toBe(false)
+  })
+})
+
+describe('CC Switch agent support', () => {
+  it('limits imports to Claude Code, Codex, OpenCode, and Pi', () => {
+    expect(supportsCcs('claude', 'anthropic')).toBe(true)
+    expect(supportsCcs('codex', 'openai')).toBe(true)
+    expect(supportsCcs('opencode', 'deepseek')).toBe(true)
+    expect(supportsCcs('pi', 'deepseek')).toBe(true)
+    expect(supportsCcs('workbuddy', 'deepseek')).toBe(false)
+    expect(supportsCcs('deepseek-harness', 'deepseek')).toBe(false)
+    expect(supportsCcs('grok', 'grok')).toBe(false)
+    expect(supportsCcs('gemini', 'gemini')).toBe(false)
   })
 })

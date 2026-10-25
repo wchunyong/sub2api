@@ -78,7 +78,7 @@ describe('UseKeyModal', () => {
     expect(wrapper.find('pre code').text()).toContain('ANTHROPIC_BASE_URL')
   })
 
-  it('omits the attribution override from every standard Claude Code setup form', async () => {
+  it('omits the attribution override from both Claude Code settings paths', async () => {
     const wrapper = mount(UseKeyModal, {
       props: {
         show: true,
@@ -98,7 +98,7 @@ describe('UseKeyModal', () => {
       }
     })
 
-    for (const shell of ['macOS / Linux', 'Windows CMD', 'PowerShell']) {
+    for (const shell of ['macOS / Linux', 'Windows']) {
       if (shell !== 'macOS / Linux') {
         const shellTab = wrapper.findAll('button').find(
           (button) => button.text().trim() === shell
@@ -109,6 +109,7 @@ describe('UseKeyModal', () => {
       }
 
       const codeBlocks = wrapper.findAll('pre code').map((code) => code.text())
+      expect(codeBlocks).toHaveLength(1)
       const allCode = codeBlocks.join('\n')
       const settings = JSON.parse(codeBlocks.find((content) => content.includes('"$schema"'))!)
 
@@ -241,25 +242,13 @@ describe('UseKeyModal', () => {
     await wrapper.get('#claude-model').setValue('grok-4.5')
 
     let codeBlocks = wrapper.findAll('pre code').map((code) => code.text())
-    expect(codeBlocks.join('\n')).toContain('ANTHROPIC_BASE_URL="https://example.com"')
-    expect(codeBlocks.join('\n')).toContain('ANTHROPIC_AUTH_TOKEN="sk-grok-claude-test"')
-    const unixConfig = codeBlocks.find((content) => content.startsWith('export ANTHROPIC_BASE_URL'))
-    expect(unixConfig).toBeDefined()
-    for (const name of [
-      'ANTHROPIC_MODEL',
-      'ANTHROPIC_DEFAULT_OPUS_MODEL',
-      'ANTHROPIC_DEFAULT_SONNET_MODEL',
-      'ANTHROPIC_DEFAULT_HAIKU_MODEL',
-      'ANTHROPIC_DEFAULT_FABLE_MODEL',
-      'CLAUDE_CODE_SUBAGENT_MODEL'
-    ]) {
-      expect(unixConfig).toContain(`export ${name}="grok-4.5"`)
-    }
-    const settingsConfig = codeBlocks.find((content) => content.includes('"$schema"'))
-    expect(settingsConfig).toBeDefined()
-    const parsedSettings = JSON.parse(settingsConfig!)
+    expect(codeBlocks).toHaveLength(1)
+    const parsedSettings = JSON.parse(codeBlocks[0]!)
     expect(parsedSettings.$schema).toBe('https://json.schemastore.org/claude-code-settings.json')
+    expect(parsedSettings.env.ANTHROPIC_BASE_URL).toBe('https://example.com')
+    expect(parsedSettings.env.ANTHROPIC_AUTH_TOKEN).toBe('sk-grok-claude-test')
     expect(parsedSettings.env.ANTHROPIC_MODEL).toBe('grok-4.5')
+    expect(parsedSettings.modelPicker.options).toEqual([{ model: 'grok-4.5', label: 'grok-4.5' }])
     expect(codeBlocks.join('\n')).not.toContain('CLAUDE_CODE_ATTRIBUTION_HEADER')
     expect(codeBlocks.join('\n')).not.toContain('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC')
     expect(parsedSettings.env).not.toHaveProperty('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC')
@@ -269,40 +258,20 @@ describe('UseKeyModal', () => {
     expect(wrapper.find('nav[aria-label="Client"]').classes()).toContain('min-w-max')
     expect(wrapper.find('nav[aria-label="Client"]').element.parentElement?.classList.contains('overflow-x-auto')).toBe(true)
 
-    const cmdTab = wrapper.findAll('button').find(
-      (button) => button.text().trim() === 'Windows CMD'
+    const windowsTab = wrapper.findAll('button').find(
+      (button) => button.text().trim() === 'Windows'
     )
-    expect(cmdTab).toBeDefined()
-    await cmdTab!.trigger('click')
+    expect(windowsTab).toBeDefined()
+    await windowsTab!.trigger('click')
     await nextTick()
 
     codeBlocks = wrapper.findAll('pre code').map((code) => code.text())
-    expect(codeBlocks.join('\n')).toContain('set ANTHROPIC_MODEL=grok-4.5')
-    expect(codeBlocks.join('\n')).toContain('set ANTHROPIC_DEFAULT_FABLE_MODEL=grok-4.5')
-    expect(codeBlocks.join('\n')).toContain('set CLAUDE_CODE_SUBAGENT_MODEL=grok-4.5')
+    expect(codeBlocks).toHaveLength(1)
     expect(codeBlocks.join('\n')).not.toContain('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC')
     expect(codeBlocks.join('\n')).not.toContain('CLAUDE_CODE_ATTRIBUTION_HEADER')
-    const cmdSettings = JSON.parse(codeBlocks.find((content) => content.includes('"$schema"'))!)
-    expect(cmdSettings.env).not.toHaveProperty('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC')
-    expect(cmdSettings.env).not.toHaveProperty('CLAUDE_CODE_ATTRIBUTION_HEADER')
-
-    const powershellTab = wrapper.findAll('button').find(
-      (button) => button.text().trim() === 'PowerShell'
-    )
-    expect(powershellTab).toBeDefined()
-    await powershellTab!.trigger('click')
-    await nextTick()
-
-    codeBlocks = wrapper.findAll('pre code').map((code) => code.text())
-    expect(codeBlocks.join('\n')).toContain('$env:ANTHROPIC_BASE_URL="https://example.com"')
-    expect(codeBlocks.join('\n')).toContain('$env:ANTHROPIC_MODEL="grok-4.5"')
-    expect(codeBlocks.join('\n')).toContain('$env:ANTHROPIC_DEFAULT_FABLE_MODEL="grok-4.5"')
-    expect(codeBlocks.join('\n')).toContain('$env:CLAUDE_CODE_SUBAGENT_MODEL="grok-4.5"')
-    expect(codeBlocks.join('\n')).not.toContain('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC')
-    expect(codeBlocks.join('\n')).not.toContain('CLAUDE_CODE_ATTRIBUTION_HEADER')
-    const powershellSettings = JSON.parse(codeBlocks.find((content) => content.includes('"$schema"'))!)
-    expect(powershellSettings.env).not.toHaveProperty('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC')
-    expect(powershellSettings.env).not.toHaveProperty('CLAUDE_CODE_ATTRIBUTION_HEADER')
+    const windowsSettings = JSON.parse(codeBlocks[0]!)
+    expect(windowsSettings.env).not.toHaveProperty('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC')
+    expect(windowsSettings.env).not.toHaveProperty('CLAUDE_CODE_ATTRIBUTION_HEADER')
     expect(wrapper.text()).toContain('%USERPROFILE%\\.claude\\settings.json')
 
     const copyButton = wrapper.findAll('button').find((button) =>
@@ -311,7 +280,7 @@ describe('UseKeyModal', () => {
     expect(copyButton).toBeDefined()
     await copyButton!.trigger('click')
     expect(copyToClipboardMock).toHaveBeenCalledWith(
-      expect.stringContaining('ANTHROPIC_AUTH_TOKEN="sk-grok-claude-test"'),
+      expect.stringContaining('"ANTHROPIC_AUTH_TOKEN": "sk-grok-claude-test"'),
       'keys.copied'
     )
   })
@@ -398,8 +367,8 @@ describe('UseKeyModal', () => {
 
     const claudeConfig = wrapper.findAll('pre code')
       .map((code) => code.text())
-      .find((content) => content.startsWith('export ANTHROPIC_BASE_URL'))
-    expect(claudeConfig).toContain('ANTHROPIC_BASE_URL="https://example.com"')
+      .find((content) => content.includes('"$schema"'))
+    expect(JSON.parse(claudeConfig!).env.ANTHROPIC_BASE_URL).toBe('https://example.com')
   })
 
   it('renders API Key Mode authorization in OpenAI Codex config', async () => {
@@ -1086,23 +1055,30 @@ describe('UseKeyModal', () => {
     wrapper.unmount()
   })
 
-  it('requires an explicit Claude Code model before copying manual settings', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [{ id: 'gpt-image-1' }, { id: 'claude-sonnet-example' }] }) }))
+  it('selects all discovered Claude Code models and allows multiple choices', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [{ id: 'gpt-image-1' }, { id: 'claude-sonnet-example' }, { id: 'claude-opus-example' }] }) }))
     const wrapper = mount(UseKeyModal, {
       props: { show: true, client: 'claude', apiKey: 'sk-test', baseUrl: 'https://example.com', platform: 'anthropic' },
       global: { stubs: { BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' }, Icon: { template: '<span />' } } }
     })
     await flushPromises()
-    expect(wrapper.get('#claude-model').findAll('option').map(option => option.attributes('value'))).toEqual(['', 'claude-sonnet-example'])
-    expect((wrapper.get('#claude-model').element as HTMLSelectElement).value).toBe('')
-    expect(wrapper.get('[data-testid="manual-model-required"]').exists()).toBe(true)
-    await wrapper.get('#claude-model').setValue('claude-sonnet-example')
+    const choices = wrapper.get('[data-testid="claude-model-list"]').findAll('input[type="checkbox"]')
+    expect(choices.map(choice => choice.attributes('value'))).toEqual(['claude-sonnet-example', 'claude-opus-example'])
+    expect(choices.every(choice => (choice.element as HTMLInputElement).checked)).toBe(true)
     expect(wrapper.find('[data-testid="manual-model-required"]').exists()).toBe(false)
     const settings = wrapper.findAll('pre code').map(code => code.text()).find(content => content.includes('"$schema"'))!
-    const env = JSON.parse(settings).env
-    for (const name of ['ANTHROPIC_MODEL', 'ANTHROPIC_DEFAULT_OPUS_MODEL', 'ANTHROPIC_DEFAULT_SONNET_MODEL', 'ANTHROPIC_DEFAULT_HAIKU_MODEL', 'ANTHROPIC_DEFAULT_FABLE_MODEL', 'CLAUDE_CODE_SUBAGENT_MODEL', 'ANTHROPIC_CUSTOM_MODEL_OPTION']) {
+    const config = JSON.parse(settings)
+    const env = config.env
+    for (const name of ['ANTHROPIC_MODEL', 'ANTHROPIC_DEFAULT_OPUS_MODEL', 'ANTHROPIC_DEFAULT_SONNET_MODEL', 'ANTHROPIC_DEFAULT_HAIKU_MODEL', 'ANTHROPIC_DEFAULT_FABLE_MODEL', 'CLAUDE_CODE_SUBAGENT_MODEL']) {
       expect(env[name]).toBe('claude-sonnet-example')
     }
+    expect(env).not.toHaveProperty('ANTHROPIC_CUSTOM_MODEL_OPTION')
+    expect(config.modelPicker.options.map((option: { model: string }) => option.model)).toEqual(['claude-sonnet-example', 'claude-opus-example'])
+    expect(wrapper.findAll('pre code')).toHaveLength(1)
+    await choices[0]!.setValue(false)
+    expect(JSON.parse(wrapper.get('pre code').text()).modelPicker.options.map((option: { model: string }) => option.model)).toEqual(['claude-opus-example'])
+    await choices[1]!.setValue(false)
+    expect(wrapper.get('[data-testid="manual-model-required"]').exists()).toBe(true)
     wrapper.unmount()
   })
 
@@ -1115,6 +1091,21 @@ describe('UseKeyModal', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('keys.quickImport.modelNoChatAvailable')
     expect(wrapper.get('#claude-model').attributes('disabled')).toBeDefined()
+    wrapper.unmount()
+  })
+
+  it('accepts multiple manual Claude models when discovery is unavailable', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+    const wrapper = mount(UseKeyModal, {
+      props: { show: true, client: 'claude', apiKey: 'sk-test', baseUrl: 'https://example.com', platform: 'anthropic' },
+      global: { stubs: { BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' }, Icon: { template: '<span />' } } }
+    })
+    await flushPromises()
+    await wrapper.get('#claude-model').setValue('claude-sonnet-example\nclaude-opus-example')
+    expect(wrapper.find('[data-testid="manual-model-required"]').exists()).toBe(false)
+    const config = JSON.parse(wrapper.get('pre code').text())
+    expect(config.modelPicker.options.map((option: { model: string }) => option.model)).toEqual(['claude-sonnet-example', 'claude-opus-example'])
+    expect(wrapper.findAll('pre code')).toHaveLength(1)
     wrapper.unmount()
   })
 

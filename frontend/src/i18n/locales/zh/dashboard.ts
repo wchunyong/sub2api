@@ -170,7 +170,12 @@ export default {
       copyImport: '复制导入命令',
       copyClean: '复制清理命令',
       ccsHint: '通过 CC Switch 管理配置',
+      ccsDirectHint: '点击 Claude Code 或 Codex 直接打开 CC Switch；OpenCode 和 Pi 请先选择一个模型。',
+      ccsSelectOneModel: '{agent} 请选择一个模型',
+      ccsOpenFailed: '无法打开 CC Switch，请确认已安装并允许浏览器打开应用。',
       manualHint: '查看密钥与配置说明',
+      allModels: '一键脚本自动导入全部兼容模型',
+      allModelsHint: '从当前密钥分组读取全部兼容对话模型；首个模型作为启动默认值，CC Switch 使用该默认值。',
       chooseModel: '请选择模型',
       modelPlaceholder: '填写当前密钥可用的完整模型 ID',
       modelLoading: '正在读取这把密钥可用的模型…',
@@ -216,16 +221,16 @@ export default {
     useKey: '使用密钥',
     useKeyModal: {
       title: '使用 API 密钥',
-      claudeModelLabel: 'Claude Code 模型 ID',
-      claudeModelPlaceholder: '从当前密钥可用模型中填写完整 ID',
-      claudeModelHint: '列表来自当前密钥的 /v1/models；确认所选模型支持 Claude Code 的 Messages 接口。',
-      claudeModelFallback: '无法读取模型列表时，请从主站模型页复制当前密钥可用的完整模型 ID。不要保留占位符。',
-      selectModelBeforeCopy: '请先选择或输入这把 Key 可用的模型 ID，然后复制配置。',
-      description: '将以下环境变量添加到您的终端配置文件或直接在终端中运行。',
+      claudeModelLabel: 'Claude Code 模型（可多选）',
+      claudeModelPlaceholder: '每行填写一个当前密钥可用的完整模型 ID',
+      claudeModelHint: '列表来自当前密钥的 /v1/models；可多选支持 Claude Code Messages 接口的模型。第一个选中项作为启动默认模型。',
+      claudeModelFallback: '无法读取模型列表时，请每行填写一个当前密钥可用的完整模型 ID。',
+      selectModelBeforeCopy: '请先选择或输入至少一个这把 Key 可用的模型 ID，然后复制配置。',
+      description: '将以下内容写入 Claude Code 的用户配置文件，保存后重启 Claude Code。',
       copy: '复制',
       copied: '已复制',
       note: '这些环境变量将在当前终端会话中生效。如需永久配置，请将其添加到 ~/.bashrc、~/.zshrc 或相应的配置文件中。',
-      claudeSettingsHint: '用户级持久配置。此文件包含 API 密钥，请勿提交到项目仓库。',
+      claudeSettingsHint: '用户级持久配置；如文件已存在，请先备份并合并字段。此文件包含 API 密钥，请勿提交到项目仓库。',
       noGroupTitle: '请先分配分组',
       noGroupDescription:
         '此 API 密钥尚未分配分组，请先在密钥列表中点击分组列进行分配，然后才能查看使用配置。',
@@ -284,7 +289,7 @@ export default {
         noteWindows:
           '设置 GROK_MODELS_BASE_URL 与 XAI_API_KEY，将完整 config.toml 保存为 %USERPROFILE%\\.grok\\config.toml，运行 grok inspect，再用 /model 选择 grok-4.5（编程场景可用 grok-build-0.1）。',
         claudeNote:
-          '二选一：终端环境变量仅当前会话；~/.claude/settings.json 可持久化。请勿把含 API Key 的文件提交到仓库。',
+          '将配置保存到用户级 ~/.claude/settings.json；Windows 请保存到 %USERPROFILE%\\.claude\\settings.json。请勿把含 API Key 的文件提交到仓库。',
         codexNote:
           '导出 SUB2API_API_KEY，将 config.toml 保存到 ~/.codex（可用 mkdir -p ~/.codex）。优先 env_key，勿提交密钥。',
         codexNoteWindows:

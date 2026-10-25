@@ -30,7 +30,11 @@ describe('QuickImportModal', () => {
     const wrapper = render({ platform })
     await wrapper.get(`[data-testid="agent-${agent}"]`).trigger('click')
     await flushPromises()
-    await wrapper.get('#quick-import-model').setValue('gpt-5.5')
+    expect(wrapper.find('#quick-import-model').exists()).toBe(false)
+    if (agent === 'opencode') {
+      expect(wrapper.get('[data-testid="ccs"]').attributes('disabled')).toBeDefined()
+      await wrapper.get('[data-testid="ccs-action-model-select"]').setValue('gpt-5.5')
+    }
     expect(wrapper.get('[data-testid="ccs"]').attributes('disabled')).toBeUndefined()
     expect(wrapper.findAll('.qi-choice')).toHaveLength(3)
     const assign = vi.fn()
@@ -55,6 +59,47 @@ describe('QuickImportModal', () => {
     expect(wrapper.get('[data-testid="ccs"]').attributes('disabled')).toBeDefined()
     wrapper.unmount()
   })
+  it('opens CCS directly from the Claude and Codex cards without a second step', async () => {
+    const assign = vi.fn()
+    vi.stubGlobal('window', Object.create(window, { location: { value: { assign, origin: 'https://example.com' } } }))
+    try {
+      for (const [agent, platform] of [['claude', 'anthropic'], ['codex', 'openai']] as const) {
+        const wrapper = render({ ccsOnly: true, platform })
+        await flushPromises()
+        expect(wrapper.find('[data-testid="agent-workbuddy"]').exists()).toBe(false)
+        expect(wrapper.find('[data-testid="agent-deepseek-harness"]').exists()).toBe(false)
+        await wrapper.get(`[data-testid="agent-${agent}"]`).trigger('click')
+        expect(wrapper.find('[data-testid="auto"]').exists()).toBe(false)
+        expect(wrapper.find('[data-testid="manual"]').exists()).toBe(false)
+        const params = new URL(assign.mock.lastCall?.[0]).searchParams
+        expect(params.get('app')).toBe(agent)
+        expect(params.get('model')).toBe('gpt-5.5')
+        expect(params.get('config')).not.toBeNull()
+        wrapper.unmount()
+      }
+    } finally { vi.unstubAllGlobals() }
+  })
+  it('selects one OpenCode or Pi model inline before CCS import', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [{ id: 'first-chat' }, { id: 'second-chat' }] }) }))
+    const assign = vi.fn()
+    vi.stubGlobal('window', Object.create(window, { location: { value: { assign, origin: 'https://example.com' } } }))
+    try {
+      for (const agent of ['opencode', 'pi'] as const) {
+        const wrapper = render({ ccsOnly: true, platform: 'deepseek' })
+        await flushPromises()
+        await wrapper.get(`[data-testid="agent-${agent}"]`).trigger('click')
+        expect(wrapper.find('[data-testid="auto"]').exists()).toBe(false)
+        expect(assign).not.toHaveBeenCalled()
+        await wrapper.get('[data-testid="ccs-model-select"]').setValue('second-chat')
+        await wrapper.get('[data-testid="ccs-inline-submit"]').trigger('click')
+        const params = new URL(assign.mock.lastCall?.[0]).searchParams
+        expect(params.get('app')).toBe(agent)
+        expect(params.get('model')).toBe('second-chat')
+        wrapper.unmount()
+        assign.mockClear()
+      }
+    } finally { vi.unstubAllGlobals() }
+  })
   it('only offers Codex manifest models, not generic-only models', async () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string) => ({
       ok: true,
@@ -65,33 +110,33 @@ describe('QuickImportModal', () => {
     const wrapper = render()
     await wrapper.get('[data-testid="agent-codex"]').trigger('click')
     await flushPromises()
-    expect(wrapper.get('#quick-import-model').findAll('option').map(option => option.attributes('value'))).toEqual(['', 'gpt-codex-supported'])
-    expect((wrapper.get('#quick-import-model').element as HTMLSelectElement).value).toBe('')
-    expect(wrapper.get('[data-testid="auto"]').attributes('disabled')).toBeDefined()
-    await wrapper.get('#quick-import-model').setValue('gpt-codex-supported')
+    expect(wrapper.find('#quick-import-model').exists()).toBe(false)
     expect(wrapper.get('[data-testid="auto"]').attributes('disabled')).toBeUndefined()
+    createTicket.mockResolvedValueOnce({ ticket: 'c'.repeat(64), agent: 'codex', expires_in: 300 })
+    await wrapper.get('[data-testid="auto"]').trigger('click')
+    expect(createTicket).toHaveBeenCalledWith(1, 'codex', 'gpt-codex-supported', expect.any(AbortSignal))
     wrapper.unmount()
   })
-  it('does not silently choose a media model or the first listed model', async () => {
+  it('uses the first chat model as the default without requiring a selection', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [{ id: 'gpt-image-1' }, { id: 'deepseek-chat' }] }) }))
     const wrapper = render({ platform: 'deepseek' })
     await wrapper.get('[data-testid="agent-workbuddy"]').trigger('click')
     await flushPromises()
-    expect(wrapper.get('#quick-import-model').findAll('option').map(option => option.attributes('value'))).toEqual(['', 'deepseek-chat'])
-    expect((wrapper.get('#quick-import-model').element as HTMLSelectElement).value).toBe('')
-    expect(wrapper.get('[data-testid="auto"]').attributes('disabled')).toBeDefined()
-    await wrapper.get('#quick-import-model').setValue('deepseek-chat')
+    expect(wrapper.find('#quick-import-model').exists()).toBe(false)
     expect(wrapper.get('[data-testid="auto"]').attributes('disabled')).toBeUndefined()
+    createTicket.mockResolvedValueOnce({ ticket: 'd'.repeat(64), agent: 'workbuddy', expires_in: 300 })
+    await wrapper.get('[data-testid="auto"]').trigger('click')
+    expect(createTicket).toHaveBeenCalledWith(1, 'workbuddy', 'deepseek-chat', expect.any(AbortSignal))
     wrapper.unmount()
   })
-  it('rejects a clearly media-only model entered when discovery fails', async () => {
+  it('does not issue a ticket when model discovery fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
     const wrapper = render({ platform: 'deepseek' })
     await wrapper.get('[data-testid="agent-workbuddy"]').trigger('click')
     await flushPromises()
-    await wrapper.get('#quick-import-model').setValue('gpt-image-1')
+    expect(wrapper.find('#quick-import-model').exists()).toBe(false)
     expect(wrapper.get('[data-testid="auto"]').attributes('disabled')).toBeDefined()
-    expect(wrapper.text()).toContain('keys.quickImport.modelNotChat')
+    expect(wrapper.text()).toContain('keys.quickImport.modelUnavailable')
     wrapper.unmount()
   })
   it('explains when a key has no chat models', async () => {
@@ -100,7 +145,7 @@ describe('QuickImportModal', () => {
     await wrapper.get('[data-testid="agent-workbuddy"]').trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain('keys.quickImport.modelNoChatAvailable')
-    expect(wrapper.get('#quick-import-model').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="auto"]').attributes('disabled')).toBeDefined()
     wrapper.unmount()
   })
   it('does not offer Codex for groups without a Codex model catalog', () => {
@@ -114,7 +159,6 @@ describe('QuickImportModal', () => {
     const wrapper = render()
     await wrapper.get('[data-testid="agent-codex"]').trigger('click')
     await flushPromises()
-    await wrapper.get('#quick-import-model').setValue('gpt-5.5')
     await wrapper.get('[data-testid="auto"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('[role="alert"]').exists()).toBe(true)
@@ -132,10 +176,9 @@ describe('QuickImportModal', () => {
     createTicket.mockResolvedValueOnce({ ticket: 'a'.repeat(64), agent: 'codex', expires_in: 300 })
     await wrapper.get('[data-testid="agent-codex"]').trigger('click')
     await flushPromises()
-    await wrapper.get('#quick-import-model').setValue('gpt-5.5')
     await wrapper.get('[data-testid="auto"]').trigger('click')
     await flushPromises()
-    expect(wrapper.find('select').exists()).toBe(true)
+    expect(wrapper.find('select').exists()).toBe(false)
     expect(wrapper.find('input').exists()).toBe(false)
     expect(createTicket).toHaveBeenCalledWith(1, 'codex', 'gpt-5.5', expect.any(AbortSignal))
     expect(copy.mock.lastCall?.[0]).toContain('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
@@ -173,7 +216,6 @@ describe('QuickImportModal', () => {
     const wrapper = render()
     await wrapper.get('[data-testid="agent-opencode"]').trigger('click')
     await flushPromises()
-    await wrapper.get('#quick-import-model').setValue('gpt-5.5')
     await wrapper.get('[data-testid="auto"]').trigger('click')
     await wrapper.setProps({ keyId: 2 })
     resolve({ ticket: 'a'.repeat(64), agent: 'opencode', model: 'mock', expires_in: 300 })

@@ -596,11 +596,8 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 		add([]string{"provider", provider}, map[string]any{"npm": npm, "name": "lianjieai", "options": map[string]any{"baseURL": base, "apiKey": p.APIKey}, "models": models})
 		add([]string{"model"}, provider+"/"+p.Model)
 	case "workbuddy":
-		entries := make([]any, 0, 1)
+		entries := make([]any, 0, len(normalized))
 		for _, m := range normalized {
-			if m.ID != p.Model {
-				continue
-			}
 			// WorkBuddy must use the full endpoint as-is, without adding a second /chat/completions.
 			name := m.Name
 			if !strings.HasPrefix(name, "连接AI · ") {
@@ -610,11 +607,8 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 		}
 		add([]string{"entries"}, entries)
 	case "pi":
-		entries := make([]any, 0, 1)
+		entries := make([]any, 0, len(normalized))
 		for _, m := range normalized {
-			if m.ID != p.Model {
-				continue
-			}
 			entries = append(entries, map[string]any{"id": m.ID, "name": m.Name})
 		}
 		add([]string{"$schema"}, "https://pi.dev/schemas/models.schema.json")
@@ -823,19 +817,28 @@ func Install(root string, p Payload) error {
 		if !ok {
 			return errors.New("invalid DeepSeek Harness profile")
 		}
-		modelName := p.Model
-		for _, m := range p.Models {
-			if m.ID == p.Model {
-				modelName = m.Name
-				break
+		models := p.Models
+		if models == nil {
+			models = []Model{{ID: p.Model, Name: p.Model}}
+		}
+		modelEntries := make([]any, 0, len(models))
+		seen := make(map[string]bool, len(models))
+		for _, m := range models {
+			if strings.TrimSpace(m.ID) == "" || len([]rune(m.ID)) > 200 || strings.IndexFunc(m.ID, func(r rune) bool { return r < 32 }) >= 0 || seen[m.ID] || quickimport.IsClearlyNonChatModel(m.ID) {
+				continue
 			}
+			seen[m.ID] = true
+			if strings.TrimSpace(m.Name) == "" {
+				m.Name = m.ID
+			}
+			modelEntries = append(modelEntries, map[string]any{"id": m.ID, "name": m.Name})
 		}
 		route := map[string]any{
 			"displayName": "lianjieai",
 			"api":         "openai-completions",
 			"baseURL":     strings.TrimRight(p.BaseURL, "/"),
 			"headers":     map[string]any{"Authorization": "Bearer " + p.APIKey},
-			"models":      []any{map[string]any{"id": p.Model, "name": modelName}},
+			"models":      modelEntries,
 		}
 		if p.Platform == "deepseek" {
 			route["compat"] = map[string]any{

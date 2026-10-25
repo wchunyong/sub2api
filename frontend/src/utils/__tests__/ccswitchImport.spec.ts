@@ -54,6 +54,37 @@ describe('ccswitchImport utils', () => {
     }
   })
 
+  it('enables gateway model discovery for a Claude provider imported through CCS', () => {
+    const params = paramsFromDeeplink(buildCcSwitchImportDeeplink({
+      ...baseInput, platform: 'deepseek', clientType: 'claude', agent: 'claude',
+      model: 'first-chat', models: ['first-chat', 'second-chat']
+    }))
+    expect(params.get('app')).toBe('claude')
+    expect(JSON.parse(atob(params.get('config') || '')).env.CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY).toBe('1')
+    expect(params.get('model')).toBe('first-chat')
+  })
+
+  it('gives Codex a remote catalog for every compatible model', () => {
+    const params = paramsFromDeeplink(buildCcSwitchImportDeeplink({
+      ...baseInput, platform: 'openai', clientType: 'claude', agent: 'codex',
+      model: 'first-codex', models: ['first-codex', 'second-codex']
+    }))
+    expect(params.get('app')).toBe('codex')
+    expect(params.get('configFormat')).toBe('toml')
+    expect(atob(params.get('config') || '')).toContain('model_catalog_url = "https://api.example.com/v1/models?client_version=0.158.0"')
+    expect(params.get('model')).toBe('first-codex')
+  })
+
+  it('routes Pi to its own CCS app with the selected model', () => {
+    const params = paramsFromDeeplink(buildCcSwitchImportDeeplink({
+      ...baseInput, platform: 'deepseek', clientType: 'claude', agent: 'pi', model: 'chosen-chat'
+    }))
+    expect(params.get('app')).toBe('pi')
+    expect(params.get('endpoint')).toBe('https://api.example.com/v1')
+    expect(params.get('apiFormat')).toBe('openai_chat')
+    expect(params.get('model')).toBe('chosen-chat')
+  })
+
   it.each([
     { agent: 'claude', platform: 'deepseek', format: 'anthropic' },
     { agent: 'codex', platform: 'openai', format: 'openai_responses' },

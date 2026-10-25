@@ -314,7 +314,7 @@ describe('user KeysView column settings', () => {
     isCurrentStep.mockReturnValue(false)
   })
 
-  it('opens the key-specific agent and model picker from the CCS row action', async () => {
+  it('opens the key-specific direct CCS picker from the CCS row action', async () => {
     const key = { ...createApiKey(), group: { id: 7, name: 'DeepSeek', platform: 'deepseek' } }
     listKeys.mockResolvedValueOnce({ items: [key], total: 1, page: 1, page_size: 20, pages: 1 })
     const wrapper = await mountView()
@@ -322,6 +322,7 @@ describe('user KeysView column settings', () => {
     const picker = wrapper.findComponent({ name: 'QuickImportModal' })
     expect(picker.props('show')).toBe(true)
     expect(picker.props('keyId')).toBe(key.id)
+    expect(picker.props('ccsOnly')).toBe(true)
     wrapper.unmount()
   })
 

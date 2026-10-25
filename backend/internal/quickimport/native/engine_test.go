@@ -745,6 +745,34 @@ func TestWorkBuddyFreshImportWritesDesktopArrayAndCleanRemovesIt(t *testing.T) {
 	}
 }
 
+func TestImportWritesEveryChatModelForMultiModelClients(t *testing.T) {
+	for _, agent := range []string{"workbuddy", "pi", "deepseek-harness"} {
+		t.Run(agent, func(t *testing.T) {
+			root := t.TempDir()
+			p := Payload{Version: 1, Agent: agent, APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "first-chat", Models: []Model{
+				{ID: "first-chat", Name: "First Chat"},
+				{ID: "second-chat", Name: "Second Chat"},
+				{ID: "gpt-image-1", Name: "Image Only"},
+			}}
+			if err := Install(root, p); err != nil {
+				t.Fatal(err)
+			}
+			content, err := os.ReadFile(filepath.Join(root, paths[agent]))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, id := range []string{"first-chat", "second-chat"} {
+				if !strings.Contains(string(content), id) {
+					t.Errorf("%s missing from %s import: %s", id, agent, content)
+				}
+			}
+			if strings.Contains(string(content), "gpt-image-1") {
+				t.Errorf("media model entered %s coding assistant: %s", agent, content)
+			}
+		})
+	}
+}
+
 func TestDeepSeekHarnessMergesExistingPiAIProvider(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, paths["deepseek-harness"])
@@ -755,12 +783,12 @@ func TestDeepSeekHarnessMergesExistingPiAIProvider(t *testing.T) {
 	if err := os.WriteFile(path, []byte(before), 0600); err != nil {
 		t.Fatal(err)
 	}
-	p := Payload{Version: 1, Agent: "deepseek-harness", Platform: "deepseek", APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "test-model", Models: []Model{{ID: "test-model", Name: "Test Model"}, {ID: "image-only", Name: "Image"}}}
+	p := Payload{Version: 1, Agent: "deepseek-harness", Platform: "deepseek", APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "test-model", Models: []Model{{ID: "test-model", Name: "Test Model"}, {ID: "gpt-image-1", Name: "Image"}}}
 	if err := Install(root, p); err != nil {
 		t.Fatal(err)
 	}
 	content, err := os.ReadFile(path)
-	if err != nil || !strings.Contains(string(content), "other-model") || !strings.Contains(string(content), "test-model") || strings.Contains(string(content), "image-only") || !strings.Contains(string(content), "test-secret") || !strings.Contains(string(content), "supportsDeveloperRole: false") || !strings.Contains(string(content), "maxTokensField: max_tokens") {
+	if err != nil || !strings.Contains(string(content), "other-model") || !strings.Contains(string(content), "test-model") || strings.Contains(string(content), "gpt-image-1") || !strings.Contains(string(content), "test-secret") || !strings.Contains(string(content), "supportsDeveloperRole: false") || !strings.Contains(string(content), "maxTokensField: max_tokens") {
 		t.Fatalf("existing provider was not preserved: %s %v", content, err)
 	}
 	if err := Clean(root, "deepseek-harness"); err != nil {

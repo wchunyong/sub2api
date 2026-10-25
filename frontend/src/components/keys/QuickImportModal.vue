@@ -1,28 +1,35 @@
 <template>
-  <BaseDialog :show="show" :title="t('keys.quickImport.title')" :width="step === 'manual' ? 'wide' : 'quick-import'" @close="emit('close')">
-    <template #title>{{ t('keys.quickImport.title') }}<span class="qi-step">{{ agent ? '02' : '01' }} / {{ t(agent ? 'keys.quickImport.chooseAction' : 'keys.quickImport.selectAgent') }}</span></template>
+  <BaseDialog :show="show" :title="t(ccsOnly ? 'keys.importToCcSwitch' : 'keys.quickImport.title')" :width="step === 'manual' ? 'wide' : 'quick-import'" @close="emit('close')">
+    <template #title>{{ t(ccsOnly ? 'keys.importToCcSwitch' : 'keys.quickImport.title') }}<span class="qi-step">{{ !ccsOnly && agent ? '02' : '01' }} / {{ t(!ccsOnly && agent ? 'keys.quickImport.chooseAction' : 'keys.quickImport.selectAgent') }}</span></template>
     <div class="qi-body">
       <div class="qi-key"><span class="qi-dot" />{{ keyName }} · {{ apiKey ? `${apiKey.slice(0, 6)}…${apiKey.slice(-4)}` : '' }}</div>
       <template v-if="!agent">
         <p class="qi-label">{{ t('keys.quickImport.selectAgent') }}</p>
         <div class="qi-agents">
-          <button v-for="item in importAgents" :key="item.id" :data-testid="`agent-${item.id}`" class="qi-agent" :disabled="!agentSupported(item.id)" @click="agent = item.id">
-            <span class="qi-logo" :class="{ 'qi-chatgpt': item.id === 'codex' }"><img v-if="agentIcons[item.id]" :src="agentIcons[item.id]" alt="" /><Icon v-else name="terminal" /></span>{{ item.name }}
+          <button v-for="item in visibleAgents" :key="item.id" :data-testid="`agent-${item.id}`" class="qi-agent" :disabled="!agentSupported(item.id) || (ccsOnly && (!active || ccsModelsLoading || !ccsModelsFor(item.id).length))" @click="selectAgent(item.id)">
+            <span class="qi-logo" :class="{ 'qi-chatgpt': item.id === 'codex', 'qi-pi': item.id === 'pi' }"><img v-if="agentIcons[item.id]" :src="agentIcons[item.id]" alt="" /><Icon v-else name="terminal" /></span>{{ item.name }}
           </button>
         </div>
-        <p class="qi-status">{{ t(availableAgents.length ? 'keys.quickImport.supportedOnly' : 'keys.quickImport.unsupported') }}</p>
+        <template v-if="ccsOnly">
+          <div v-if="ccsInlineAgent" class="qi-ccs-inline" data-testid="ccs-inline-model">
+            <label for="ccs-model-select">{{ t('keys.quickImport.ccsSelectOneModel', { agent: ccsInlineAgent === 'pi' ? 'Pi' : 'OpenCode' }) }}</label>
+            <select id="ccs-model-select" v-model="selectedCcsModel" data-testid="ccs-model-select" class="input">
+              <option v-for="model in ccsModelsFor(ccsInlineAgent)" :key="model" :value="model">{{ model }}</option>
+            </select>
+            <button type="button" data-testid="ccs-inline-submit" class="btn btn-primary" :disabled="!selectedCcsModel" @click="openCcsFor(ccsInlineAgent)">{{ t('keys.importToCcSwitch') }}</button>
+          </div>
+          <p class="qi-status">{{ t(ccsModelsLoading ? 'keys.quickImport.modelLoading' : ccsOpened ? 'keys.quickImport.ccsOpened' : availableAgents.length ? 'keys.quickImport.ccsDirectHint' : 'keys.quickImport.unsupported') }}</p>
+          <a v-if="ccsOpened" href="https://github.com/farion1231/cc-switch/releases" target="_blank" rel="noopener noreferrer" class="qi-status">{{ t('keys.quickImport.installCcs') }}</a>
+          <p v-if="ccsError" role="alert" class="qi-status text-red-600">{{ ccsError }}</p>
+        </template>
+        <p v-else class="qi-status">{{ t(availableAgents.length ? 'keys.quickImport.supportedOnly' : 'keys.quickImport.unsupported') }}</p>
       </template>
       <template v-else>
-        <div class="qi-selected"><span class="qi-logo" :class="{ 'qi-chatgpt': agent === 'codex' }"><img v-if="agentIcons[agent]" :src="agentIcons[agent]" alt="" /><Icon v-else name="terminal" /></span><strong>{{ agentName }}</strong><button class="qi-back" @click="back">← {{ t('keys.quickImport.back') }}</button></div>
+        <div class="qi-selected"><span class="qi-logo" :class="{ 'qi-chatgpt': agent === 'codex', 'qi-pi': agent === 'pi' }"><img v-if="agentIcons[agent]" :src="agentIcons[agent]" alt="" /><Icon v-else name="terminal" /></span><strong>{{ agentName }}</strong><button class="qi-back" @click="back">← {{ t('keys.quickImport.back') }}</button></div>
         <template v-if="step === 'actions'">
-          <div class="qi-model">
-            <label for="quick-import-model">{{ t('keys.quickImport.model') }}</label>
-            <select v-if="modelChoices.length" id="quick-import-model" v-model="selectedModel" class="input">
-              <option value="">{{ t('keys.quickImport.chooseModel') }}</option>
-              <option v-for="model in modelChoices" :key="model" :value="model">{{ model }}</option>
-            </select>
-            <input v-else id="quick-import-model" v-model.trim="selectedModel" class="input" :disabled="modelListOnlyNonChat" :placeholder="t('keys.quickImport.modelPlaceholder')" />
-            <small>{{ t(modelListOnlyNonChat ? 'keys.quickImport.modelNoChatAvailable' : modelIsNonChat ? 'keys.quickImport.modelNotChat' : modelLoading ? 'keys.quickImport.modelLoading' : modelChoices.length ? 'keys.quickImport.modelFromKey' : 'keys.quickImport.modelUnavailable') }}</small>
+          <div class="qi-model" data-testid="model-summary">
+            <strong>{{ t('keys.quickImport.allModels') }}</strong>
+            <small>{{ t(modelListOnlyNonChat ? 'keys.quickImport.modelNoChatAvailable' : modelLoading ? 'keys.quickImport.modelLoading' : modelChoices.length ? 'keys.quickImport.allModelsHint' : 'keys.quickImport.modelUnavailable') }}</small>
           </div>
           <div class="qi-actions">
             <div class="qi-choice qi-choice-main"><span class="qi-corner"><span>{{ t('keys.quickImport.recommended') }}</span></span><button class="qi-help" :aria-expanded="help === 'import'" @click="help = help === 'import' ? '' : 'import'">{{ t('keys.quickImport.operationHelp') }} ⓘ</button>
@@ -30,7 +37,8 @@
               <button data-testid="clean" class="qi-clean" :disabled="!automaticAgent(agent)" @click="clean"><Icon name="refresh" size="xs" />{{ t(copied === 'clean' ? 'keys.useKeyModal.copied' : 'keys.quickImport.copyClean') }}</button>
             </div>
             <div v-if="!hideCcs && supportsCcs(agent, platform)" class="qi-choice"><button class="qi-help" :aria-expanded="help === 'ccs'" @click="help = help === 'ccs' ? '' : 'ccs'">{{ t('keys.quickImport.operationHelp') }} ⓘ</button>
-              <button data-testid="ccs" class="qi-action" :disabled="!compatible || !validModel || !supportsCcs(agent, platform)" @click="openCcs"><Icon name="externalLink" size="lg" /><strong>{{ t('keys.importToCcSwitch') }}</strong><small>{{ t(supportsCcs(agent, platform) ? 'keys.quickImport.ccsHint' : 'keys.quickImport.ccsUnavailable') }}</small></button>
+              <select v-if="agent === 'opencode' || agent === 'pi'" v-model="selectedCcsModel" data-testid="ccs-action-model-select" class="input qi-ccs-action-select" :aria-label="t('keys.quickImport.ccsSelectOneModel', { agent: agentName })"><option value="">{{ t('keys.quickImport.chooseModel') }}</option><option v-for="model in modelChoices" :key="model" :value="model">{{ model }}</option></select>
+              <button data-testid="ccs" class="qi-action" :disabled="!compatible || !validModel || ((agent === 'opencode' || agent === 'pi') && !selectedCcsModel) || !supportsCcs(agent, platform)" @click="openCcs"><Icon name="externalLink" size="lg" /><strong>{{ t('keys.importToCcSwitch') }}</strong><small>{{ t(supportsCcs(agent, platform) ? 'keys.quickImport.ccsHint' : 'keys.quickImport.ccsUnavailable') }}</small></button>
             </div>
             <div class="qi-choice"><button class="qi-help" :aria-expanded="help === 'manual'" @click="help = help === 'manual' ? '' : 'manual'">{{ t('keys.quickImport.operationHelp') }} ⓘ</button><button data-testid="manual" class="qi-action" :disabled="!compatible" @click="openManual"><Icon name="cog" size="lg" /><strong>{{ t('keys.quickImport.manual') }}</strong><small>{{ t('keys.quickImport.manualHint') }}</small></button></div>
           </div>
@@ -55,6 +63,9 @@ import Icon from '@/components/icons/Icon.vue'
 import claudeIcon from '@/assets/agents/claude.ico'
 import chatgptIcon from '@/assets/agents/chatgpt.png'
 import opencodeIcon from '@/assets/agents/opencode.png'
+import deepseekHarnessIcon from '@/assets/agents/deepseek-harness.svg'
+import workbuddyIcon from '@/assets/agents/workbuddy.svg'
+import piIcon from '@/assets/agents/pi.svg'
 import UseKeyModal from './UseKeyModal.vue'
 import type { GroupPlatform } from '@/types'
 import { importAgents, isClearlyNonChatModel, supportsAgent, supportsCcs, type ImportAgent } from '@/utils/quickImport'
@@ -65,7 +76,7 @@ import { buildCodexModelsManifestUrl } from '@/api/codex'
 import { parseCodexCatalogModels } from '@/utils/codexCatalogConfig'
 import { sanitizeUrl } from '@/utils/url'
 import { useClipboard } from '@/composables/useClipboard'
-const props = withDefaults(defineProps<{ show: boolean; keyId: number; keyName?: string; apiKey: string; baseUrl: string; docUrl?: string; platform: GroupPlatform | null; allowMessagesDispatch?: boolean; hideCcs?: boolean; active?: boolean; claudeCodeOnly?: boolean }>(), { active: true })
+const props = withDefaults(defineProps<{ show: boolean; keyId: number; keyName?: string; apiKey: string; baseUrl: string; docUrl?: string; platform: GroupPlatform | null; allowMessagesDispatch?: boolean; hideCcs?: boolean; active?: boolean; claudeCodeOnly?: boolean; ccsOnly?: boolean }>(), { active: true, ccsOnly: false })
 const emit = defineEmits<{ (e: 'close'): void }>()
 const { t } = useI18n()
 const { copyToClipboard } = useClipboard()
@@ -81,42 +92,76 @@ const loading = ref(false)
 const copied = ref<'import' | 'clean' | ''>('')
 const modelChoices = ref<string[]>([])
 const modelListOnlyNonChat = ref(false)
-const selectedModel = ref('')
+const selectedModel = computed(() => modelChoices.value[0] || '')
 const modelLoading = ref(false)
-const modelIsNonChat = computed(() => isClearlyNonChatModel(selectedModel.value))
-const validModel = computed(() => !modelLoading.value && !modelListOnlyNonChat.value && /^[A-Za-z0-9_.:/-]+$/.test(selectedModel.value) && !modelIsNonChat.value)
+const validModel = computed(() => !modelLoading.value && !modelListOnlyNonChat.value && !!selectedModel.value)
+const ccsChatModels = ref<string[]>([])
+const ccsCodexModels = ref<string[]>([])
+const ccsModelsLoading = ref(false)
+const ccsInlineAgent = ref<'opencode' | 'pi' | null>(null)
+const selectedCcsModel = ref('')
+const ccsError = ref('')
+let ccsModelsController: AbortController | undefined
+function ccsModelsFor(id: ImportAgent): string[] { return id === 'codex' ? ccsCodexModels.value : ccsChatModels.value }
+async function fetchModelChoices(codex: boolean, signal: AbortSignal): Promise<{ choices: string[]; onlyNonChat: boolean }> {
+  const root = (props.baseUrl || window.location.origin).replace(/\/v1\/?$/, '').replace(/\/+$/, '')
+  const response = await fetch(codex ? buildCodexModelsManifestUrl(root) : `${root}/v1/models`, { headers: { Authorization: `Bearer ${props.apiKey}`, Accept: 'application/json' }, cache: 'no-store', signal })
+  if (!response.ok) throw new Error('Model discovery failed')
+  const body: unknown = await response.json()
+  const names = codex
+    ? parseCodexCatalogModels(JSON.stringify(body)).map(item => item.slug)
+    : typeof body === 'object' && body !== null && 'data' in body && Array.isArray(body.data)
+      ? body.data.map((item: { id?: string }) => item?.id)
+      : []
+  const validNames = names.filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9_.:/-]+$/.test(id))
+  const choices = [...new Set(validNames.filter(id => !isClearlyNonChatModel(id)))]
+  return { choices, onlyNonChat: validNames.length > 0 && choices.length === 0 }
+}
 let modelController: AbortController | undefined
-watch([agent, () => props.show, () => props.apiKey, () => props.baseUrl], async () => {
+watch([agent, () => props.show, () => props.apiKey, () => props.baseUrl, () => props.ccsOnly], async () => {
   modelController?.abort()
+  selectedCcsModel.value = ''
   modelChoices.value = []
   modelListOnlyNonChat.value = false
-  selectedModel.value = ''
   modelLoading.value = false
-  if (!agent.value || !props.show || !props.apiKey) return
+  if (!agent.value || !props.show || !props.apiKey || props.ccsOnly) return
   const controller = new AbortController()
   modelController = controller
   modelLoading.value = true
   try {
-    const root = (props.baseUrl || window.location.origin).replace(/\/v1\/?$/, '').replace(/\/+$/, '')
-    const codex = agent.value === 'codex'
-    const response = await fetch(codex ? buildCodexModelsManifestUrl(root) : `${root}/v1/models`, { headers: { Authorization: `Bearer ${props.apiKey}`, Accept: 'application/json' }, cache: 'no-store', signal: controller.signal })
-    if (!response.ok) return
-    const body: unknown = await response.json()
+    const result = await fetchModelChoices(agent.value === 'codex', controller.signal)
     if (controller.signal.aborted) return
-    const names = codex
-      ? parseCodexCatalogModels(JSON.stringify(body)).map(item => item.slug)
-      : typeof body === 'object' && body !== null && 'data' in body && Array.isArray(body.data)
-        ? body.data.map((item: { id?: string }) => item?.id)
-        : []
-    const validNames = names.filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9_.:/-]+$/.test(id))
-    modelChoices.value = [...new Set(validNames.filter(id => !isClearlyNonChatModel(id)))]
-    modelListOnlyNonChat.value = validNames.length > 0 && modelChoices.value.length === 0
-    if (modelChoices.value.length) selectedModel.value = ''
-  } catch { /* Manual model entry remains available. */ }
+    modelChoices.value = result.choices
+    modelListOnlyNonChat.value = result.onlyNonChat
+  } catch { /* Discovery failure leaves only the manual setup path available. */ }
   finally {
     if (modelController === controller) modelLoading.value = false
   }
 })
+watch([() => props.show, () => props.ccsOnly, () => props.keyId, () => props.apiKey, () => props.baseUrl, () => props.platform, () => props.allowMessagesDispatch, () => props.active], async () => {
+  ccsModelsController?.abort()
+  ccsChatModels.value = []
+  ccsCodexModels.value = []
+  ccsModelsLoading.value = false
+  ccsInlineAgent.value = null
+  selectedCcsModel.value = ''
+  ccsError.value = ''
+  if (!props.show || !props.ccsOnly || !props.apiKey || !props.active) return
+  const controller = new AbortController()
+  ccsModelsController = controller
+  ccsModelsLoading.value = true
+  const needsChat = (['claude', 'opencode', 'pi'] as const).some(id => agentSupported(id))
+  const needsCodex = agentSupported('codex')
+  const [chat, codex] = await Promise.allSettled([
+    needsChat ? fetchModelChoices(false, controller.signal) : Promise.resolve({ choices: [] }),
+    needsCodex ? fetchModelChoices(true, controller.signal) : Promise.resolve({ choices: [] })
+  ])
+  if (controller.signal.aborted) return
+  if (chat.status === 'fulfilled') ccsChatModels.value = chat.value.choices
+  if (codex.status === 'fulfilled') ccsCodexModels.value = codex.value.choices
+  ccsModelsLoading.value = false
+  if ((needsChat && chat.status === 'rejected') || (needsCodex && codex.status === 'rejected')) ccsError.value = t('keys.quickImport.modelUnavailable')
+}, { immediate: true })
 let controller: AbortController | undefined
 let generation = 0
 let expiry: ReturnType<typeof setTimeout> | undefined
@@ -125,7 +170,7 @@ function invalidate() {
   clearTimeout(expiry); command.value = ''; error.value = ''; loading.value = false; copied.value = ''
 }
 watch([agent, step, os, selectedModel, () => props.show, () => props.keyId, () => props.apiKey, () => props.platform, () => props.active, () => props.baseUrl, () => props.claudeCodeOnly, () => props.allowMessagesDispatch], invalidate, { flush: 'sync' })
-onBeforeUnmount(invalidate)
+onBeforeUnmount(() => { invalidate(); modelController?.abort(); ccsModelsController?.abort() })
 async function generate() {
   if (!agent.value || !compatible.value || !automaticAgent(agent.value) || !validModel.value) return
   invalidate(); const current = generation; const target = agent.value
@@ -157,12 +202,33 @@ async function clean() {
   invalidate()
   await copyCommand('clean')
 }
-const agentIcons: Partial<Record<ImportAgent, string>> = { claude: claudeIcon, codex: chatgptIcon, opencode: opencodeIcon }
-function agentSupported(id: ImportAgent) { return (!props.claudeCodeOnly || id === 'claude') && supportsAgent(id, props.platform, props.allowMessagesDispatch) }
+const agentIcons: Partial<Record<ImportAgent, string>> = {
+  claude: claudeIcon,
+  codex: chatgptIcon,
+  'deepseek-harness': deepseekHarnessIcon,
+  workbuddy: workbuddyIcon,
+  opencode: opencodeIcon,
+  pi: piIcon
+}
+function agentSupported(id: ImportAgent) { return (!props.claudeCodeOnly || id === 'claude') && (!props.ccsOnly || supportsCcs(id, props.platform)) && supportsAgent(id, props.platform, props.allowMessagesDispatch) }
+const visibleAgents = computed(() => props.ccsOnly ? importAgents.filter(item => agentSupported(item.id)) : importAgents)
 const availableAgents = computed(() => importAgents.filter(item => agentSupported(item.id)))
 const agentName = computed(() => importAgents.find(item => item.id === agent.value)?.name)
 const compatible = computed(() => !!agent.value && props.active !== false && (!props.claudeCodeOnly || agent.value === 'claude') && supportsAgent(agent.value, props.platform, props.allowMessagesDispatch))
-watch(() => [props.show, props.keyId, props.apiKey, props.platform], () => { agent.value = null; step.value = 'actions'; ccsOpened.value = false })
+watch(() => [props.show, props.keyId, props.apiKey, props.platform, props.ccsOnly], () => { agent.value = null; step.value = 'actions'; ccsOpened.value = false })
+function selectAgent(id: ImportAgent) {
+  if (!agentSupported(id)) return
+  if (!props.ccsOnly) { agent.value = id; return }
+  if (!props.active || ccsModelsLoading.value || !ccsModelsFor(id).length) return
+  ccsError.value = ''
+  if (id === 'opencode' || id === 'pi') {
+    ccsInlineAgent.value = id
+    selectedCcsModel.value = ccsModelsFor(id)[0] || ''
+    return
+  }
+  ccsInlineAgent.value = null
+  openCcsFor(id)
+}
 function back() { if (step.value === 'actions') agent.value = null; else step.value = 'actions'; ccsOpened.value = false }
 function openManual() {
   if (!agent.value) return
@@ -173,11 +239,23 @@ function openManual() {
   }
   step.value = 'manual'
 }
+function openCcsFor(id: ImportAgent) {
+  if (!props.active || !agentSupported(id) || !supportsCcs(id, props.platform)) return
+  const choices = props.ccsOnly ? ccsModelsFor(id) : modelChoices.value
+  const model = id === 'opencode' || id === 'pi' ? selectedCcsModel.value : choices[0]
+  if (!model || !choices.includes(model)) return
+  const link = buildCcSwitchImportDeeplink({ baseUrl: props.baseUrl || window.location.origin, platform: props.platform, agent: id, model, models: choices, clientType: 'claude', providerName: props.keyName || '连接AI', apiKey: props.apiKey, usageScript: CC_SWITCH_USAGE_SCRIPT })
+  try {
+    window.location.assign(link)
+    ccsOpened.value = true
+    ccsError.value = ''
+  } catch {
+    ccsError.value = t('keys.quickImport.ccsOpenFailed')
+  }
+}
 function openCcs() {
-  if (!agent.value || !compatible.value || !validModel.value || !supportsCcs(agent.value, props.platform)) return
-  const link = buildCcSwitchImportDeeplink({ baseUrl: props.baseUrl || window.location.origin, platform: props.platform, agent: agent.value, model: selectedModel.value, clientType: agent.value === 'gemini' ? 'gemini' : 'claude', providerName: props.keyName || '连接AI', apiKey: props.apiKey, usageScript: CC_SWITCH_USAGE_SCRIPT })
-  window.location.assign(link)
-  ccsOpened.value = true
+  if (!agent.value || !compatible.value || !validModel.value) return
+  openCcsFor(agent.value)
 }
 </script>
 
@@ -189,6 +267,9 @@ function openCcs() {
 .qi-head{display:flex;align-items:center;justify-content:space-between;padding:22px 26px;border-bottom:1px solid var(--qi-line)}.qi-body h2{font-size:20px;font-weight:650;margin:0;line-height:1.4}.qi-step{font-size:12px;color:var(--qi-sub);margin-top:4px}.qi-body button{font:inherit;cursor:pointer;color:inherit}.qi-close{border:0;background:none;padding:10px;color:var(--qi-sub);display:grid;place-items:center;border-radius:9px}.qi-close:hover{background:var(--qi-hover)}.qi-body{padding:24px 26px}.qi-key{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--qi-sub);margin-bottom:22px}.qi-dot{height:6px;width:6px;border-radius:50%;background:var(--qi-accent)}.qi-label{font-size:15px;font-weight:550;margin:0 0 14px}.qi-agents{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.qi-agent{border:1px solid var(--qi-line);background:transparent;border-radius:14px;display:flex;align-items:center;flex-direction:column;gap:13px;padding:22px 8px;font-size:14px;font-weight:550;transition:background .15s,border-color .15s}.qi-agent:hover{background:var(--qi-soft);border-color:var(--qi-accent)}.qi-logo{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--qi-hover)}.qi-logo svg{width:24px;height:24px}.qi-claude{color:#da947a}.qi-foot{padding:16px 26px;color:var(--qi-sub);font-size:12px;background:var(--qi-hover);line-height:1.7}.qi-selected{display:flex;align-items:center;gap:12px;margin-bottom:22px}.qi-name{font-size:17px;font-weight:600}.qi-body .qi-back{margin-left:auto;background:none;border:0;color:var(--qi-sub);font-size:13px;padding:10px 0 10px 12px;display:flex;gap:5px;align-items:center}.qi-actions{display:flex;flex-direction:column;gap:10px}.qi-action{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:17px 18px;border-radius:12px;background:transparent;border:1px solid var(--qi-line);min-height:70px}.qi-action:hover{background:var(--qi-hover)}.qi-action.qi-primary{background:var(--qi-accent);border-color:var(--qi-accent);color:#fff}.qi-primary:hover{filter:brightness(1.06)}.qi-action .qi-copy{margin-left:auto;opacity:.8;flex-shrink:0}.qi-action strong{font-size:14px;font-weight:600;display:block}.qi-action small{font-size:12px;line-height:1.6;display:block;color:var(--qi-sub);margin-top:3px}.qi-primary small{color:#e3fffa}.qi-action>svg{width:20px;height:20px;flex-shrink:0}.qi-separator{height:1px;background:var(--qi-line);margin:7px 0}.qi-status{font-size:12px;line-height:1.7;color:var(--qi-sub);margin-top:17px;min-height:21px}.qi-status[data-success="true"]{color:light-dark(#08766e,#5ce0cc)}.qi-action[hidden]{display:none}.qi-reopen{background:var(--qi-bg);border:1px solid var(--qi-line);padding:16px;border-radius:12px}.qi-body [hidden]{display:none!important}@media(max-width:420px){.qi-head,.qi-body{padding:20px}.qi-agents{gap:8px}.qi-agent{font-size:12px;padding:18px 4px}.qi-action{padding:15px 12px;gap:10px}.qi-foot{padding:14px 20px}}
 .qi-window{max-width:700px}.qi-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:stretch}.qi-choice{border:1px solid var(--qi-line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}.qi-choice-main{background:var(--qi-soft);border-color:var(--qi-accent)}.qi-action{flex-direction:column;text-align:center;justify-content:center;gap:16px;border:0;border-radius:0;min-height:162px;height:100%;padding:22px 10px;background:transparent}.qi-action.qi-primary{color:var(--qi-text);background:transparent;border:0}.qi-action.qi-primary>svg{color:var(--qi-accent)}.qi-primary small{color:var(--qi-sub)}.qi-action .qi-copy{display:none}.qi-action>svg{width:25px;height:25px}.qi-action strong{line-height:1.6}.qi-body .qi-clean{display:flex;align-items:center;justify-content:center;gap:6px;color:var(--qi-sub);background:none;border:0;border-top:1px solid var(--qi-line);padding:13px 5px;min-height:44px;font-size:12px}.qi-clean:hover{background:var(--qi-hover);color:var(--qi-text)}.qi-clean strong{font-weight:400}.qi-clean svg{width:14px;height:14px}.qi-logo img{width:28px;height:28px;object-fit:contain}.qi-choice[hidden]{display:none}.qi-actions.qi-two{grid-template-columns:repeat(2,minmax(0,1fr))}@media(max-width:420px){.qi-actions{gap:7px}.qi-action{padding:18px 5px;min-height:152px}.qi-action strong{font-size:12px}.qi-action small{font-size:11px}.qi-body .qi-clean{font-size:11px}.qi-clean svg{display:none}}
 .qi-logo:has(.qi-chatgpt-image){background:#ffffff}.qi-logo .qi-chatgpt-image{width:30px;height:30px;object-fit:contain}
+.qi-pi{background:#fff}.qi-pi img{filter:brightness(0)}
+.qi-ccs-inline{display:grid;gap:10px;margin-top:20px;padding:16px;border:1px solid var(--qi-line);border-radius:12px}.qi-ccs-inline label{font-size:13px;font-weight:600}.qi-ccs-inline .input{width:100%}.qi-ccs-inline .btn{justify-self:start}
+.qi-ccs-action-select{width:calc(100% - 24px);margin:38px 12px 0}
 
 .qi-actions:has(>.qi-choice:nth-child(2):last-child){grid-template-columns:repeat(2,minmax(0,1fr))}.qi-actions:has(>.qi-choice:only-child){grid-template-columns:1fr}.qi-choice-main .qi-action>svg{color:#0dafa2}.qi-action:disabled{opacity:.5;cursor:not-allowed}.qi-action{min-height:190px}.qi-body .qi-clean{flex-shrink:0}.qi-chatgpt{background:#fff}.qi-chatgpt img{width:30px;height:30px}.qi-badge{font-size:11px;border-radius:5px;padding:2px 7px;color:var(--qi-sub);background:var(--qi-hover)}.qi-placeholder{visibility:hidden}.qi-step{display:block;font-size:12px;font-weight:400;color:#8190a4;margin-top:4px}.qi-body{padding:0;display:block}
 :global(.dark) .qi-body{--qi-bg:#1d293b;--qi-text:#f1f5fa;--qi-sub:#a2b0c3;--qi-line:#354357;--qi-hover:#25344a;--qi-soft:#173c40}

@@ -1,5 +1,6 @@
 import type { GroupPlatform } from '@/types'
 import type { ImportAgent } from './quickImport'
+import { buildCodexModelsManifestUrl } from '@/api/codex'
 
 export const OPENAI_CC_SWITCH_CODEX_MODEL = 'gpt-5.5'
 export const GROK_CC_SWITCH_MODEL = 'grok-4.5'
@@ -22,6 +23,7 @@ export interface CcSwitchImportDeeplinkInput {
   usageScript: string
   agent?: ImportAgent
   model?: string
+  models?: string[]
 }
 
 /**
@@ -121,19 +123,39 @@ export function buildCcSwitchImportDeeplink(input: CcSwitchImportDeeplinkInput):
     entries.push(['haikuModel', input.model], ['sonnetModel', input.model], ['opusModel', input.model])
   }
 
+  // CC Switch keeps Claude's imported env block. Claude Code then discovers
+  // every model exposed by this key's gateway rather than one hard-coded row.
+  if (input.agent === 'claude' && input.models?.length) {
+    entries.push(['config', btoa(JSON.stringify({ env: { CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY: '1' } }))])
+  }
+
+  // CC Switch preserves model_catalog_url from a Codex provider TOML. Codex
+  // fetches its full model manifest from the same gateway after import.
+  if (input.agent === 'codex' && input.models?.length) {
+    const endpoint = config.endpoint
+    const catalogUrl = buildCodexModelsManifestUrl(endpoint)
+    const toml = `model_provider = "lianjieai"\nmodel = ${JSON.stringify(input.model || input.models[0])}\n\n[model_providers.lianjieai]\nname = "lianjieai"\nbase_url = ${JSON.stringify(endpoint)}\nwire_api = "responses"\nmodel_catalog_url = ${JSON.stringify(catalogUrl)}\n`
+    entries[entries.findIndex(([name]) => name === 'configFormat')] = ['configFormat', 'toml']
+    entries.push(['config', btoa(toml)])
+  }
+
   return `ccswitch://v1/import?${new URLSearchParams(entries).toString()}`
 }
 
 function resolveSelectedAgentConfig(input: CcSwitchImportDeeplinkInput): CcSwitchImportConfig | undefined {
-  if (input.agent === 'codex' || input.agent === 'opencode') {
+  if (input.agent === 'codex' || input.agent === 'opencode' || input.agent === 'pi') {
     const root = withoutTrailingSlashes(input.baseUrl).replace(/\/v1$/, '')
     const openCodeFormat = input.platform === 'anthropic' || input.platform === 'antigravity'
       ? 'anthropic' : input.platform === 'gemini'
         ? 'gemini_native' : input.platform === 'openai'
           ? 'openai_responses' : 'openai_chat'
-    const endpoint = input.agent === 'opencode' && input.platform === 'antigravity'
+    const endpoint = input.agent === 'pi' && input.platform === 'anthropic'
+      ? root
+      : input.agent === 'pi' && input.platform === 'antigravity'
+        ? `${root}/antigravity`
+        : (input.agent === 'opencode' || input.agent === 'pi') && input.platform === 'antigravity'
       ? `${root}/antigravity/v1`
-      : input.agent === 'opencode' && input.platform === 'gemini'
+      : (input.agent === 'opencode' || input.agent === 'pi') && input.platform === 'gemini'
         ? `${root}/v1beta`
         : withV1Endpoint(input.baseUrl)
     return {

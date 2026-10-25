@@ -26,9 +26,7 @@ export function supportsAgent(agent: ImportAgent, platform: GroupPlatform | null
 }
 
 export function supportsCcs(agent: ImportAgent, platform: GroupPlatform | null): boolean {
-  // CCS supports these clients independently of the key's upstream platform.
-  // The caller still checks key validity and Agent compatibility.
-  return (['claude', 'codex', 'opencode'].includes(agent) && !!platform) ||
-    (agent === 'gemini' && (platform === 'gemini' || platform === 'antigravity')) ||
-    (agent === 'grok' && platform === 'grok')
+  // The site's CCS flow only exposes clients with a supported provider link.
+  // The caller also checks the key's platform and Agent compatibility.
+  return !!platform && ['claude', 'codex', 'opencode', 'pi'].includes(agent)
 }
