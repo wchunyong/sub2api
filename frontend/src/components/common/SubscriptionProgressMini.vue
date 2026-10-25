@@ -160,6 +160,10 @@
           </div>
         </div>
 
+        <p class="border-t border-gray-100 px-3 py-2 text-xs leading-5 text-gray-600 dark:border-dark-700 dark:text-gray-400">
+          {{ t('subscriptionProgress.apiKeyHint') }}
+        </p>
+
       </div>
     </transition>
   </div>

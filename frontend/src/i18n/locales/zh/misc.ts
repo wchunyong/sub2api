@@ -44,6 +44,7 @@ export default {
   subscriptionProgress: {
     title: '免费额度',
     viewDetails: '免费额度',
+    apiKeyHint: '使用免费额度需单独创建 API Key，并在创建时选择免费分组。',
     activeCount: '{count} 个有效订阅',
     daily: '每日',
     weekly: '每周',

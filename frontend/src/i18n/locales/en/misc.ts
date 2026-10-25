@@ -44,6 +44,7 @@ export default {
   subscriptionProgress: {
     title: 'Free Quota',
     viewDetails: 'Free Quota',
+    apiKeyHint: 'To use the free quota, create a separate API key and select the free group.',
     activeCount: '{count} active subscription(s)',
     daily: 'Daily',
     weekly: 'Weekly',
