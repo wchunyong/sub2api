@@ -118,6 +118,7 @@ export default {
     groupLabel: 'Group',
     groupLockedHint: 'Once an API key is created, its group cannot be changed. Create a new API key to use a different group.',
     providerLabel: 'Provider',
+    crazyMondayActive: 'Crazy Monday',
     providers: {
       anthropic: 'Anthropic',
       openai: 'OpenAI',

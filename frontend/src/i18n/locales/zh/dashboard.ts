@@ -118,6 +118,7 @@ export default {
     groupLabel: '分组',
     groupLockedHint: 'API密钥一旦创建，不支持分组切换，使用不同分组请重新创建API密钥',
     providerLabel: '厂商',
+    crazyMondayActive: '疯狂星期一',
     providers: {
       anthropic: 'Anthropic',
       openai: 'OpenAI',

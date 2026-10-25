@@ -28,13 +28,13 @@ func TestNextMondayWindowFromSundayNightWaitsUntilMonday(t *testing.T) {
 	}
 }
 
-func TestLoadActiveUserIDsRequiresCompletedCNYSpendingAboveTen(t *testing.T) {
+func TestLoadActiveUserIDsRequiresCompletedCNYRechargeAboveTen(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	mock.ExpectQuery(`(?s)FROM users.*FROM payment_orders.*status = \$2.*provider_snapshot.*> 10`).WithArgs(int64(0), payment.OrderStatusCompleted, 500).
+	mock.ExpectQuery(`(?s)FROM users.*FROM payment_orders.*status = \$2.*order_type = \$3.*provider_snapshot.*> 10`).WithArgs(int64(0), payment.OrderStatusCompleted, payment.OrderTypeBalance, 500).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
 	ids, err := loadActiveUserIDs(context.Background(), db, 0, 500)
 	if err != nil {

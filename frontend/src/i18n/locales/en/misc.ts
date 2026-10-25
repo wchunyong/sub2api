@@ -23,12 +23,12 @@ export default {
   },
   crazyMonday: {
     kicker: 'Weekly benefit', title: 'Crazy Monday',
-    description: 'Users with more than ¥10 in completed lifetime payments receive $10 of daily quota every Monday.',
+    description: 'Users with more than ¥10 in completed lifetime recharge payments receive $10 of daily quota every Monday.',
     startsIn: 'Next Monday in', endsIn: 'Benefit ends in', schedule: 'Granted at 00:00 Beijing time every Monday and expires at 00:00 Tuesday.',
     benefitLabel: 'Weekly benefit', benefit: '$10 every Monday', benefitDetails: 'Usable under the Crazy Monday group rules for that day. One grant per eligible user each week.',
-    eligibilityLabel: 'Eligibility', eligibility: 'Lifetime payments > 10', eligibilityDetails: 'Completed CNY recharge and paid subscription orders count. Exactly ¥10 does not qualify.',
+    eligibilityLabel: 'Eligibility', eligibility: 'Lifetime recharge > 10', eligibilityDetails: 'Only the amount paid for completed CNY recharge orders counts. Redeem codes, gifts, manual credits and subscription purchases do not count; exactly ¥10 does not qualify.',
     recharge: 'Recharge now', details: 'Why did the rules change?',
-    reason: 'Crazy Monday has become popular, and the resulting Monday traffic spikes have affected paying users. To keep the service stable and protect their experience, eligibility now requires more than ¥10 in completed lifetime payments. Thank you for understanding and for supporting this weekly benefit.'
+    reason: 'Crazy Monday has become popular, and the resulting Monday traffic spikes have affected paying users. To keep the service stable and protect their experience, eligibility now requires more than ¥10 in completed lifetime recharge payments. Thank you for understanding and for supporting this weekly benefit.'
   },
   programmersDay: {
     kicker: 'Limited 1024 offer', title: "Programmers' Day",

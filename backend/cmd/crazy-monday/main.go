@@ -218,10 +218,11 @@ func loadActiveUserIDs(ctx context.Context, db *sql.DB, cursor int64, limit int)
 		       FROM payment_orders
 		       WHERE user_id = users.id
 		         AND status = $2
+		         AND order_type = $3
 		         AND COALESCE(NULLIF(provider_snapshot->>'currency', ''), 'CNY') = 'CNY') > 10
 		ORDER BY id ASC
-		LIMIT $3
-	`, cursor, payment.OrderStatusCompleted, limit)
+		LIMIT $4
+	`, cursor, payment.OrderStatusCompleted, payment.OrderTypeBalance, limit)
 	if err != nil {
 		return nil, fmt.Errorf("load active users: %w", err)
 	}

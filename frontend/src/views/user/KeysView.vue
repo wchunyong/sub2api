@@ -526,6 +526,13 @@
               >
                 <Icon name="check" size="xs" :stroke-width="3" />
               </span>
+              <span
+                v-if="provider.value === 'openai' && crazyMondayActive"
+                data-test="crazy-monday-provider-badge"
+                class="absolute -top-2 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold leading-none text-emerald-800 ring-1 ring-emerald-200 dark:bg-emerald-900 dark:text-emerald-200 dark:ring-emerald-700"
+              >
+                {{ t('keys.crazyMondayActive') }}
+              </span>
             </label>
           </div>
           <p class="mt-2 text-xs leading-5 text-gray-500 dark:text-gray-400" aria-live="polite">
@@ -1444,6 +1451,13 @@ const createProviderOptions = computed(() => KEY_GROUP_PROVIDERS.map((value) => 
   label: t(`keys.providers.${value}`),
   count: groups.value.filter((group) => getKeyGroupProvider(group.platform) === value).length
 })))
+
+const crazyMondayActive = computed(() => {
+  const beijingDay = new Date(now.value.getTime() + 8 * 60 * 60 * 1000).getUTCDay()
+  return beijingDay === 1 && groups.value.some(
+    (group) => group.name === '疯狂星期一' && getKeyGroupProvider(group.platform) === 'openai'
+  )
+})
 
 const formGroupOptions = computed(() => showEditModal.value
   ? groupOptions.value

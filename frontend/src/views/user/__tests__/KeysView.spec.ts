@@ -58,6 +58,7 @@ const messages: Record<string, string> = {
   'keys.expiresAt': 'Expires',
   'keys.group': 'Group',
   'keys.groupLockedHint': 'Once an API key is created, its group cannot be changed. Create a new API key to use a different group.',
+  'keys.crazyMondayActive': 'Crazy Monday',
   'keys.id': 'ID',
   'keys.currentConcurrency': 'Current Concurrency',
   'keys.lastUsedAt': 'Last Used',
@@ -716,6 +717,34 @@ describe('user KeysView column settings', () => {
       await chooseProvider(wrapper, 'other')
       expect(optionIds(wrapper)).toEqual([7, 8, 9, 10, 11, 12])
       expect(wrapper.findAllComponents({ name: 'Select' })[0].props('options')).toHaveLength(14)
+    })
+
+    it('shows the Crazy Monday badge on OpenAI only during Beijing Monday when the group is available', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      try {
+        getAvailableGroups.mockResolvedValue([
+          availableGroups[0],
+          { ...availableGroups[1], name: '疯狂星期一' },
+        ])
+        vi.setSystemTime(new Date('2026-10-25T16:00:00.000Z'))
+        const wrapper = await openCreate()
+        expect(wrapper.get('[data-test="crazy-monday-provider-badge"]').text()).toBe('Crazy Monday')
+        expect(wrapper.get('[data-test="crazy-monday-provider-badge"]').element.closest('label')?.querySelector('input')?.value).toBe('openai')
+        wrapper.unmount()
+
+        vi.setSystemTime(new Date('2026-10-26T16:00:00.000Z'))
+        const afterMonday = await openCreate()
+        expect(afterMonday.find('[data-test="crazy-monday-provider-badge"]').exists()).toBe(false)
+        afterMonday.unmount()
+
+        getAvailableGroups.mockResolvedValue([availableGroups[0], availableGroups[1]])
+        vi.setSystemTime(new Date('2026-10-26T08:00:00.000Z'))
+        const withoutGroup = await openCreate()
+        expect(withoutGroup.find('[data-test="crazy-monday-provider-badge"]').exists()).toBe(false)
+        withoutGroup.unmount()
+      } finally {
+        vi.useRealTimers()
+      }
     })
 
     it('clears the previous group on provider change and submits only the newly selected group', async () => {
