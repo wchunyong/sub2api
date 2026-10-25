@@ -16,6 +16,7 @@
             <select id="ccs-model-select" v-model="selectedCcsModel" data-testid="ccs-model-select" class="input">
               <option v-for="model in ccsModelsFor(ccsInlineAgent)" :key="model" :value="model">{{ model }}</option>
             </select>
+            <small class="qi-ccs-notice">{{ t('keys.quickImport.ccsSingleModelNotice') }}</small>
             <button type="button" data-testid="ccs-inline-submit" class="btn btn-primary" :disabled="!selectedCcsModel" @click="openCcsFor(ccsInlineAgent)">{{ t('keys.importToCcSwitch') }}</button>
           </div>
           <p class="qi-status">{{ t(ccsModelsLoading ? 'keys.quickImport.modelLoading' : ccsOpened ? 'keys.quickImport.ccsOpened' : availableAgents.length ? 'keys.quickImport.ccsDirectHint' : 'keys.quickImport.unsupported') }}</p>
@@ -38,6 +39,7 @@
             </div>
             <div v-if="!hideCcs && supportsCcs(agent, platform)" class="qi-choice"><button class="qi-help" :aria-expanded="help === 'ccs'" @click="help = help === 'ccs' ? '' : 'ccs'">{{ t('keys.quickImport.operationHelp') }} ⓘ</button>
               <select v-if="agent === 'opencode' || agent === 'pi'" v-model="selectedCcsModel" data-testid="ccs-action-model-select" class="input qi-ccs-action-select" :aria-label="t('keys.quickImport.ccsSelectOneModel', { agent: agentName })"><option value="">{{ t('keys.quickImport.chooseModel') }}</option><option v-for="model in modelChoices" :key="model" :value="model">{{ model }}</option></select>
+              <small v-if="agent === 'opencode' || agent === 'pi'" class="qi-ccs-notice">{{ t('keys.quickImport.ccsSingleModelNotice') }}</small>
               <button data-testid="ccs" class="qi-action" :disabled="!compatible || !validModel || ((agent === 'opencode' || agent === 'pi') && !selectedCcsModel) || !supportsCcs(agent, platform)" @click="openCcs"><Icon name="externalLink" size="lg" /><strong>{{ t('keys.importToCcSwitch') }}</strong><small>{{ t(supportsCcs(agent, platform) ? 'keys.quickImport.ccsHint' : 'keys.quickImport.ccsUnavailable') }}</small></button>
             </div>
             <div class="qi-choice"><button class="qi-help" :aria-expanded="help === 'manual'" @click="help = help === 'manual' ? '' : 'manual'">{{ t('keys.quickImport.operationHelp') }} ⓘ</button><button data-testid="manual" class="qi-action" :disabled="!compatible" @click="openManual"><Icon name="cog" size="lg" /><strong>{{ t('keys.quickImport.manual') }}</strong><small>{{ t('keys.quickImport.manualHint') }}</small></button></div>
@@ -74,7 +76,6 @@ import { automaticAgent, cleanupCommand, importCommand, type ImportOS } from '@/
 import { createImportTicket, importServer } from '@/api/quickImport'
 import { buildCodexModelsManifestUrl } from '@/api/codex'
 import { parseCodexCatalogModels } from '@/utils/codexCatalogConfig'
-import { sanitizeUrl } from '@/utils/url'
 import { useClipboard } from '@/composables/useClipboard'
 const props = withDefaults(defineProps<{ show: boolean; keyId: number; keyName?: string; apiKey: string; baseUrl: string; docUrl?: string; platform: GroupPlatform | null; allowMessagesDispatch?: boolean; hideCcs?: boolean; active?: boolean; claudeCodeOnly?: boolean; ccsOnly?: boolean }>(), { active: true, ccsOnly: false })
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -232,11 +233,6 @@ function selectAgent(id: ImportAgent) {
 function back() { if (step.value === 'actions') agent.value = null; else step.value = 'actions'; ccsOpened.value = false }
 function openManual() {
   if (!agent.value) return
-  if (['deepseek-harness', 'workbuddy', 'pi'].includes(agent.value)) {
-    const base = (sanitizeUrl(props.docUrl || '') || 'https://docs.lianjieai.top/').replace(/\/+$/, '')
-    window.open(`${base}/agent/${agent.value}`, '_blank', 'noopener,noreferrer')
-    return
-  }
   step.value = 'manual'
 }
 function openCcsFor(id: ImportAgent) {
@@ -270,6 +266,7 @@ function openCcs() {
 .qi-pi{background:#fff}.qi-pi img{filter:brightness(0)}
 .qi-ccs-inline{display:grid;gap:10px;margin-top:20px;padding:16px;border:1px solid var(--qi-line);border-radius:12px}.qi-ccs-inline label{font-size:13px;font-weight:600}.qi-ccs-inline .input{width:100%}.qi-ccs-inline .btn{justify-self:start}
 .qi-ccs-action-select{width:calc(100% - 24px);margin:38px 12px 0}
+.qi-ccs-notice{display:block;color:var(--qi-sub);font-size:12px;line-height:1.5}.qi-choice .qi-ccs-notice{margin:6px 12px}
 
 .qi-actions:has(>.qi-choice:nth-child(2):last-child){grid-template-columns:repeat(2,minmax(0,1fr))}.qi-actions:has(>.qi-choice:only-child){grid-template-columns:1fr}.qi-choice-main .qi-action>svg{color:#0dafa2}.qi-action:disabled{opacity:.5;cursor:not-allowed}.qi-action{min-height:190px}.qi-body .qi-clean{flex-shrink:0}.qi-chatgpt{background:#fff}.qi-chatgpt img{width:30px;height:30px}.qi-badge{font-size:11px;border-radius:5px;padding:2px 7px;color:var(--qi-sub);background:var(--qi-hover)}.qi-placeholder{visibility:hidden}.qi-step{display:block;font-size:12px;font-weight:400;color:#8190a4;margin-top:4px}.qi-body{padding:0;display:block}
 :global(.dark) .qi-body{--qi-bg:#1d293b;--qi-text:#f1f5fa;--qi-sub:#a2b0c3;--qi-line:#354357;--qi-hover:#25344a;--qi-soft:#173c40}

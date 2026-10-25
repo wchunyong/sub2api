@@ -172,6 +172,7 @@ export default {
       ccsHint: '通过 CC Switch 管理配置',
       ccsDirectHint: '点击 Claude Code 或 Codex 直接打开 CC Switch；OpenCode 和 Pi 请先选择一个模型。',
       ccsSelectOneModel: '{agent} 请选择一个模型',
+      ccsSingleModelNotice: 'CC Switch 官方深链目前一次只能导入一个模型；如需全部模型，请使用复制导入命令或手动配置。',
       ccsOpenFailed: '无法打开 CC Switch，请确认已安装并允许浏览器打开应用。',
       manualHint: '查看密钥与配置说明',
       allModels: '一键脚本自动导入全部兼容模型',
@@ -225,11 +226,15 @@ export default {
       claudeModelPlaceholder: '每行填写一个当前密钥可用的完整模型 ID',
       claudeModelHint: '列表来自当前密钥的 /v1/models；可多选支持 Claude Code Messages 接口的模型。第一个选中项作为启动默认模型。',
       claudeModelFallback: '无法读取模型列表时，请每行填写一个当前密钥可用的完整模型 ID。',
+      manualModelsLabel: '导入的模型（默认全选，可多选）',
+      manualModelsHint: '已默认选中当前密钥分组的全部兼容对话模型；可取消不需要的模型，首个选中项作为启动默认模型。',
+      manualMergeHint: '如文件已存在，请先备份并将连接AI部分合并进去；文件包含 API 密钥，不要提交到仓库。',
+      harnessProfile: 'DeepSeek Harness 配置版本',
       selectModelBeforeCopy: '请先选择或输入至少一个这把 Key 可用的模型 ID，然后复制配置。',
       description: '将以下内容写入 Claude Code 的用户配置文件，保存后重启 Claude Code。',
       copy: '复制',
       copied: '已复制',
-      note: '这些环境变量将在当前终端会话中生效。如需永久配置，请将其添加到 ~/.bashrc、~/.zshrc 或相应的配置文件中。',
+      note: '请将生成的内容保存到对应配置文件；如文件已存在，请先备份并合并，避免覆盖原配置。',
       claudeSettingsHint: '用户级持久配置；如文件已存在，请先备份并合并字段。此文件包含 API 密钥，请勿提交到项目仓库。',
       noGroupTitle: '请先分配分组',
       noGroupDescription:
@@ -237,13 +242,13 @@ export default {
       openai: {
         description: '将以下配置文件添加到 Codex CLI 配置目录中。',
         authModeTitle: 'Codex 认证模式',
-        authModeDescription: '推荐从环境变量读取连接AI Key；旧版 auth.json 方式仅供已有配置迁移。',
+        authModeDescription: '推荐把连接AI Key 写入当前 Codex Provider 配置；旧版 auth.json 方式仅供已有配置迁移。',
         authModeLegacy: 'auth.json 兼容',
         authModeApiKey: 'API Key（推荐）',
-        authModeApiKeyRestartNotice: '先设置 LIANJIEAI_API_KEY，再完全退出并重启 Codex。桌面 App 需要用户级环境变量；当前终端里的临时变量只对从该终端启动的程序有效。',
-        apiKeyEnvHint: '此命令只在当前终端会话中生效。桌面 App 请将变量设为操作系统用户级环境变量，并完全重启 App。',
+        authModeApiKeyRestartNotice: '保存 config.toml 后完全退出并重启 Codex。文件包含完整 API Key，请勿提交到项目仓库或发送给他人。',
+        apiKeyEnvHint: 'API Key 已写入 config.toml。此文件包含完整密钥，请妥善保管。',
         configTomlHint: '请确保以下内容位于 config.toml 文件的开头部分',
-        note: '请确保配置目录存在。macOS/Linux 用户可运行 mkdir -p ~/.codex 创建目录。',
+        note: '请在用户目录创建 .codex 文件夹，保存配置后完全重启 Codex。配置文件包含完整密钥。',
         noteWindows:
           '按 Win+R，输入 %userprofile%\\.codex 打开配置目录。如目录不存在，请先手动创建。'
       },
@@ -264,16 +269,13 @@ export default {
         description: '为 Antigravity 分组配置 API 访问。请根据您使用的客户端选择对应的配置方式。',
         claudeCode: 'Claude Code',
         geminiCli: 'Gemini CLI',
-        claudeNote:
-          '这些环境变量将在当前终端会话中生效。如需永久配置，请将其添加到 ~/.bashrc、~/.zshrc 或相应的配置文件中。',
-        geminiNote:
-          '这些环境变量将在当前终端会话中生效。如需永久配置，请将其添加到 ~/.bashrc、~/.zshrc 或相应的配置文件中。'
+        claudeNote: '保存用户级 settings.json 后重启 Claude Code；已有文件请合并字段。',
+        geminiNote: '将变量保存到用户级 .gemini/.env 文件后重启 Gemini CLI；已有文件请合并字段。'
       },
       gemini: {
-        description:
-          '将以下环境变量添加到您的终端配置文件或直接在终端中运行，以配置 Gemini CLI 访问。',
+        description: '将以下配置保存到用户级 .gemini/.env 文件，以配置 Gemini CLI 访问。',
         modelComment: '如果你有 Gemini 3 权限可以填：gemini-3-pro-preview',
-        note: '这些环境变量将在当前终端会话中生效。如需永久配置，请将其添加到 ~/.bashrc、~/.zshrc 或相应的配置文件中。'
+        note: '保存用户级 .gemini/.env 文件后重启 Gemini CLI；文件包含完整 API Key。'
       },
       grok: {
         description:
@@ -281,42 +283,42 @@ export default {
         claudeDescription: '配置 Claude Code，让 Messages API 请求通过当前 Sub2API Grok 分组发送。',
         codexDescription: '配置 Codex，让 Responses API 请求通过当前 Sub2API Grok 分组发送。',
         configTomlHint:
-          '官方路径：~/.grok/config.toml（或 $GROK_HOME）。请填写 [endpoints]（models_base_url / models_list_url / xai_api_base_url / cli_chat_proxy_base_url）、[auth] preferred_method=api_key、[models]、[session]、[features] 图片/视频覆盖。优先 env_key，勿硬编码 api_key；文本模型必须 api_backend=responses。合并前备份，保存后运行 grok inspect。',
+          '官方路径：~/.grok/config.toml（或 $GROK_HOME）。请合并 [endpoints]、[auth]、[models] 和 [model.*]；模型条目已写入 API Key 与 Responses 协议。已有文件请先备份，保存后重启 Grok Build。',
         codexConfigTomlHint:
-          'Codex 官方：wire_api 仅支持 "responses"；优先 env_key，勿与 experimental_bearer_token 混用；非 OpenAI 网关默认 supports_websockets = false（Sub2API 仍可接客户端 WS 并桥接到 HTTP/SSE）。合并前备份 ~/.codex/config.toml。',
+          'Codex Provider 使用 Responses；API Key 已写入 config.toml。非 OpenAI 网关默认关闭 WebSocket。已有配置请先备份并合并，勿提交含 Key 的文件。',
         note:
-          '导出 GROK_MODELS_BASE_URL 与 XAI_API_KEY，将完整 config.toml（endpoints/auth/models/session/features）保存为 ~/.grok/config.toml，运行 grok inspect，再用 /model 选择 grok-4.5（编程场景可用 grok-build-0.1）。',
+          '将完整配置保存为 ~/.grok/config.toml，重启 Grok Build 后在 /model 选择模型。文件含完整 API Key，请勿提交到仓库。',
         noteWindows:
-          '设置 GROK_MODELS_BASE_URL 与 XAI_API_KEY，将完整 config.toml 保存为 %USERPROFILE%\\.grok\\config.toml，运行 grok inspect，再用 /model 选择 grok-4.5（编程场景可用 grok-build-0.1）。',
+          '将完整配置保存为 %USERPROFILE%\\.grok\\config.toml，重启 Grok Build 后在 /model 选择模型。文件含完整 API Key。',
         claudeNote:
           '将配置保存到用户级 ~/.claude/settings.json；Windows 请保存到 %USERPROFILE%\\.claude\\settings.json。请勿把含 API Key 的文件提交到仓库。',
         codexNote:
-          '导出 SUB2API_API_KEY，将 config.toml 保存到 ~/.codex（可用 mkdir -p ~/.codex）。优先 env_key，勿提交密钥。',
+          '将 config.toml 保存到 ~/.codex 后重启 Codex；配置文件包含完整 API Key，请勿提交。',
         codexNoteWindows:
-          '设置 $env:SUB2API_API_KEY，将 config.toml 保存到 %USERPROFILE%\\.codex。优先 env_key，勿提交密钥。'
+          '将 config.toml 保存到 %USERPROFILE%\\.codex 后重启 Codex；配置文件包含完整 API Key。'
       },
       deepseek: {
         description: '使用当前 DeepSeek 分组和 API Key 配置所选工具。',
         codexDescription: '使用 API Key 配置 Codex，并通过当前 DeepSeek 分组发送请求。',
         codexConfigTomlHint: '保存 config.toml 后重启 Codex，客户端会加载远程目录。使用本地文件模式时，还需下载目录并保存到配置中的路径。',
-        codexNote: '启动 Codex 前先导出 SUB2API_API_KEY。下载的目录只包含模型元数据，不包含 API Key。'
+        codexNote: '保存 config.toml 后重启 Codex；配置文件包含完整 API Key，模型目录文件仅包含模型元数据。'
       },
       minimax: {
         description: '使用当前 MiniMax 分组和 API Key 配置所选工具。',
         codexDescription: '使用 API Key 配置 Codex，并通过当前 MiniMax 分组发送请求。',
         codexConfigTomlHint: '保存 config.toml 后重启 Codex，客户端会加载远程目录。使用本地文件模式时，还需下载目录并保存到配置中的路径。',
-        codexNote: '启动 Codex 前先导出 SUB2API_API_KEY。下载的目录只包含模型元数据，不包含 API Key。'
+        codexNote: '保存 config.toml 后重启 Codex；配置文件包含完整 API Key，模型目录文件仅包含模型元数据。'
       },
       composite: {
         description: '通过当前 Composite 路由分组配置受支持的客户端。',
         codexDescription: '使用 API Key 和当前 Composite 分组的完整模型目录配置 Codex。',
         codexConfigTomlHint: '保存 config.toml 后重启 Codex，客户端会加载远程目录。使用本地文件模式时，还需下载目录并保存到配置中的路径。',
-        codexNote: '启动 Codex 前先导出 SUB2API_API_KEY；分组会根据目录中选中的模型路由请求。'
+        codexNote: '保存 config.toml 后重启 Codex；配置文件包含完整 API Key，分组会按所选模型路由请求。'
       },
       routedCodex: {
         description: '使用当前路由分组的完整模型目录配置 Codex。',
         configTomlHint: '保存 config.toml 后重启 Codex，客户端会加载远程目录。使用本地文件模式时，还需下载目录并保存到配置中的路径。',
-        note: '启动 Codex 前先导出 SUB2API_API_KEY。下载的目录只包含模型元数据，不包含 API Key。'
+        note: '保存 config.toml 后重启 Codex；配置文件包含完整 API Key，模型目录文件仅包含模型元数据。'
       },
       codexModelCatalog: {
         mode: '目录来源',
@@ -324,7 +326,7 @@ export default {
         local: '本地文件（旧版客户端）',
         oversized: '完整目录超过远程加载的 1 MiB 限制，已改为本地文件。请下载目录并保存到配置中的路径。',
         title: 'Codex 模型目录',
-        description: 'Codex 会使用配置中的认证信息加载并刷新远程目录。使用本地文件模式时，请在下方获取目录并保存到配置中的路径。',
+        description: '默认远程加载全部可用模型；取消部分模型后使用本地目录，请将下方生成的目录文件保存到配置中的路径。',
         fetch: '获取目录',
         retry: '重试',
         download: '下载目录',

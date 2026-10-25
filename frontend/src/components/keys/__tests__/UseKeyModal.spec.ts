@@ -147,7 +147,7 @@ describe('UseKeyModal', () => {
 
     const allCode = wrapper.findAll('pre code').map((code) => code.text()).join('\n')
     expect(allCode).toContain('GROK_MODELS_BASE_URL')
-    expect(allCode).toContain('XAI_API_KEY')
+    expect(allCode).toContain('api_key = "sk-grok-test"')
     expect(allCode).toContain('[model."grok-4.5"]')
     expect(allCode).toContain('[model."grok-build-0.1"]')
     expect(allCode).toContain('[model."grok-4.20-multi-agent-0309"]')
@@ -164,14 +164,13 @@ describe('UseKeyModal', () => {
     expect(allCode).toContain('video_gen = true')
     expect(allCode).toContain('image_gen_model_override = "grok-imagine-image-quality"')
     expect(allCode).toContain('image_edit_model_override = "grok-imagine-edit"')
-    expect(allCode).toContain('env_key = "XAI_API_KEY"')
+    expect(allCode).toContain('api_key = "sk-grok-test"')
     expect(allCode).toContain('Keep api_backend = "responses" on every model entry.')
     expect(allCode).toContain('grok-imagine-image')
     expect(allCode).toContain('grok-imagine-edit')
     expect(allCode).toMatch(/\[model\."grok-4\.5"\][\s\S]*?context_window = 500000/)
     expect(allCode).toMatch(/\[model\."grok-build-0\.1"\][\s\S]*?context_window = 256000/)
-    // Prefer env_key; hardcode api_key only as commented alternative
-    expect(allCode).not.toMatch(/^api_key = "sk-grok-test"$/m)
+    expect(allCode).not.toContain('path: Terminal')
 
     const modelBlocks = allCode
       .split(/(?=^\[model\.)/m)
@@ -315,16 +314,16 @@ describe('UseKeyModal', () => {
     expect(configToml).not.toContain('model_context_window')
     expect(configToml).not.toContain('model_auto_compact_token_limit')
     expect(configToml).toContain('requires_openai_auth = false')
-    expect(configToml).not.toContain('experimental_bearer_token')
+    expect(configToml).toContain('experimental_bearer_token = "sk-test"')
     expect(configToml).not.toContain('x-openai-actor-authorization')
-    expect(configToml).toContain('env_key = "LIANJIEAI_API_KEY"')
+    expect(configToml).not.toContain('env_key =')
     expect(configToml).not.toContain('image_generation')
     expect(configToml).not.toContain('supports_websockets')
     expect(configToml).not.toContain('responses_websockets_v2')
     const features = configToml?.split('[features]\n')[1]?.split('\n[')[0]
     expect(features).toContain('goals = true')
     expect(configToml).not.toContain('model_reasoning_effort = "xhigh"')
-    expect(codeBlocks).toContain('export LIANJIEAI_API_KEY="sk-test"')
+    expect(codeBlocks.some(block => block.startsWith('export '))).toBe(false)
     expect(wrapper.text()).not.toContain('auth.json')
     expect(wrapper.find('[data-testid="codex-api-key-restart-notice"]').exists()).toBe(true)
     expect(wrapper.get('[data-testid="manual-model-required"]').exists()).toBe(true)
@@ -401,11 +400,11 @@ describe('UseKeyModal', () => {
     expect(apiKeyMode.attributes('aria-checked')).toBe('true')
     expect(configToml).toBeDefined()
     expect(configToml).toContain('requires_openai_auth = false')
-    expect(configToml).not.toContain('experimental_bearer_token')
+    expect(configToml).toContain('experimental_bearer_token = "sk-test"')
     expect(configToml).not.toContain('x-openai-actor-authorization')
     expect(configToml).toContain('model_catalog_url = "https://example.com/v1/models"')
     expect(configToml).not.toContain('model_catalog_json')
-    expect(configToml).toContain('env_key = "LIANJIEAI_API_KEY"')
+    expect(configToml).not.toContain('env_key =')
     expect(configToml).not.toContain('image_generation')
     expect(codeBlocks).not.toContain('{\n  "OPENAI_API_KEY": "sk-test"\n}')
     expect(wrapper.text()).not.toContain('auth.json')
@@ -466,15 +465,15 @@ describe('UseKeyModal', () => {
     expect(configToml).not.toContain('model_context_window')
     expect(configToml).not.toContain('model_auto_compact_token_limit')
     expect(configToml).toContain('requires_openai_auth = false')
-    expect(configToml).not.toContain('experimental_bearer_token')
+    expect(configToml).toContain('experimental_bearer_token = "sk-test"')
     expect(configToml).not.toContain('x-openai-actor-authorization')
-    expect(configToml).toContain('env_key = "LIANJIEAI_API_KEY"')
+    expect(configToml).not.toContain('env_key =')
     expect(configToml).not.toContain('image_generation')
     expect(configToml).toContain('supports_websockets = true')
     const features = configToml?.split('[features]\n')[1]?.split('\n[')[0]
     expect(features).toContain('responses_websockets_v2 = true')
     expect(features).toContain('goals = true')
-    expect(codeBlocks).toContain('export LIANJIEAI_API_KEY="sk-test"')
+    expect(codeBlocks.some(block => block.startsWith('export '))).toBe(false)
     expect(wrapper.text()).not.toContain('auth.json')
   })
 
@@ -516,9 +515,9 @@ describe('UseKeyModal', () => {
     expect(wrapper.get('[data-testid="codex-auth-mode-api-key"]').attributes('aria-checked')).toBe('true')
     expect(configToml).toBeDefined()
     expect(configToml).toContain('requires_openai_auth = false')
-    expect(configToml).not.toContain('experimental_bearer_token')
+    expect(configToml).toContain('experimental_bearer_token = "sk-test"')
     expect(configToml).not.toContain('x-openai-actor-authorization')
-    expect(configToml).toContain('env_key = "LIANJIEAI_API_KEY"')
+    expect(configToml).not.toContain('env_key =')
     expect(configToml).not.toContain('image_generation')
     expect(configToml).toContain('supports_websockets = true')
     const features = configToml?.split('[features]\n')[1]?.split('\n[')[0]
@@ -738,12 +737,12 @@ describe('UseKeyModal', () => {
         }
       ]
     }
-    const fetchMock = vi.fn().mockResolvedValue({
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => ({
       ok: true,
       status: 200,
-      json: async () => ({ data: manifest.models.map(model => ({ id: model.slug })) }),
+      json: async () => url.includes('client_version=') ? manifest : { data: manifest.models.map(model => ({ id: model.slug })) },
       text: async () => JSON.stringify(manifest)
-    })
+    }))
     vi.stubGlobal('fetch', fetchMock)
 
     const wrapper = mount(UseKeyModal, {
@@ -777,7 +776,7 @@ describe('UseKeyModal', () => {
       .find((content) => content.includes('[model_providers.sub2api]'))
     expect(unixConfig).toContain('[model_providers.sub2api]\nname = "Sub2API Composite"\nbase_url = "https://example.com/v1"\nmodel_catalog_url = "https://example.com/v1/models"')
     expect(unixConfig).not.toContain('model_catalog_json')
-    expect(unixConfig).toContain('env_key = "SUB2API_API_KEY"')
+    expect(unixConfig).toContain('experimental_bearer_token = "sk-composite-test"')
     expect(fetchMock).toHaveBeenCalledWith(
       'https://example.com/v1/models',
       expect.objectContaining({
@@ -799,8 +798,8 @@ describe('UseKeyModal', () => {
     expect(wrapper.get('[data-testid="codex-model-catalog"]').text())
       .toContain('keys.useKeyModal.codexModelCatalog.download')
 
-    expect(wrapper.get('[data-testid="manual-model-required"]').exists()).toBe(true)
-    await wrapper.get('#manual-model').setValue('claude-opus-4-8')
+    expect(wrapper.find('[data-testid="manual-model-required"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="manual-model-list"]').findAll('input:checked')).toHaveLength(2)
 
     const loadedUnixConfig = wrapper.findAll('pre code')
       .map((code) => code.text())
@@ -892,8 +891,8 @@ describe('UseKeyModal', () => {
     })
     try {
       await flushPromises()
-      expect(wrapper.get('[data-testid="manual-model-required"]').exists()).toBe(true)
-      await wrapper.get('#manual-model').setValue('deepseek-current-model')
+      expect(wrapper.find('[data-testid="manual-model-required"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="manual-model-list"]').findAll('input:checked')).toHaveLength(1)
       const config = wrapper.findAll('pre code').map(code => code.text()).find(content => content.includes('"provider"'))!
       const parsed = JSON.parse(config)
       expect(parsed.provider.lianjieai.npm).toBe('@ai-sdk/openai-compatible')
@@ -906,11 +905,11 @@ describe('UseKeyModal', () => {
     }
   })
 
-  // Scenario: a downloaded catalog does not silently choose a model for the user.
-  it('requires explicit Composite model selection after loading the catalog', async () => {
+  it('defaults to all Composite models after loading the catalog', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
+      json: async () => ({ models: [{ slug: 'claude-opus-4-8' }, { slug: 'gpt-5.5' }] }),
       text: async () => JSON.stringify({
         models: [
           { slug: 'claude-opus-4-8' },
@@ -946,14 +945,14 @@ describe('UseKeyModal', () => {
     await wrapper.get('[data-testid="codex-model-catalog-fetch"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="manual-model-required"]').exists()).toBe(true)
-    await wrapper.get('#manual-model').setValue('gpt-5.5')
+    expect(wrapper.find('[data-testid="manual-model-required"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="manual-model-list"]').findAll('input:checked')).toHaveLength(2)
 
     const config = wrapper.findAll('pre code')
       .map((code) => code.text())
       .find((content) => content.includes('[model_providers.sub2api]'))
-    expect(config).toContain('model = "gpt-5.5"')
-    expect(config).toContain('review_model = "gpt-5.5"')
+    expect(config).toContain('model = "claude-opus-4-8"')
+    expect(config).toContain('review_model = "claude-opus-4-8"')
   })
 
   it('offers remote and optional file catalogs for OpenAI in both transport modes and on both platforms', async () => {
@@ -989,7 +988,7 @@ describe('UseKeyModal', () => {
         expect(configToml).toContain('[model_providers.OpenAI]\nname = "OpenAI"\nbase_url = "https://example.com/v1"\nmodel_catalog_url = "https://example.com/v1/models"')
         expect(configToml).not.toContain('model_catalog_json')
         expect(configToml).toContain('requires_openai_auth = false')
-        expect(configToml).toContain('env_key = "LIANJIEAI_API_KEY"')
+        expect(configToml).toContain('experimental_bearer_token = "sk-openai-test"')
         expect(configToml).not.toContain('client_version')
         expect(wrapper.find('[data-testid="codex-model-catalog"]').exists()).toBe(true)
 
@@ -1024,10 +1023,9 @@ describe('UseKeyModal', () => {
       global: { stubs: { BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' }, Icon: { template: '<span />' } } }
     })
     await flushPromises()
-    expect(wrapper.get('#manual-model').findAll('option').map(option => option.attributes('value'))).toEqual(['', 'codex-available'])
-    expect((wrapper.get('#manual-model').element as HTMLSelectElement).value).toBe('')
-    expect(wrapper.get('[data-testid="manual-model-required"]').exists()).toBe(true)
-    await wrapper.get('#manual-model').setValue('codex-available')
+    expect(wrapper.get('[data-testid="manual-model-list"]').findAll('input').map(input => input.attributes('value'))).toEqual(['codex-available'])
+    expect(wrapper.get('[data-testid="manual-model-list"]').findAll('input:checked')).toHaveLength(1)
+    expect(wrapper.find('[data-testid="manual-model-required"]').exists()).toBe(false)
     const config = wrapper.findAll('pre code').map(code => code.text()).find(content => content.includes('model_provider = "OpenAI"'))
     expect(config).toContain('model = "codex-available"')
     expect(fetchMock).toHaveBeenCalledWith('https://example.com/v1/models?client_version=0.158.0', expect.any(Object))
@@ -1046,7 +1044,7 @@ describe('UseKeyModal', () => {
       global: { stubs: { BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' }, Icon: { template: '<span />' } } }
     })
     await flushPromises()
-    await wrapper.get('#manual-model').setValue('catalog-model')
+    expect(wrapper.get('[data-testid="manual-model-list"]').findAll('input:checked')).toHaveLength(1)
     expect(wrapper.find('[data-testid="manual-model-required"]').exists()).toBe(false)
     await wrapper.get('[data-testid="codex-model-catalog-fetch"]').trigger('click')
     await flushPromises()
