@@ -309,7 +309,7 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { buildCodexModelCatalogUrl, buildCodexModelsManifestUrl, fetchCodexModelsManifest } from '@/api/codex'
-import { isClearlyNonChatModel } from '@/utils/quickImport'
+import { isClearlyNonChatModel, orderImportModels } from '@/utils/quickImport'
 import type { GroupPlatform } from '@/types'
 import {
   findCodexCatalogModel,
@@ -527,7 +527,7 @@ watch(() => [props.show, props.baseUrl, props.apiKey, activeClientTab.value], as
         ? body.data.map((item: { id?: string }) => item?.id)
         : []
     const validNames = names.filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9_.:/-]+$/.test(id))
-    manualModels.value = [...new Set(validNames.filter(id => !isClearlyNonChatModel(id)))]
+    manualModels.value = orderImportModels([...new Set(validNames.filter(id => !isClearlyNonChatModel(id)))], codexClient)
     manualOnlyNonChatModels.value = validNames.length > 0 && manualModels.value.length === 0
     selectedManualModels.value = [...manualModels.value]
   } catch { /* Manual model entry remains available. */ }

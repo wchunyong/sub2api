@@ -70,7 +70,7 @@ import workbuddyIcon from '@/assets/agents/workbuddy.svg'
 import piIcon from '@/assets/agents/pi.svg'
 import UseKeyModal from './UseKeyModal.vue'
 import type { GroupPlatform } from '@/types'
-import { importAgents, isClearlyNonChatModel, supportsAgent, supportsCcs, type ImportAgent } from '@/utils/quickImport'
+import { importAgents, isClearlyNonChatModel, orderImportModels, supportsAgent, supportsCcs, type ImportAgent } from '@/utils/quickImport'
 import { buildCcSwitchImportDeeplink, CC_SWITCH_USAGE_SCRIPT } from '@/utils/ccswitchImport'
 import { automaticAgent, cleanupCommand, importCommand, type ImportOS } from '@/utils/quickImportCommands'
 import { createImportTicket, importServer } from '@/api/quickImport'
@@ -115,7 +115,7 @@ async function fetchModelChoices(codex: boolean, signal: AbortSignal): Promise<{
       ? body.data.map((item: { id?: string }) => item?.id)
       : []
   const validNames = names.filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9_.:/-]+$/.test(id))
-  const choices = [...new Set(validNames.filter(id => !isClearlyNonChatModel(id)))]
+  const choices = orderImportModels([...new Set(validNames.filter(id => !isClearlyNonChatModel(id)))], codex)
   return { choices, onlyNonChat: validNames.length > 0 && choices.length === 0 }
 }
 let modelController: AbortController | undefined
