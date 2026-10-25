@@ -1,10 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import { nextTick } from 'vue'
+import { nextTick, reactive } from 'vue'
 
 import type { ApiKey } from '@/types'
 import { keysAPI } from '@/api'
 import KeysView from '../KeysView.vue'
+
+const routeState = reactive({ query: {} as Record<string, string> })
+const replaceRoute = vi.fn(async ({ query }: { query: Record<string, string> }) => {
+  routeState.query = query
+})
+
+vi.mock('vue-router', () => ({
+  useRoute: () => routeState,
+  useRouter: () => ({ replace: replaceRoute }),
+}))
 
 const {
   listKeys,
@@ -284,6 +294,8 @@ const getButtonByText = (wrapper: VueWrapper, text: string) => {
 describe('user KeysView column settings', () => {
   beforeEach(() => {
     localStorage.clear()
+    routeState.query = {}
+    replaceRoute.mockClear()
 
     listKeys.mockReset()
     updateKey.mockReset()
@@ -323,6 +335,16 @@ describe('user KeysView column settings', () => {
     expect(picker.props('show')).toBe(true)
     expect(picker.props('keyId')).toBe(key.id)
     expect(picker.props('ccsOnly')).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('opens the create dialog when the free quota link adds the create query', async () => {
+    const wrapper = await mountView()
+    routeState.query = { create: '1' }
+    await nextTick()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    expect(replaceRoute).toHaveBeenCalledWith({ name: 'Keys', query: {} })
     wrapper.unmount()
   })
 

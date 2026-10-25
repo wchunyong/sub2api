@@ -11,7 +11,12 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/payment"
 )
 
-const newUserRechargeCandidateKey = "new_user_recharge_candidate"
+const (
+	newUserRechargeCandidateKey   = "new_user_recharge_candidate"
+	newUserRechargeBonusAmountKey = "new_user_recharge_bonus_amount"
+	newUserRechargeBonusAmount    = 5.0
+	legacyNewUserRechargeBonus    = 10.0
+)
 
 func newUserRechargeCandidate(userCreatedAt, orderCreatedAt time.Time, faceAmount float64) bool {
 	return !userCreatedAt.IsZero() && !orderCreatedAt.Before(userCreatedAt) &&
@@ -80,7 +85,11 @@ func (s *PaymentService) prepareNewUserRechargeBonus(ctx context.Context, order 
 	if updated == 0 {
 		return order, nil
 	}
-	credited, err := tx.PaymentOrder.UpdateOneID(order.ID).AddAmount(10).AddBonusAmount(10).
+	bonusAmount := legacyNewUserRechargeBonus
+	if snapshotAmount, ok := order.ProviderSnapshot[newUserRechargeBonusAmountKey].(float64); ok && snapshotAmount > 0 {
+		bonusAmount = snapshotAmount
+	}
+	credited, err := tx.PaymentOrder.UpdateOneID(order.ID).AddAmount(bonusAmount).AddBonusAmount(bonusAmount).
 		SetUpdatedAt(time.Now().UTC().Truncate(time.Microsecond)).Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("add new user recharge bonus: %w", err)
