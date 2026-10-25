@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/Wei-Shaw/sub2api/internal/payment"
 )
 
 func TestNextMondayWindowFromSundayNightWaitsUntilMonday(t *testing.T) {
@@ -33,7 +34,7 @@ func TestLoadActiveUserIDsRequiresCompletedCNYSpendingAboveTen(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	mock.ExpectQuery("(?s)FROM users.*FROM payment_orders.*status = 'completed'.*provider_snapshot.*> 10").WithArgs(int64(0), 500).
+	mock.ExpectQuery(`(?s)FROM users.*FROM payment_orders.*status = \$2.*provider_snapshot.*> 10`).WithArgs(int64(0), payment.OrderStatusCompleted, 500).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
 	ids, err := loadActiveUserIDs(context.Background(), db, 0, 500)
 	if err != nil {

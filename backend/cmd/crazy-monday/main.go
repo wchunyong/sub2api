@@ -11,6 +11,7 @@ import (
 
 	_ "github.com/Wei-Shaw/sub2api/ent/runtime"
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/payment"
 	"github.com/Wei-Shaw/sub2api/internal/repository"
 )
 
@@ -216,11 +217,11 @@ func loadActiveUserIDs(ctx context.Context, db *sql.DB, cursor int64, limit int)
 		  AND (SELECT COALESCE(SUM(pay_amount), 0)
 		       FROM payment_orders
 		       WHERE user_id = users.id
-		         AND status = 'completed'
+		         AND status = $2
 		         AND COALESCE(NULLIF(provider_snapshot->>'currency', ''), 'CNY') = 'CNY') > 10
 		ORDER BY id ASC
-		LIMIT $2
-	`, cursor, limit)
+		LIMIT $3
+	`, cursor, payment.OrderStatusCompleted, limit)
 	if err != nil {
 		return nil, fmt.Errorf("load active users: %w", err)
 	}
