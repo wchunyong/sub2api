@@ -115,6 +115,44 @@ func TestCodexCatalogCompatibility(t *testing.T) {
 	}
 }
 
+func TestDesktopImportsUseGatewayModelCapabilities(t *testing.T) {
+	s := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("client_version") == "" {
+			fmt.Fprint(w, `{"data":[{"id":"vision-think","name":"Vision Think"},{"id":"text-only"}]}`)
+			return
+		}
+		fmt.Fprint(w, `{"models":[{"slug":"vision-think","input_modalities":["text","image"],"supported_reasoning_levels":[{"effort":"low"},{"effort":"medium"},{"effort":"high"}],"default_reasoning_level":"high"},{"slug":"text-only","input_modalities":["text"],"supported_reasoning_levels":[]}]}`)
+	}))
+	defer s.Close()
+	for _, agent := range []string{"deepseek-harness", "workbuddy"} {
+		p := Payload{Agent: agent, BaseURL: s.URL, ProbeURL: s.URL + "/models", Model: "vision-think"}
+		if err := (Network{Client: s.Client()}).SynchronizeModels(&p); err != nil {
+			t.Fatal(err)
+		}
+		if len(p.Models) != 2 || !p.Models[0].SupportsImages || len(p.Models[0].ReasoningEfforts) != 3 || p.Models[1].SupportsImages || len(p.Models[1].ReasoningEfforts) != 0 {
+			t.Fatalf("%s lost model capabilities: %+v", agent, p.Models)
+		}
+	}
+}
+
+func TestDesktopImportKeepsTextDefaultsWhenCapabilityCatalogUnavailable(t *testing.T) {
+	s := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("client_version") != "" {
+			http.NotFound(w, r)
+			return
+		}
+		fmt.Fprint(w, `{"data":[{"id":"unknown-chat"}]}`)
+	}))
+	defer s.Close()
+	p := Payload{Agent: "workbuddy", BaseURL: s.URL, ProbeURL: s.URL + "/models", Model: "unknown-chat"}
+	if err := (Network{Client: s.Client()}).SynchronizeModels(&p); err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Models) != 1 || p.Models[0].SupportsImages || len(p.Models[0].ReasoningEfforts) != 0 {
+		t.Fatalf("invented capabilities: %+v", p.Models)
+	}
+}
+
 func TestCodexImportUsesDedicatedCatalogWhenGenericListDoesNotContainModel(t *testing.T) {
 	for _, tc := range []struct {
 		name   string

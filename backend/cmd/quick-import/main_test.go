@@ -113,7 +113,7 @@ func TestDeepSeekHarnessAmbiguousProfileStopsBeforeImport(t *testing.T) {
 	}
 }
 
-func TestCleanReportsConflictWithoutCredentials(t *testing.T) {
+func TestCleanPromptsBeforeDiscardingLaterEdits(t *testing.T) {
 	root := t.TempDir()
 	if err := native.Install(root, native.Payload{Version: 1, Agent: "codex", APIKey: "private-test-key", BaseURL: "https://example.test/v1", Model: "imported"}); err != nil {
 		t.Fatal(err)
@@ -128,18 +128,57 @@ func TestCleanReportsConflictWithoutCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out, stderr bytes.Buffer
-	if run([]string{"clean", "--agent", "codex", "--home", root, "--yes"}, strings.NewReader(""), &out, &stderr) == 0 {
-		t.Fatal("accepted changed credentials")
+	if run([]string{"clean", "--agent", "codex", "--home", root, "--yes"}, strings.NewReader("n\n"), &out, &stderr) != 0 {
+		t.Fatal("declining restore should not error")
 	}
-	if !strings.Contains(stderr.String(), "model_providers.lianjieai_quick") {
-		t.Fatal("missing conflict field")
-	}
-	if strings.Contains(stderr.String(), "private") {
-		t.Fatal("credential leaked")
+	if !strings.Contains(out.String(), "导入后") || strings.Contains(out.String(), "private") || strings.Contains(stderr.String(), "private") {
+		t.Fatal("cleanup warning missing or credential leaked")
 	}
 	after, err := os.ReadFile(path)
 	if err != nil || string(after) != edited {
 		t.Fatal("conflict changed configuration")
+	}
+	out.Reset()
+	stderr.Reset()
+	if run([]string{"clean", "--agent", "codex", "--home", root, "--yes"}, strings.NewReader("y\n"), &out, &stderr) != 0 {
+		t.Fatalf("confirmed restore failed: %s", stderr.String())
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatal("confirmed restore did not remove newly created config")
+	}
+}
+
+func TestCleanPromptsForUnrelatedLocalEdit(t *testing.T) {
+	root := t.TempDir()
+	if err := native.Install(root, native.Payload{Version: 1, Agent: "claude", APIKey: "test-key", BaseURL: "https://example.test/v1", Model: "test-model"}); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, ".claude", "settings.json")
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	edited := strings.Replace(string(content), "{", "{\n  \"unrelated\": true,", 1)
+	if err := os.WriteFile(path, []byte(edited), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var out, stderr bytes.Buffer
+	if code := run([]string{"clean", "--agent", "claude", "--home", root}, strings.NewReader("y\nn\n"), &out, &stderr); code != 0 {
+		t.Fatalf("decline failed: %s", stderr.String())
+	}
+	if after, _ := os.ReadFile(path); string(after) != edited {
+		t.Fatal("decline changed file")
+	}
+	if !strings.Contains(out.String(), "导入后") {
+		t.Fatal("missing later-edit warning")
+	}
+	out.Reset()
+	stderr.Reset()
+	if code := run([]string{"clean", "--agent", "claude", "--home", root}, strings.NewReader("y\ny\n"), &out, &stderr); code != 0 {
+		t.Fatalf("restore failed: %s", stderr.String())
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatal("confirmed restore kept newly created file")
 	}
 }
 

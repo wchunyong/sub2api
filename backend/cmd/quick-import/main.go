@@ -87,19 +87,41 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 		return fail("Invalid home directory")
 	}
 	if args[0] == "clean" {
+		reader := bufio.NewReader(in)
 		fmt.Fprintf(out, "正在恢复 %s 最近一次连接AI导入；其他工具的配置不会更改。\n", name)
 		if !*yes {
 			fmt.Fprint(out, "确认恢复？输入 y 继续 [y/N] ")
-			answer, _ := bufio.NewReader(in).ReadString('\n')
+			answer, _ := reader.ReadString('\n')
 			if strings.ToLower(strings.TrimSpace(answer)) != "y" {
 				return 0
 			}
 		}
-		if err := native.Clean(root, *agent); err != nil {
+		confirmForce := func(field string) bool {
+			fmt.Fprintf(out, "检测到导入后本地配置发生变化（%s）。确认后将放弃这些修改，恢复到导入前的配置。\n", field)
+			fmt.Fprint(out, "确认放弃修改并恢复？输入 y 继续 [y/N] ")
+			answer, _ := reader.ReadString('\n')
+			return strings.ToLower(strings.TrimSpace(answer)) == "y"
+		}
+		changed, err := native.CleanupChanged(root, *agent)
+		if err != nil {
+			return fail("恢复失败。请检查配置文件权限和本机恢复信息。")
+		}
+		if changed {
+			if !confirmForce("配置文件") {
+				return 0
+			}
+			err = native.CleanForce(root, *agent)
+		} else {
+			err = native.Clean(root, *agent)
 			var conflict *native.RecoveryConflict
 			if errors.As(err, &conflict) {
-				return fail("原配置在导入后有变化，已保留当前文件：" + conflict.Error())
+				if !confirmForce(conflict.Field) {
+					return 0
+				}
+				err = native.CleanForce(root, *agent)
 			}
+		}
+		if err != nil {
 			return fail("恢复失败。请检查配置文件权限和本机恢复信息。")
 		}
 		fmt.Fprintln(out, "恢复完成。请完全退出并重启工具；若曾多次导入，可再次运行以恢复更早的版本。")

@@ -24,13 +24,25 @@ import (
 const provider = "lianjieai_quick"
 const legacyProvider = "sub2api_quick"
 
+func containsString(items []string, value string) bool {
+	for _, item := range items {
+		if item == value {
+			return true
+		}
+	}
+	return false
+}
+
 var ErrDSHAmbiguousProfile = errors.New("both DeepSeek Harness web and desktop profiles exist; choose the one you use")
 
 var paths = map[string]string{"claude": ".claude/settings.json", "codex": ".codex/config.toml", "opencode": ".config/opencode/opencode.json", "workbuddy": ".workbuddy/models.json", "pi": ".pi/agent/models.json", "deepseek-harness": ".dsh/profiles/web/cordis.patch.yml"}
 
 type Model struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID                     string   `json:"id"`
+	Name                   string   `json:"name"`
+	SupportsImages         bool     `json:"supports_images,omitempty"`
+	ReasoningEfforts       []string `json:"reasoning_efforts,omitempty"`
+	DefaultReasoningEffort string   `json:"default_reasoning_effort,omitempty"`
 }
 type Payload struct {
 	Version                    int            `json:"version"`
@@ -599,11 +611,31 @@ func configuration(p Payload, catalogPath string) ([]change, error) {
 		entries := make([]any, 0, len(normalized))
 		for _, m := range normalized {
 			// WorkBuddy must use the full endpoint as-is, without adding a second /chat/completions.
-			name := m.Name
-			if !strings.HasPrefix(name, "连接AI · ") {
-				name = "连接AI · " + name
+			// The picker appends the model ID to name, so keep the source label short.
+			entry := map[string]any{"id": m.ID, "name": "连接AI", "vendor": "Custom", "url": base + "/chat/completions", "apiKey": p.APIKey, "supportsToolCall": true, "supportsImages": m.SupportsImages, "supportsReasoning": false, "useCustomProtocol": true}
+			levels := []string{}
+			canDisable := false
+			medium := false
+			for _, effort := range m.ReasoningEfforts {
+				if effort == "none" {
+					canDisable = true
+				} else if effort == "minimal" || effort == "low" || effort == "medium" || effort == "high" || effort == "xhigh" || effort == "max" {
+					levels = append(levels, effort)
+					medium = medium || effort == "medium"
+				}
 			}
-			entries = append(entries, map[string]any{"id": m.ID, "name": name, "vendor": "Custom", "url": base + "/chat/completions", "apiKey": p.APIKey, "supportsToolCall": true, "supportsImages": false, "useCustomProtocol": true})
+			if len(levels) > 0 {
+				defaultEffort := m.DefaultReasoningEffort
+				if medium {
+					defaultEffort = "medium"
+				}
+				if !containsString(levels, defaultEffort) {
+					defaultEffort = levels[0]
+				}
+				entry["supportsReasoning"] = true
+				entry["reasoning"] = map[string]any{"defaultEffort": defaultEffort, "supportedEfforts": levels, "canDisableThinking": canDisable}
+			}
+			entries = append(entries, entry)
 		}
 		add([]string{"entries"}, entries)
 	case "pi":
@@ -817,6 +849,25 @@ func Install(root string, p Payload) error {
 		if !ok {
 			return errors.New("invalid DeepSeek Harness profile")
 		}
+		// The desktop Models UI writes these per-model options into the same
+		// route. Keep explicit local choices when gateway metadata is absent.
+		existingOptions := map[string]map[string]any{}
+		for _, item := range entries {
+			row, _ := item.(map[string]any)
+			if row["id"] != "llm-pi-ai" {
+				continue
+			}
+			config, _ := row["config"].(map[string]any)
+			providers, _ := config["providers"].(map[string]any)
+			route, _ := providers["lianjieai"].(map[string]any)
+			priorModels, _ := route["models"].([]any)
+			for _, item := range priorModels {
+				model, _ := item.(map[string]any)
+				if id, ok := model["id"].(string); ok {
+					existingOptions[id] = model
+				}
+			}
+		}
 		models := p.Models
 		if models == nil {
 			models = []Model{{ID: p.Model, Name: p.Model}}
@@ -831,7 +882,68 @@ func Install(root string, p Payload) error {
 			if strings.TrimSpace(m.Name) == "" {
 				m.Name = m.ID
 			}
-			modelEntries = append(modelEntries, map[string]any{"id": m.ID, "name": m.Name})
+			modelEntry := map[string]any{"id": m.ID, "name": m.Name}
+			if m.SupportsImages {
+				modelEntry["input"] = []string{"text", "image"}
+			}
+			if len(m.ReasoningEfforts) > 0 {
+				efforts := map[string]any{}
+				for _, level := range m.ReasoningEfforts {
+					if level == "none" {
+						efforts["off"] = nil
+					} else if level == "minimal" || level == "low" || level == "medium" || level == "high" || level == "xhigh" || level == "max" {
+						efforts[level] = level
+					}
+				}
+				if len(efforts) > 1 || len(efforts) == 1 && !containsString(m.ReasoningEfforts, "none") {
+					modelEntry["reasoningEfforts"] = efforts
+				}
+			}
+			if prior := existingOptions[m.ID]; prior != nil {
+				if input, ok := prior["input"].([]any); ok && len(input) > 0 {
+					valid := true
+					for _, modality := range input {
+						if modality != "text" && modality != "image" {
+							valid = false
+						}
+					}
+					if valid {
+						modelEntry["input"] = input
+					}
+				}
+				if efforts, ok := prior["reasoningEfforts"].(map[string]any); ok {
+					valid, hasThinking := len(efforts) > 0, false
+					for level, wire := range efforts {
+						if level == "off" {
+							if wire != nil {
+								valid = false
+							}
+							continue
+						}
+						if level != "minimal" && level != "low" && level != "medium" && level != "high" && level != "xhigh" && level != "max" {
+							valid = false
+						}
+						value, ok := wire.(string)
+						if !ok || strings.TrimSpace(value) == "" {
+							valid = false
+						}
+						hasThinking = true
+					}
+					if valid && hasThinking {
+						modelEntry["reasoningEfforts"] = efforts
+					}
+				}
+			}
+			if p.Platform == "deepseek" && strings.HasPrefix(strings.ToLower(m.ID), "deepseek-") {
+				if efforts, ok := modelEntry["reasoningEfforts"].(map[string]any); ok {
+					if _, hasOff := efforts["off"]; hasOff {
+						// DeepSeek thinks by default; an empty off needs this dialect
+						// to send thinking: {type: disabled} instead of omission.
+						modelEntry["compat"] = map[string]any{"thinkingFormat": "deepseek"}
+					}
+				}
+			}
+			modelEntries = append(modelEntries, modelEntry)
 		}
 		route := map[string]any{
 			"displayName": "lianjieai",
@@ -956,7 +1068,74 @@ func (conflict *RecoveryConflict) Error() string {
 	return "configuration conflict at " + conflict.Field + "; later edits preserved. Review this field before retrying cleanup"
 }
 
+// CleanupChanged reports whether a local file managed by the latest import
+// differs from what that import wrote. It does not reveal configuration data.
+func CleanupChanged(root, agent string) (bool, error) {
+	root, err := filepath.Abs(root)
+	if err != nil {
+		return false, err
+	}
+	folder, unlock, err := lock(root, agent)
+	if err != nil {
+		return false, err
+	}
+	defer unlock()
+	records, err := readJournal(folder)
+	if err != nil {
+		return false, err
+	}
+	if len(records) == 0 {
+		return false, errors.New("no configuration to clean for this Agent")
+	}
+	rec := records[len(records)-1]
+	if rec.Agent != agent {
+		return false, errors.New("Agent mismatch")
+	}
+	if rec.CleanupPending {
+		return false, nil // Let Clean resume its existing recovery transaction.
+	}
+	if err := checkPending(records); err != nil {
+		return false, err
+	}
+	profile := rec.Profile
+	if agent == "deepseek-harness" && profile == "" {
+		profile = "web"
+	}
+	path, err := target(root, agent, profile)
+	if err != nil {
+		return false, err
+	}
+	current, _, err := readText(path)
+	if err != nil {
+		return false, err
+	}
+	if current != rec.After {
+		return true, nil
+	}
+	for _, item := range rec.Owned {
+		aux, err := ownedPath(root, folder, item)
+		if err != nil {
+			return false, err
+		}
+		content, err := os.ReadFile(aux)
+		if err != nil || string(content) != item.Text {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func Clean(root, agent string) error {
+	return clean(root, agent, false)
+}
+
+// CleanForce restores the exact pre-import configuration after the caller has
+// explicitly confirmed that later local edits may be discarded.
+func CleanForce(root, agent string) error {
+	return clean(root, agent, true)
+}
+
+func clean(root, agent string, force bool) error {
 	root, err := filepath.Abs(root)
 	if err != nil {
 		return err
@@ -999,7 +1178,9 @@ func Clean(root, agent string) error {
 			continue
 		}
 		if e != nil || string(b) != item.Text {
-			return errors.New("model catalog conflict: later edits preserved")
+			if !force {
+				return &RecoveryConflict{Field: "model catalog"}
+			}
 		}
 	}
 	removeOwned := func() error {
@@ -1037,12 +1218,15 @@ func Clean(root, agent string) error {
 			return err
 		}
 	}
-	data, err := load(current, agent)
-	if err != nil {
-		return err
-	}
-	for _, c := range rec.Changes {
-		if !equal(get(data, c.Path), c.Value) {
+	if !force {
+		data, err := load(current, agent)
+		if err != nil {
+			return err
+		}
+		for _, c := range rec.Changes {
+			if equal(get(data, c.Path), c.Value) {
+				continue
+			}
 			if agent == "codex" && reflect.DeepEqual(c.Path, []string{"model"}) && (data["model_provider"] == provider || data["model_provider"] == legacyProvider) {
 				if selected, ok := data["model"].(string); ok && strings.TrimSpace(selected) != "" {
 					continue
@@ -1059,7 +1243,7 @@ func Clean(root, agent string) error {
 		}
 	}
 	result := rec.Before
-	if current != rec.After {
+	if current != rec.After && !force {
 		result, err = render(current, agent, rec.Inverse)
 		if err != nil {
 			return err

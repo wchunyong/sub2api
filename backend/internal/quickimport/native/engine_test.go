@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestLegacyPythonJournal(t *testing.T) {
@@ -317,6 +320,12 @@ func TestCatalogConflict(t *testing.T) {
 	b, _ := os.ReadFile(aux)
 	if string(b) != "later edit" {
 		t.Fatal("catalog edit lost")
+	}
+	if err = CleanForce(root, "codex"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = os.Stat(aux); !os.IsNotExist(err) {
+		t.Fatal("confirmed restore did not remove imported catalog")
 	}
 }
 
@@ -728,7 +737,7 @@ func TestWorkBuddyFreshImportWritesDesktopArrayAndCleanRemovesIt(t *testing.T) {
 	if models[0]["vendor"] != "Custom" || models[0]["useCustomProtocol"] != true || models[0]["url"] != "https://example.test/v1/chat/completions" {
 		t.Fatalf("WorkBuddy must send the exact gateway endpoint without appending a second path: %s", content)
 	}
-	if models[0]["name"] != "连接AI · Test Model" {
+	if models[0]["name"] != "连接AI" {
 		t.Fatalf("WorkBuddy model picker must identify the imported source: %s", content)
 	}
 	if _, set := models[0]["maxInputTokens"]; set {
@@ -742,6 +751,50 @@ func TestWorkBuddyFreshImportWritesDesktopArrayAndCleanRemovesIt(t *testing.T) {
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("cleanup left a new WorkBuddy config: %v", err)
+	}
+}
+
+func TestDesktopImportWritesOnlyDeclaredCapabilities(t *testing.T) {
+	models := []Model{
+		{ID: "vision-think", Name: "Vision Think", SupportsImages: true, ReasoningEfforts: []string{"none", "low", "medium", "high"}, DefaultReasoningEffort: "high"},
+		{ID: "text-only", Name: "Text Only"},
+	}
+	for _, agent := range []string{"workbuddy", "deepseek-harness"} {
+		root := t.TempDir()
+		p := Payload{Version: 1, Agent: agent, APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: models[0].ID, Models: models}
+		if err := Install(root, p); err != nil {
+			t.Fatal(err)
+		}
+		content, err := os.ReadFile(filepath.Join(root, paths[agent]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if agent == "workbuddy" {
+			var got []map[string]any
+			if err := json.Unmarshal(content, &got); err != nil {
+				t.Fatal(err)
+			}
+			if got[0]["name"] != "连接AI" || got[0]["supportsImages"] != true || got[0]["supportsReasoning"] != true || got[1]["supportsImages"] != false || got[1]["supportsReasoning"] != false {
+				t.Fatalf("WorkBuddy capability mismatch: %s", content)
+			}
+			reasoning, _ := got[0]["reasoning"].(map[string]any)
+			if reasoning["defaultEffort"] != "medium" || reasoning["canDisableThinking"] != true || !reflect.DeepEqual(reasoning["supportedEfforts"], []any{"low", "medium", "high"}) {
+				t.Fatalf("WorkBuddy reasoning mismatch: %s", content)
+			}
+		} else {
+			var got []map[string]any
+			if err := yaml.Unmarshal(content, &got); err != nil {
+				t.Fatal(err)
+			}
+			config := got[0]["config"].(map[string]any)
+			provider := config["providers"].(map[string]any)["lianjieai"].(map[string]any)
+			entries := provider["models"].([]any)
+			first := entries[0].(map[string]any)
+			second := entries[1].(map[string]any)
+			if !reflect.DeepEqual(first["input"], []any{"text", "image"}) || first["reasoningEfforts"].(map[string]any)["medium"] != "medium" || first["reasoningEfforts"].(map[string]any)["off"] != nil || second["input"] != nil || second["reasoningEfforts"] != nil {
+				t.Fatalf("Harness capability mismatch: %s", content)
+			}
+		}
 	}
 }
 
@@ -797,6 +850,56 @@ func TestDeepSeekHarnessMergesExistingPiAIProvider(t *testing.T) {
 	content, err = os.ReadFile(path)
 	if err != nil || string(content) != before {
 		t.Fatalf("cleanup did not restore original profile: %s %v", content, err)
+	}
+}
+
+func TestDeepSeekHarnessReimportKeepsDesktopModelOptionsWithoutCatalogMetadata(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, ".dsh", "profiles", "desktop", "cordis.patch.yml")
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	before := "- id: llm-pi-ai\n  config:\n    providers:\n      lianjieai:\n        models:\n          - id: vision-chat\n            input: [text, image]\n            reasoningEfforts:\n              off: null\n              low: low\n              medium: medium\n"
+	if err := os.WriteFile(path, []byte(before), 0600); err != nil {
+		t.Fatal(err)
+	}
+	p := Payload{Version: 1, Agent: "deepseek-harness", Profile: "desktop", APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "vision-chat", Models: []Model{{ID: "vision-chat", Name: "Vision Chat"}}}
+	if err := Install(root, p); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rows []map[string]any
+	if err := yaml.Unmarshal(content, &rows); err != nil {
+		t.Fatal(err)
+	}
+	provider := rows[0]["config"].(map[string]any)["providers"].(map[string]any)["lianjieai"].(map[string]any)
+	model := provider["models"].([]any)[0].(map[string]any)
+	if !reflect.DeepEqual(model["input"], []any{"text", "image"}) || model["reasoningEfforts"].(map[string]any)["medium"] != "medium" {
+		t.Fatalf("desktop UI choices were lost: %s", content)
+	}
+}
+
+func TestDeepSeekHarnessOffEffortUsesDeepSeekThinkingDialect(t *testing.T) {
+	root := t.TempDir()
+	p := Payload{Version: 1, Agent: "deepseek-harness", Platform: "deepseek", APIKey: "test-secret", BaseURL: "https://example.test/v1", Model: "deepseek-v4-pro", Models: []Model{{ID: "deepseek-v4-pro", ReasoningEfforts: []string{"none", "high"}}}}
+	if err := Install(root, p); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(filepath.Join(root, paths["deepseek-harness"]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rows []map[string]any
+	if err := yaml.Unmarshal(content, &rows); err != nil {
+		t.Fatal(err)
+	}
+	provider := rows[0]["config"].(map[string]any)["providers"].(map[string]any)["lianjieai"].(map[string]any)
+	model := provider["models"].([]any)[0].(map[string]any)
+	if model["compat"].(map[string]any)["thinkingFormat"] != "deepseek" {
+		t.Fatalf("off would not disable DeepSeek thinking: %s", content)
 	}
 }
 

@@ -136,6 +136,46 @@ func (n Network) SynchronizeModels(p *Payload) error {
 			}
 			models = append(models, Model{ID: id, Name: name})
 		}
+		if p.Agent == "workbuddy" || p.Agent == "deepseek-harness" {
+			// The generic list often contains IDs only. The gateway's Codex
+			// catalog describes the same IDs with per-model input and effort
+			// capabilities. Missing metadata leaves the conservative defaults.
+			var catalog struct {
+				Models []map[string]any `json:"models"`
+			}
+			if n.request(http.MethodGet, p.ProbeURL+"?client_version=0.155.3", p.APIKey, nil, 8*1024*1024, &catalog) == nil {
+				byID := make(map[string]map[string]any, len(catalog.Models))
+				for _, entry := range catalog.Models {
+					if id, ok := entry["slug"].(string); ok {
+						byID[id] = entry
+					}
+				}
+				for i := range models {
+					entry := byID[models[i].ID]
+					if modalities, ok := entry["input_modalities"].([]any); ok {
+						for _, modality := range modalities {
+							if modality == "image" {
+								models[i].SupportsImages = true
+							}
+						}
+					}
+					if levels, ok := entry["supported_reasoning_levels"].([]any); ok {
+						seenLevel := map[string]bool{}
+						for _, level := range levels {
+							item, _ := level.(map[string]any)
+							effort, _ := item["effort"].(string)
+							if (effort == "none" || effort == "minimal" || effort == "low" || effort == "medium" || effort == "high" || effort == "xhigh" || effort == "max") && !seenLevel[effort] {
+								seenLevel[effort] = true
+								models[i].ReasoningEfforts = append(models[i].ReasoningEfforts, effort)
+							}
+						}
+					}
+					if def, ok := entry["default_reasoning_level"].(string); ok {
+						models[i].DefaultReasoningEffort = def
+					}
+				}
+			}
+		}
 		p.Models = models
 	}
 	versionFn := n.Version
