@@ -874,6 +874,43 @@ func TestBuildCodexModelsManifestForGroupUsesDeepSeekVisionCapabilities(t *testi
 	}
 }
 
+func TestBuildCodexModelsManifestForGroupRecognizesDeepSeekV41FlashVision(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name       string
+		model      string
+		modalities []string
+		want       []any
+	}{
+		{name: "gateway V4.1 alias", model: "deepseek-v4.1-flash", want: []any{"text", "image"}},
+		{name: "official Flash ID", model: "deepseek-flash", want: []any{"text", "image"}},
+		{name: "explicit text-only account", model: "deepseek-v4.1-flash", modalities: []string{"text"}, want: []any{"text"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			account := Account{
+				ID: 1, Platform: PlatformDeepseek, Type: AccountTypeAPIKey,
+				Credentials: map[string]any{"model_mapping": map[string]any{"vision-alias": tt.model}},
+			}
+			if tt.modalities != nil {
+				account.SetUpstreamModelMetadataSnapshot(UpstreamModelMetadataSnapshot{Models: map[string]UpstreamModelMetadata{
+					tt.model: {ID: tt.model, InputModalities: tt.modalities},
+				}})
+			}
+			const groupID int64 = 791
+			svc := &GatewayService{accountRepo: codexModelsVisibilityAccountRepo{byGroup: map[int64][]Account{
+				groupID: {account},
+			}}}
+			body, err := svc.BuildCodexModelsManifestForGroup(context.Background(),
+				&Group{ID: groupID, Platform: PlatformDeepseek}, "", []string{"vision-alias"})
+			require.NoError(t, err)
+			models := decodeCodexManifestModels(t, body)
+			require.Len(t, models, 1)
+			require.Equal(t, tt.want, models[0]["input_modalities"])
+		})
+	}
+}
+
 func TestBuildCodexModelsManifestForGroupPrefersSyncedOpenAIImageCapabilities(t *testing.T) {
 	t.Parallel()
 

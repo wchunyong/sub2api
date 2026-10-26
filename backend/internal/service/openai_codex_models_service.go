@@ -1296,7 +1296,10 @@ func accountCodexModelSupportsImageInput(account *Account, upstreamModel string)
 				return stringSliceContains(modalities, "image")
 			}
 		}
-		if strings.EqualFold(strings.TrimSpace(upstreamModel), "deepseek-v4-flash-vision-exp") {
+		// DeepSeek Flash V4.1 accepts image input. Compatible gateways may
+		// expose the release name instead of the official deepseek-flash ID.
+		switch strings.ToLower(strings.TrimSpace(upstreamModel)) {
+		case "deepseek-v4-flash-vision-exp", "deepseek-flash", "deepseek-v4.1-flash":
 			return account.Type == AccountTypeAPIKey
 		}
 		if account.Platform != PlatformOpenAI || !isOpenAICodexImageInputModel(upstreamModel) {
