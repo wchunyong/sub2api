@@ -23829,6 +23829,7 @@ type GroupMutation struct {
 	model_routing                           *map[string][]int64
 	model_routing_enabled                   *bool
 	mcp_xml_inject                          *bool
+	prompt_rewrite                          *bool
 	supported_model_scopes                  *[]string
 	appendsupported_model_scopes            []string
 	sort_order                              *int
@@ -26482,6 +26483,42 @@ func (m *GroupMutation) ResetMcpXMLInject() {
 	m.mcp_xml_inject = nil
 }
 
+// SetPromptRewrite sets the "prompt_rewrite" field.
+func (m *GroupMutation) SetPromptRewrite(b bool) {
+	m.prompt_rewrite = &b
+}
+
+// PromptRewrite returns the value of the "prompt_rewrite" field in the mutation.
+func (m *GroupMutation) PromptRewrite() (r bool, exists bool) {
+	v := m.prompt_rewrite
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPromptRewrite returns the old "prompt_rewrite" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldPromptRewrite(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPromptRewrite is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPromptRewrite requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPromptRewrite: %w", err)
+	}
+	return oldValue.PromptRewrite, nil
+}
+
+// ResetPromptRewrite resets all changes to the "prompt_rewrite" field.
+func (m *GroupMutation) ResetPromptRewrite() {
+	m.prompt_rewrite = nil
+}
+
 // SetSupportedModelScopes sets the "supported_model_scopes" field.
 func (m *GroupMutation) SetSupportedModelScopes(s []string) {
 	m.supported_model_scopes = &s
@@ -27634,7 +27671,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 67)
+	fields := make([]string, 0, 68)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}
@@ -27778,6 +27815,9 @@ func (m *GroupMutation) Fields() []string {
 	}
 	if m.mcp_xml_inject != nil {
 		fields = append(fields, group.FieldMcpXMLInject)
+	}
+	if m.prompt_rewrite != nil {
+		fields = append(fields, group.FieldPromptRewrite)
 	}
 	if m.supported_model_scopes != nil {
 		fields = append(fields, group.FieldSupportedModelScopes)
@@ -27940,6 +27980,8 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.ModelRoutingEnabled()
 	case group.FieldMcpXMLInject:
 		return m.McpXMLInject()
+	case group.FieldPromptRewrite:
+		return m.PromptRewrite()
 	case group.FieldSupportedModelScopes:
 		return m.SupportedModelScopes()
 	case group.FieldSortOrder:
@@ -28083,6 +28125,8 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldModelRoutingEnabled(ctx)
 	case group.FieldMcpXMLInject:
 		return m.OldMcpXMLInject(ctx)
+	case group.FieldPromptRewrite:
+		return m.OldPromptRewrite(ctx)
 	case group.FieldSupportedModelScopes:
 		return m.OldSupportedModelScopes(ctx)
 	case group.FieldSortOrder:
@@ -28465,6 +28509,13 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetMcpXMLInject(v)
+		return nil
+	case group.FieldPromptRewrite:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPromptRewrite(v)
 		return nil
 	case group.FieldSupportedModelScopes:
 		v, ok := value.([]string)
@@ -29253,6 +29304,9 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldMcpXMLInject:
 		m.ResetMcpXMLInject()
+		return nil
+	case group.FieldPromptRewrite:
+		m.ResetPromptRewrite()
 		return nil
 	case group.FieldSupportedModelScopes:
 		m.ResetSupportedModelScopes()

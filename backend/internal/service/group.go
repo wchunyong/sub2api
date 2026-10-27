@@ -90,6 +90,9 @@ type Group struct {
 
 	// MCP XML 协议注入开关（仅 antigravity 平台使用）
 	MCPXMLInject bool
+	// PromptRewrite enables the configured upstream prompt compatibility rewrite.
+	// It is disabled by default.
+	PromptRewrite bool
 
 	// 支持的模型系列（仅 antigravity 平台使用）
 	// 可选值: claude, gemini_text, gemini_image

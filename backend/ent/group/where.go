@@ -275,6 +275,11 @@ func McpXMLInject(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldMcpXMLInject, v))
 }
 
+// PromptRewrite applies equality check predicate on the "prompt_rewrite" field. It's identical to PromptRewriteEQ.
+func PromptRewrite(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldPromptRewrite, v))
+}
+
 // SortOrder applies equality check predicate on the "sort_order" field. It's identical to SortOrderEQ.
 func SortOrder(v int) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldSortOrder, v))
@@ -2223,6 +2228,16 @@ func McpXMLInjectEQ(v bool) predicate.Group {
 // McpXMLInjectNEQ applies the NEQ predicate on the "mcp_xml_inject" field.
 func McpXMLInjectNEQ(v bool) predicate.Group {
 	return predicate.Group(sql.FieldNEQ(FieldMcpXMLInject, v))
+}
+
+// PromptRewriteEQ applies the EQ predicate on the "prompt_rewrite" field.
+func PromptRewriteEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldPromptRewrite, v))
+}
+
+// PromptRewriteNEQ applies the NEQ predicate on the "prompt_rewrite" field.
+func PromptRewriteNEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldPromptRewrite, v))
 }
 
 // SortOrderEQ applies the EQ predicate on the "sort_order" field.

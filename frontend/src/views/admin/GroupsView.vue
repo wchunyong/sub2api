@@ -1384,6 +1384,24 @@
           </div>
         </div>
 
+        <!-- 上游提示词兼容改写 -->
+        <div class="border-t pt-4">
+          <div class="mb-1.5 flex items-center gap-1">
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {{ t("admin.groups.promptRewrite.title") }}
+            </label>
+          </div>
+          <div class="flex items-center gap-3">
+            <Toggle v-model="createForm.prompt_rewrite" />
+            <span class="text-sm text-gray-500 dark:text-gray-400">
+              {{ createForm.prompt_rewrite ? t("admin.groups.promptRewrite.enabled") : t("admin.groups.promptRewrite.disabled") }}
+            </span>
+          </div>
+          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            {{ t("admin.groups.promptRewrite.tooltip") }}
+          </p>
+        </div>
+
         <!-- Claude Code 客户端限制（仅 anthropic 平台） -->
         <div v-if="createForm.platform === 'anthropic'" class="border-t pt-4">
           <div class="mb-1.5 flex items-center gap-1">
@@ -3022,6 +3040,24 @@
               }}
             </span>
           </div>
+        </div>
+
+        <!-- 上游提示词兼容改写 -->
+        <div class="border-t pt-4">
+          <div class="mb-1.5 flex items-center gap-1">
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {{ t("admin.groups.promptRewrite.title") }}
+            </label>
+          </div>
+          <div class="flex items-center gap-3">
+            <Toggle v-model="editForm.prompt_rewrite" />
+            <span class="text-sm text-gray-500 dark:text-gray-400">
+              {{ editForm.prompt_rewrite ? t("admin.groups.promptRewrite.enabled") : t("admin.groups.promptRewrite.disabled") }}
+            </span>
+          </div>
+          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            {{ t("admin.groups.promptRewrite.tooltip") }}
+          </p>
         </div>
 
         <!-- Claude Code 客户端限制（仅 anthropic 平台） -->
@@ -5008,6 +5044,8 @@ const createForm = reactive({
   supported_model_scopes: ["claude", "gemini_text", "gemini_image"] as string[],
   // MCP XML 协议注入开关（仅 antigravity 平台）
   mcp_xml_inject: true,
+  // 上游提示词兼容改写开关（默认关闭）
+  prompt_rewrite: false,
   // 从分组复制账号
   copy_accounts_from_group_ids: [] as number[],
   // 分组级 RPM 限制（每用户每分钟最大请求数；0 = 不限制）
@@ -5375,6 +5413,8 @@ const editForm = reactive({
   supported_model_scopes: ["claude", "gemini_text", "gemini_image"] as string[],
   // MCP XML 协议注入开关（仅 antigravity 平台）
   mcp_xml_inject: true,
+  // 上游提示词兼容改写开关（默认关闭）
+  prompt_rewrite: false,
   // 从分组复制账号
   copy_accounts_from_group_ids: [] as number[],
   // 分组级 RPM 限制（每用户每分钟最大请求数；0 = 不限制）
@@ -5821,6 +5861,7 @@ const closeCreateModal = () => {
   createForm.require_privacy_set = false;
   createForm.supported_model_scopes = ["claude", "gemini_text", "gemini_image"];
   createForm.mcp_xml_inject = true;
+  createForm.prompt_rewrite = false;
   createForm.copy_accounts_from_group_ids = [];
   createForm.rpm_limit = 0;
   createForm.max_reasoning_effort = "";
@@ -6135,6 +6176,7 @@ const handleEdit = async (group: AdminGroup) => {
     "gemini_image",
   ];
   editForm.mcp_xml_inject = group.mcp_xml_inject ?? true;
+  editForm.prompt_rewrite = group.prompt_rewrite ?? false;
   editForm.copy_accounts_from_group_ids = []; // 复制账号字段每次编辑时重置为空
   editForm.rpm_limit = group.rpm_limit ?? 0;
   editForm.max_reasoning_effort = normalizeReasoningEffortForPlatform(

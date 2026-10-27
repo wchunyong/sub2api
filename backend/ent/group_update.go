@@ -934,6 +934,20 @@ func (_u *GroupUpdate) SetNillableMcpXMLInject(v *bool) *GroupUpdate {
 	return _u
 }
 
+// SetPromptRewrite sets the "prompt_rewrite" field.
+func (_u *GroupUpdate) SetPromptRewrite(v bool) *GroupUpdate {
+	_u.mutation.SetPromptRewrite(v)
+	return _u
+}
+
+// SetNillablePromptRewrite sets the "prompt_rewrite" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillablePromptRewrite(v *bool) *GroupUpdate {
+	if v != nil {
+		_u.SetPromptRewrite(*v)
+	}
+	return _u
+}
+
 // SetSupportedModelScopes sets the "supported_model_scopes" field.
 func (_u *GroupUpdate) SetSupportedModelScopes(v []string) *GroupUpdate {
 	_u.mutation.SetSupportedModelScopes(v)
@@ -1846,6 +1860,9 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.McpXMLInject(); ok {
 		_spec.SetField(group.FieldMcpXMLInject, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.PromptRewrite(); ok {
+		_spec.SetField(group.FieldPromptRewrite, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.SupportedModelScopes(); ok {
 		_spec.SetField(group.FieldSupportedModelScopes, field.TypeJSON, value)
@@ -3137,6 +3154,20 @@ func (_u *GroupUpdateOne) SetNillableMcpXMLInject(v *bool) *GroupUpdateOne {
 	return _u
 }
 
+// SetPromptRewrite sets the "prompt_rewrite" field.
+func (_u *GroupUpdateOne) SetPromptRewrite(v bool) *GroupUpdateOne {
+	_u.mutation.SetPromptRewrite(v)
+	return _u
+}
+
+// SetNillablePromptRewrite sets the "prompt_rewrite" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillablePromptRewrite(v *bool) *GroupUpdateOne {
+	if v != nil {
+		_u.SetPromptRewrite(*v)
+	}
+	return _u
+}
+
 // SetSupportedModelScopes sets the "supported_model_scopes" field.
 func (_u *GroupUpdateOne) SetSupportedModelScopes(v []string) *GroupUpdateOne {
 	_u.mutation.SetSupportedModelScopes(v)
@@ -4079,6 +4110,9 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 	}
 	if value, ok := _u.mutation.McpXMLInject(); ok {
 		_spec.SetField(group.FieldMcpXMLInject, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.PromptRewrite(); ok {
+		_spec.SetField(group.FieldPromptRewrite, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.SupportedModelScopes(); ok {
 		_spec.SetField(group.FieldSupportedModelScopes, field.TypeJSON, value)

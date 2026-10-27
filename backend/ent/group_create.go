@@ -662,6 +662,20 @@ func (_c *GroupCreate) SetNillableMcpXMLInject(v *bool) *GroupCreate {
 	return _c
 }
 
+// SetPromptRewrite sets the "prompt_rewrite" field.
+func (_c *GroupCreate) SetPromptRewrite(v bool) *GroupCreate {
+	_c.mutation.SetPromptRewrite(v)
+	return _c
+}
+
+// SetNillablePromptRewrite sets the "prompt_rewrite" field if the given value is not nil.
+func (_c *GroupCreate) SetNillablePromptRewrite(v *bool) *GroupCreate {
+	if v != nil {
+		_c.SetPromptRewrite(*v)
+	}
+	return _c
+}
+
 // SetSupportedModelScopes sets the "supported_model_scopes" field.
 func (_c *GroupCreate) SetSupportedModelScopes(v []string) *GroupCreate {
 	_c.mutation.SetSupportedModelScopes(v)
@@ -1145,6 +1159,10 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultMcpXMLInject
 		_c.mutation.SetMcpXMLInject(v)
 	}
+	if _, ok := _c.mutation.PromptRewrite(); !ok {
+		v := group.DefaultPromptRewrite
+		_c.mutation.SetPromptRewrite(v)
+	}
 	if _, ok := _c.mutation.SupportedModelScopes(); !ok {
 		v := group.DefaultSupportedModelScopes
 		_c.mutation.SetSupportedModelScopes(v)
@@ -1358,6 +1376,9 @@ func (_c *GroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.McpXMLInject(); !ok {
 		return &ValidationError{Name: "mcp_xml_inject", err: errors.New(`ent: missing required field "Group.mcp_xml_inject"`)}
+	}
+	if _, ok := _c.mutation.PromptRewrite(); !ok {
+		return &ValidationError{Name: "prompt_rewrite", err: errors.New(`ent: missing required field "Group.prompt_rewrite"`)}
 	}
 	if _, ok := _c.mutation.SupportedModelScopes(); !ok {
 		return &ValidationError{Name: "supported_model_scopes", err: errors.New(`ent: missing required field "Group.supported_model_scopes"`)}
@@ -1649,6 +1670,10 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.McpXMLInject(); ok {
 		_spec.SetField(group.FieldMcpXMLInject, field.TypeBool, value)
 		_node.McpXMLInject = value
+	}
+	if value, ok := _c.mutation.PromptRewrite(); ok {
+		_spec.SetField(group.FieldPromptRewrite, field.TypeBool, value)
+		_node.PromptRewrite = value
 	}
 	if value, ok := _c.mutation.SupportedModelScopes(); ok {
 		_spec.SetField(group.FieldSupportedModelScopes, field.TypeJSON, value)
@@ -2695,6 +2720,18 @@ func (u *GroupUpsert) SetMcpXMLInject(v bool) *GroupUpsert {
 // UpdateMcpXMLInject sets the "mcp_xml_inject" field to the value that was provided on create.
 func (u *GroupUpsert) UpdateMcpXMLInject() *GroupUpsert {
 	u.SetExcluded(group.FieldMcpXMLInject)
+	return u
+}
+
+// SetPromptRewrite sets the "prompt_rewrite" field.
+func (u *GroupUpsert) SetPromptRewrite(v bool) *GroupUpsert {
+	u.Set(group.FieldPromptRewrite, v)
+	return u
+}
+
+// UpdatePromptRewrite sets the "prompt_rewrite" field to the value that was provided on create.
+func (u *GroupUpsert) UpdatePromptRewrite() *GroupUpsert {
+	u.SetExcluded(group.FieldPromptRewrite)
 	return u
 }
 
@@ -3947,6 +3984,20 @@ func (u *GroupUpsertOne) SetMcpXMLInject(v bool) *GroupUpsertOne {
 func (u *GroupUpsertOne) UpdateMcpXMLInject() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateMcpXMLInject()
+	})
+}
+
+// SetPromptRewrite sets the "prompt_rewrite" field.
+func (u *GroupUpsertOne) SetPromptRewrite(v bool) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetPromptRewrite(v)
+	})
+}
+
+// UpdatePromptRewrite sets the "prompt_rewrite" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdatePromptRewrite() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdatePromptRewrite()
 	})
 }
 
@@ -5407,6 +5458,20 @@ func (u *GroupUpsertBulk) SetMcpXMLInject(v bool) *GroupUpsertBulk {
 func (u *GroupUpsertBulk) UpdateMcpXMLInject() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateMcpXMLInject()
+	})
+}
+
+// SetPromptRewrite sets the "prompt_rewrite" field.
+func (u *GroupUpsertBulk) SetPromptRewrite(v bool) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetPromptRewrite(v)
+	})
+}
+
+// UpdatePromptRewrite sets the "prompt_rewrite" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdatePromptRewrite() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdatePromptRewrite()
 	})
 }
 

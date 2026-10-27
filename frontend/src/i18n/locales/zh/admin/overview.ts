@@ -1315,6 +1315,12 @@ export default {
         disabled: '已禁用',
         hint: '仅调整用量计费日志中的 token 类别。不会持久化每个请求的映射状态。'
       },
+      promptRewrite: {
+        title: '上游提示词转写',
+        tooltip: '开启后，在请求转发到上游前改写 system/developer 提示词中的指定文本。默认关闭。',
+        enabled: '已启用',
+        disabled: '已禁用'
+      },
       mcpXml: {
         title: 'MCP XML 协议注入',
         tooltip: '启用后，当请求包含 MCP 工具时，会在 system prompt 中注入 XML 格式调用协议提示词。关闭此选项可避免对某些客户端造成干扰。',

@@ -667,6 +667,9 @@ export interface AdminGroup extends Group {
   // MCP XML 协议注入（仅 antigravity 平台使用）
   mcp_xml_inject: boolean
 
+  // 上游提示词兼容改写
+  prompt_rewrite: boolean
+
   // 支持的模型系列（仅 antigravity 平台使用）
   supported_model_scopes?: string[]
 

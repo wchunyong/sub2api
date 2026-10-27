@@ -1316,6 +1316,12 @@ export default {
         disabled: 'Disabled',
         hint: 'Only token categories in usage billing logs are adjusted. No per-request mapping state is persisted.'
       },
+      promptRewrite: {
+        title: 'Upstream Prompt Rewrite',
+        tooltip: 'When enabled, selected text in system/developer prompts is rewritten before forwarding the request upstream. Disabled by default.',
+        enabled: 'Enabled',
+        disabled: 'Disabled'
+      },
       mcpXml: {
         title: 'MCP XML Protocol Injection',
         tooltip: 'When enabled, if the request contains MCP tools, an XML format call protocol prompt will be injected into the system prompt. Disable this to avoid interference with certain clients.',
