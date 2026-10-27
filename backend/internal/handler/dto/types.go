@@ -149,6 +149,9 @@ type Group struct {
 	// OpenAI Live 接口开关
 	AllowLive bool `json:"allow_live"`
 
+	// 上游提示词兼容改写开关
+	PromptRewrite bool `json:"prompt_rewrite"`
+
 	// 账号过滤控制（仅 OpenAI/Antigravity 平台有效）
 	RequireOAuthOnly  bool `json:"require_oauth_only"`
 	RequirePrivacySet bool `json:"require_privacy_set"`
