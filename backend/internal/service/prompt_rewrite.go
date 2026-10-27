@@ -44,6 +44,19 @@ func RewritePromptForUpstream(body []byte, group *Group) []byte {
 			touched = true
 		}
 	}
+	// Responses requests commonly carry the system prompt in the top-level
+	// instructions field. Anthropic Messages requests use a top-level system
+	// field instead of a system message, so cover both shapes as well.
+	for _, key := range []string{"instructions", "system"} {
+		raw, ok := root[key]
+		if !ok {
+			continue
+		}
+		if next, changed := rewriteRawPromptContent(raw); changed {
+			root[key] = next
+			touched = true
+		}
+	}
 	if !touched {
 		return body
 	}
@@ -59,18 +72,29 @@ func rewriteMessageContent(message map[string]json.RawMessage) bool {
 	if !ok {
 		return false
 	}
+	next, changed := rewriteRawPromptContent(raw)
+	if changed {
+		message["content"] = next
+	}
+	return changed
+}
+
+func rewriteRawPromptContent(raw json.RawMessage) (json.RawMessage, bool) {
 	var text string
 	if json.Unmarshal(raw, &text) == nil {
 		next := rewritePromptText(text)
 		if next == text {
-			return false
+			return nil, false
 		}
-		message["content"], _ = json.Marshal(next)
-		return true
+		encoded, err := json.Marshal(next)
+		if err != nil {
+			return nil, false
+		}
+		return encoded, true
 	}
 	var parts []map[string]json.RawMessage
 	if json.Unmarshal(raw, &parts) != nil {
-		return false
+		return nil, false
 	}
 	changed := false
 	for _, part := range parts {
@@ -85,9 +109,13 @@ func rewriteMessageContent(message map[string]json.RawMessage) bool {
 		}
 	}
 	if changed {
-		message["content"], _ = json.Marshal(parts)
+		encoded, err := json.Marshal(parts)
+		if err != nil {
+			return nil, false
+		}
+		return encoded, true
 	}
-	return changed
+	return nil, false
 }
 
 func rewritePromptText(text string) string {

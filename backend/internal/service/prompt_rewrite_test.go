@@ -3,6 +3,8 @@ package service
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -44,6 +46,44 @@ func TestRewritePromptForUpstream(t *testing.T) {
 			}
 			if content != tc.want {
 				t.Fatalf("content = %q, want %q", content, tc.want)
+			}
+		})
+	}
+}
+
+func TestRewritePromptForUpstreamTopLevelSystemFields(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body string
+		path string
+	}{
+		{name: "responses instructions", body: `{"instructions":"` + promptRewriteBlocked + `"}`, path: "instructions"},
+		{name: "responses input developer", body: `{"input":[{"type":"message","role":"developer","content":[{"type":"input_text","text":"` + promptRewriteBlocked + `"}]}]}`, path: "input.0.content.0.text"},
+		{name: "anthropic top-level system", body: `{"system":[{"type":"text","text":"` + promptRewriteBlocked + `"}]}`, path: "system.0.text"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := RewritePromptForUpstream([]byte(tc.body), &Group{PromptRewrite: true})
+			var payload map[string]any
+			if err := json.Unmarshal(got, &payload); err != nil {
+				t.Fatal(err)
+			}
+			var value any = payload
+			for _, part := range strings.Split(tc.path, ".") {
+				switch current := value.(type) {
+				case map[string]any:
+					value = current[part]
+				case []any:
+					var index int
+					if _, err := fmt.Sscanf(part, "%d", &index); err != nil {
+						t.Fatalf("invalid path segment %q: %v", part, err)
+					}
+					value = current[index]
+				default:
+					t.Fatalf("path %q stopped at %T", tc.path, value)
+				}
+			}
+			if value != promptRewriteSafe {
+				t.Fatalf("value = %v, want %q", value, promptRewriteSafe)
 			}
 		})
 	}
