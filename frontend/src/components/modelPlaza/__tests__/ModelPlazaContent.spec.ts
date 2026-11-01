@@ -3,7 +3,6 @@ import { mount } from '@vue/test-utils'
 import ModelPlazaContent from '../ModelPlazaContent.vue'
 import PlazaGroupSection from '../PlazaGroupSection.vue'
 import PlazaFilterBar from '../PlazaFilterBar.vue'
-import PlazaDomesticCatalog from '../PlazaDomesticCatalog.vue'
 import type { ModelPlazaGroup, ModelPlazaResponse } from '@/api/modelPlaza'
 
 vi.mock('vue-i18n', async () => {
@@ -15,7 +14,7 @@ vi.mock('@/stores/auth', () => ({ useAuthStore: () => ({ isAuthenticated: false 
 
 function group(platform: string, rate: number): ModelPlazaGroup {
   return {
-    id: platform === 'openai' ? 2 : 1,
+    id: platform === 'openai' ? 2 : platform === 'kimi' ? 3 : platform === 'zhipu' ? 4 : 1,
     name: platform,
     description: '',
     platform,
@@ -39,7 +38,7 @@ function render(groups: ModelPlazaGroup[], description = '') {
   const response: ModelPlazaResponse = { description, groups }
   return mount(ModelPlazaContent, {
     props: { response, loading: false },
-    global: { stubs: { PlazaFilterBar: true, PlazaGroupSection: true, PlazaDomesticCatalog: true, Icon: true } }
+    global: { stubs: { PlazaFilterBar: true, PlazaGroupSection: true, Icon: true } }
   })
 }
 
@@ -57,9 +56,10 @@ describe('model plaza promotion headline', () => {
     wrapper.unmount()
   })
 
-  it('does not claim every domestic model is discounted when a domestic group has another rate', () => {
+  it('uses neutral pricing copy when the visible domestic groups do not all have a 0.3 rate', () => {
     const wrapper = render([group('deepseek', 0.3), group('kimi', 0.5)])
-    expect(wrapper.text()).toContain('modelPlaza.hero.plannedPromoLabel')
+    expect(wrapper.text()).toContain('modelPlaza.hero.priceLabel')
+    expect(wrapper.text()).toContain('modelPlaza.hero.transparent')
     expect(wrapper.text()).not.toContain('modelPlaza.hero.promoLabel')
     wrapper.unmount()
   })
@@ -77,21 +77,22 @@ describe('model plaza promotion headline', () => {
     wrapper.unmount()
   })
 
-  it('lets the platform and group filters select Hunyuan planned cards', async () => {
-    const wrapper = render([group('openai', 0.5)])
+  it('lists only API groups and models in the cards and filters', async () => {
+    const wrapper = render([group('openai', 0.5), group('kimi', 0.3), group('deepseek', 0.3)])
     const filters = wrapper.findComponent(PlazaFilterBar)
-    expect(filters.props('platforms')).toContain('hunyuan')
-    const hunyuan = filters.props('groups').find((item: { platform: string }) => item.platform === 'hunyuan')
-    expect(hunyuan?.rate).toBe(0.3)
-    filters.vm.$emit('update:groupId', hunyuan.id)
+    expect(filters.props('platforms')).toEqual(['deepseek', 'kimi', 'openai'])
+    expect(filters.props('groups').map((item: { name: string }) => item.name)).toEqual(['openai', 'kimi', 'deepseek'])
+    expect(filters.props('rates')).toEqual([0.3, 0.5])
+    expect(wrapper.findAllComponents(PlazaGroupSection)).toHaveLength(3)
+    expect(wrapper.get('[data-testid="model-count"]').text()).toBe('3')
+    filters.vm.$emit('update:platform', 'kimi')
     await wrapper.vm.$nextTick()
-    expect(wrapper.findComponent(PlazaDomesticCatalog).props('families').map((family: { platform: string }) => family.platform))
-      .toEqual(['hunyuan'])
-    expect(wrapper.findComponent(PlazaGroupSection).exists()).toBe(false)
+    expect(wrapper.findAllComponents(PlazaGroupSection).map(section => section.props('group').platform)).toEqual(['kimi'])
+    expect(wrapper.get('[data-testid="model-count"]').text()).toBe('1')
     wrapper.unmount()
   })
 
-  it('removes the live 0.6 Zhipu group and rate while retaining planned GLM cards', () => {
+  it('removes the live 0.6 Zhipu group and rate', () => {
     const zhipu = group('zhipu', 0.6)
     zhipu.name = '智谱-满血'
     const wrapper = render([zhipu])
@@ -99,8 +100,7 @@ describe('model plaza promotion headline', () => {
     expect(filters.props('groups').some((item: { id: number }) => item.id === zhipu.id)).toBe(false)
     expect(filters.props('rates')).not.toContain(0.6)
     expect(wrapper.findComponent(PlazaGroupSection).exists()).toBe(false)
-    expect(wrapper.findComponent(PlazaDomesticCatalog).props('families')
-      .some((family: { platform: string }) => family.platform === 'zhipu')).toBe(true)
+    expect(wrapper.get('[data-testid="model-count"]').text()).toBe('0')
     wrapper.unmount()
 
     zhipu.user_rate_multiplier = 0.3
@@ -112,19 +112,32 @@ describe('model plaza promotion headline', () => {
   it('counts distinct visible card names and updates the count after filters and search', async () => {
     const openai = group('openai', 0.5)
     const duplicate = group('openai', 0.3)
-    duplicate.id = 3
+    duplicate.id = 5
     const deepseek = group('deepseek', 0.3)
-    deepseek.models[0].name = 'deepseek-v4.1-flash'
+    deepseek.models[0].name = 'shared-model'
+    duplicate.models[0].name = 'shared-model'
     const wrapper = render([openai, duplicate, deepseek])
     const filters = wrapper.findComponent(PlazaFilterBar)
 
-    expect(wrapper.get('[data-testid="model-count"]').text()).toBe('13')
-    filters.vm.$emit('update:platform', 'hunyuan')
-    await wrapper.vm.$nextTick()
     expect(wrapper.get('[data-testid="model-count"]').text()).toBe('2')
-    filters.vm.$emit('update:search', 'hy3')
+    filters.vm.$emit('update:platform', 'deepseek')
     await wrapper.vm.$nextTick()
     expect(wrapper.get('[data-testid="model-count"]').text()).toBe('1')
+    filters.vm.$emit('update:search', 'no-match')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.get('[data-testid="model-count"]').text()).toBe('0')
+    wrapper.unmount()
+  })
+
+  it('shows no fabricated models, platforms, groups, or rates for an empty API response', () => {
+    const wrapper = render([])
+    const filters = wrapper.findComponent(PlazaFilterBar)
+    expect(filters.props('platforms')).toEqual([])
+    expect(filters.props('groups')).toEqual([])
+    expect(filters.props('rates')).toEqual([])
+    expect(wrapper.get('[data-testid="model-count"]').text()).toBe('0')
+    expect(wrapper.findComponent(PlazaGroupSection).exists()).toBe(false)
+    expect(wrapper.text()).toContain('modelPlaza.hero.priceLabel')
     wrapper.unmount()
   })
 })

@@ -47,15 +47,6 @@ describe('PlazaModelCard', () => {
     expect(wrapper.text()).toContain('2')
   })
 
-  it('labels a planned 0.3 price separately from billed prices', () => {
-    const wrapper = mount(PlazaModelCard, {
-      props: { model, rateMultiplier: 0.3, planned: true }
-    })
-    expect(wrapper.text()).toContain('原价 $0.30')
-    expect(wrapper.text()).toContain('modelPlaza.card.plannedPrice')
-    expect(wrapper.find('[data-price="input"]').text()).toBe('$0.09')
-  })
-
   it('uses the first configured tier when a per-request model has no flat price', () => {
     const tiered: PlazaModel = {
       ...model,

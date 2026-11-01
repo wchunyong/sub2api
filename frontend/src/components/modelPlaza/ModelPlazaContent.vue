@@ -14,9 +14,9 @@
           </div>
         </div>
         <div class="rounded-3xl border border-white/25 bg-white/10 p-6 backdrop-blur-sm sm:p-8 lg:order-first">
-          <p class="text-sm font-medium text-primary-100/85">{{ hasDomesticPromotion ? t('modelPlaza.hero.promoLabel') : t('modelPlaza.hero.plannedPromoLabel') }}</p>
-          <p class="mt-2 text-5xl font-bold tracking-tight text-white sm:text-6xl">{{ t('modelPlaza.hero.discount') }}</p>
-          <p class="mt-3 text-sm text-primary-50/80">{{ hasDomesticPromotion ? t('modelPlaza.hero.promoNote', { count: promoGroups.length }) : t('modelPlaza.hero.plannedPromoNote') }}</p>
+          <p class="text-sm font-medium text-primary-100/85">{{ hasDomesticPromotion ? t('modelPlaza.hero.promoLabel') : t('modelPlaza.hero.priceLabel') }}</p>
+          <p class="mt-2 text-5xl font-bold tracking-tight text-white sm:text-6xl">{{ hasDomesticPromotion ? t('modelPlaza.hero.discount') : t('modelPlaza.hero.transparent') }}</p>
+          <p class="mt-3 text-sm text-primary-50/80">{{ hasDomesticPromotion ? t('modelPlaza.hero.promoNote', { count: promoGroups.length }) : t('modelPlaza.hero.priceNote') }}</p>
         </div>
       </div>
     </section>
@@ -58,9 +58,7 @@
         />
       </div>
 
-      <!-- 国产模型规划价格与已接入分组共用模型广场列表。 -->
-      <div v-if="filteredGroups.length > 0 || filteredDomesticFamilies.length > 0" class="space-y-10">
-        <PlazaDomesticCatalog v-if="filteredDomesticFamilies.length > 0" :families="filteredDomesticFamilies" />
+      <div v-if="filteredGroups.length > 0" class="space-y-10">
         <PlazaGroupSection v-for="g in filteredGroups" :key="g.id" :group="g" />
       </div>
       <div
@@ -79,8 +77,6 @@ import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import PlazaFilterBar from './PlazaFilterBar.vue'
 import PlazaGroupSection from './PlazaGroupSection.vue'
-import PlazaDomesticCatalog from './PlazaDomesticCatalog.vue'
-import { domesticCatalogFamilies } from './domesticCatalog'
 import type { ModelPlazaGroup, ModelPlazaResponse } from '@/api/modelPlaza'
 import { getPlatformSpec } from '@/constants/platformCatalog'
 import { useAuthStore } from '@/stores/auth'
@@ -116,56 +112,27 @@ const selectedRate = ref<number | 'all'>('all')
 const searchQuery = ref('')
 
 const searchActive = computed(() => searchQuery.value.trim() !== '')
-const filteredDomesticFamilies = computed(() => {
-  if (selectedRate.value !== 'all' && selectedRate.value !== 0.3) return []
-  const q = searchQuery.value.trim().toLowerCase()
-  return domesticCatalogFamilies
-    .map((family, index) => ({ family, id: -(index + 1) }))
-    .filter(({ family, id }) =>
-      (selectedPlatform.value === 'all' || selectedPlatform.value === family.platform) &&
-      (selectedGroupId.value === 'all' || selectedGroupId.value === id)
-    )
-    .map(({ family }) => ({
-      ...family,
-      models: family.models.filter(model =>
-        (!q || model.name.toLowerCase().includes(q))
-      )
-    }))
-    .filter(family => family.models.length > 0)
-})
-
 /** 生效倍率 = 用户专属倍率 ?? 分组默认倍率。 */
 function effectiveRate(g: ModelPlazaGroup): number {
   return g.user_rate_multiplier ?? g.rate_multiplier
 }
 
 const platforms = computed(() =>
-  [...new Set([
-    ...visibleGroups.value.map((g) => g.platform).filter(Boolean),
-    ...domesticCatalogFamilies.map((family) => family.platform)
-  ])].sort()
+  [...new Set(visibleGroups.value.map((g) => g.platform).filter(Boolean))].sort()
 )
 
 const groupOptions = computed(() =>
-  [
-    ...domesticCatalogFamilies.map((family, index) => ({
-      id: -(index + 1),
-      name: t('modelPlaza.domestic.groupName', { name: family.label }),
-      platform: family.platform,
-      rate: 0.3
-    })),
-    ...visibleGroups.value.map((g) => ({
-      id: g.id,
-      name: g.name,
-      platform: g.platform,
-      rate: effectiveRate(g)
-    }))
-  ]
+  visibleGroups.value.map((g) => ({
+    id: g.id,
+    name: g.name,
+    platform: g.platform,
+    rate: effectiveRate(g)
+  }))
 )
 
 /** 全量生效倍率;当前组合下不可用的项由 FilterBar 置灰而非隐藏。 */
 const rates = computed(() =>
-  [...new Set([0.3, ...visibleGroups.value.map(effectiveRate)])].sort((a, b) => a - b)
+  [...new Set(visibleGroups.value.map(effectiveRate))].sort((a, b) => a - b)
 )
 
 /** 数据刷新后选中的倍率可能不复存在,重置为全部。 */
@@ -199,8 +166,7 @@ const filteredGroups = computed(() => {
   )
 })
 
-const totalModels = computed(() => new Set([
-  ...filteredDomesticFamilies.value.flatMap(family => family.models.map(model => model.name.trim().toLowerCase())),
-  ...filteredGroups.value.flatMap(group => group.models.map(model => model.name.trim().toLowerCase()))
-]).size)
+const totalModels = computed(() => new Set(
+  filteredGroups.value.flatMap(group => group.models.map(model => model.name.trim().toLowerCase()))
+).size)
 </script>

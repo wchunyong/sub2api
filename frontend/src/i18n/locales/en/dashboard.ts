@@ -730,15 +730,13 @@ export default {
     hero: {
       eyebrow: 'MODEL PLAZA',
       title: 'Great models. Clear prices.',
-      subtitle: 'Browse models by platform and group, with base, planned 30% and current prices.',
+      subtitle: 'Browse connected models by platform and group, with base and current prices.',
       models: 'Models shown',
       groups: 'Price groups',
       unit: 'Units shown on cards',
       promoLabel: 'Current domestic model offer',
       discount: '30% price',
       promoNote: 'The {count} groups with domestic models currently show a 0.3 rate. Peak or tiered rules may change billing; OpenAI follows configured rates.',
-      plannedPromoLabel: 'Domestic models · planned 30% prices',
-      plannedPromoNote: 'See domestic model prices at 30% of base, with the savings clearly shown. Connected models are billed at their group prices.',
       priceLabel: 'Transparent pricing',
       transparent: 'Live prices',
       priceNote: 'Prices reflect the current group rate'
@@ -766,16 +764,12 @@ export default {
       tokenUnit: 'USD / 1M Token',
       originalPrice: 'Base {price}',
       currentPrice: 'Our price',
-      plannedPrice: 'Planned 30% price',
       cacheRead: 'Cache read',
       cacheWrite: 'Cache write',
       groupCount: '{count} models',
       modelCount: '{count} models',
       pricingNote: 'Card base prices are channel prices; our prices use the effective rate',
       detailHint: 'Base tier shown; long-context or time-based rules may change the billed price'
-    },
-    domestic: {
-      groupName: 'Domestic · {name}'
     },
     detail: {
       noModels: 'No models configured for this group',
