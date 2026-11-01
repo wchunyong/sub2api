@@ -127,11 +127,6 @@ func ByNotifyMode(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldNotifyMode, opts...).ToFunc()
 }
 
-// ByBannerConfig orders the results by the banner_config field.
-func ByBannerConfig(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldBannerConfig, opts...).ToFunc()
-}
-
 // ByStartsAt orders the results by the starts_at field.
 func ByStartsAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStartsAt, opts...).ToFunc()

@@ -365,6 +365,16 @@ func NotifyModeContainsFold(v string) predicate.Announcement {
 	return predicate.Announcement(sql.FieldContainsFold(FieldNotifyMode, v))
 }
 
+// BannerConfigIsNil applies the IsNil predicate on the "banner_config" field.
+func BannerConfigIsNil() predicate.Announcement {
+	return predicate.Announcement(sql.FieldIsNull(FieldBannerConfig))
+}
+
+// BannerConfigNotNil applies the NotNil predicate on the "banner_config" field.
+func BannerConfigNotNil() predicate.Announcement {
+	return predicate.Announcement(sql.FieldNotNull(FieldBannerConfig))
+}
+
 // TargetingIsNil applies the IsNil predicate on the "targeting" field.
 func TargetingIsNil() predicate.Announcement {
 	return predicate.Announcement(sql.FieldIsNull(FieldTargeting))

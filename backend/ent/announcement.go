@@ -25,7 +25,7 @@ type Announcement struct {
 	Content string `json:"content,omitempty"`
 	// 状态: draft, active, archived
 	Status string `json:"status,omitempty"`
-	// 通知模式: silent(仅铃铛), popup(弹窗提醒)
+	// 通知模式: silent(仅铃铛), popup(弹窗提醒), banner(顶部横幅)
 	NotifyMode string `json:"notify_mode,omitempty"`
 	// 顶部横幅配置（JSON）
 	BannerConfig domain.AnnouncementBannerConfig `json:"banner_config,omitempty"`
