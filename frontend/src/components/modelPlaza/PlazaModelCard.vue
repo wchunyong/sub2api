@@ -19,7 +19,7 @@
         <p class="mt-1 break-all font-mono text-xl font-bold tracking-tight text-primary-700 dark:text-primary-300" :data-price="price.key">
           {{ price.paid }}
         </p>
-        <p class="mt-0.5 text-[11px] text-gray-400 dark:text-dark-500">{{ t(planned ? 'modelPlaza.card.plannedPrice' : 'modelPlaza.card.currentPrice') }}</p>
+        <p class="mt-0.5 text-[11px] text-gray-400 dark:text-dark-500">{{ t('modelPlaza.card.currentPrice') }}</p>
       </div>
     </div>
 
@@ -44,7 +44,6 @@ const props = defineProps<{
   imageRateMultiplier?: number | null
   videoRateIndependent?: boolean
   videoRateMultiplier?: number | null
-  planned?: boolean
 }>()
 
 const { t } = useI18n()
