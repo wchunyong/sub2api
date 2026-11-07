@@ -112,8 +112,8 @@
                 <p v-if="tenYuanActivityEligible" data-test="ten-yuan-activity-hint" class="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
                   {{ t('tenYuanActivity.checkoutHint') }}
                 </p>
-                <p v-if="checkout.new_user_recharge_available && validAmount >= 10" data-test="new-user-benefit-hint" class="rounded-lg bg-green-50 px-3 py-2 text-xs font-semibold text-green-800 dark:bg-green-950/40 dark:text-green-200">
-                  {{ t('newUserBenefits.checkoutHint') }}
+                <p v-if="checkout.new_user_recharge_available && validAmount >= newUserBenefitMinAmount" data-test="new-user-benefit-hint" class="rounded-lg bg-green-50 px-3 py-2 text-xs font-semibold text-green-800 dark:bg-green-950/40 dark:text-green-200">
+                  {{ t('newUserBenefits.checkoutHint', { min: newUserBenefitMinAmount, amount: newUserBenefitBonusAmount }) }}
                 </p>
               </div>
             </div>
@@ -329,6 +329,7 @@ import { planValiditySuffix as validitySuffixOf } from '@/components/payment/val
 import type { PaymentMethodOption } from '@/components/payment/PaymentMethodSelector.vue'
 import { buildPaymentErrorToastMessage, describePaymentScenarioError } from './paymentUx'
 import { hasWechatResumeQuery, parseWechatResumeRoute, stripWechatResumeQuery } from './paymentWechatResume'
+import { DEFAULT_NEW_USER_BONUS_AMOUNT, DEFAULT_NEW_USER_MIN_AMOUNT } from '@/features/newUserBenefits/state'
 
 const i18n = useI18n()
 const { t } = i18n
@@ -543,6 +544,9 @@ const checkout = ref<CheckoutInfoResponse>({
   recharge_bonus_tiers: [], recharge_bonus_mode: 'bonus', recharge_bonus_notice: '',
   new_user_recharge_available: false,
 })
+
+const newUserBenefitMinAmount = computed(() => checkout.value.new_user_recharge_bonus?.min_amount ?? DEFAULT_NEW_USER_MIN_AMOUNT)
+const newUserBenefitBonusAmount = computed(() => checkout.value.new_user_recharge_bonus?.bonus_amount ?? DEFAULT_NEW_USER_BONUS_AMOUNT)
 
 const rechargePaymentAmounts = [10, 20, 50, 100, 200, 400, 800]
 const rechargeCreditByPaymentAmount = new Map<number, number>([

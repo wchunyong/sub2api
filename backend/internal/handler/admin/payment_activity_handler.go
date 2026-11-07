@@ -74,6 +74,33 @@ func (h *PaymentHandler) CloseTenYuanActivity(c *gin.Context) {
 	response.Success(c, gin.H{"closed": true})
 }
 
+func (h *PaymentHandler) GetNewUserRechargeBonus(c *gin.Context) {
+	cfg, err := h.configService.GetNewUserRechargeBonus(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, cfg)
+}
+
+func (h *PaymentHandler) UpdateNewUserRechargeBonus(c *gin.Context) {
+	var req struct {
+		Enabled     *bool    `json:"enabled" binding:"required"`
+		BonusAmount *float64 `json:"bonus_amount" binding:"required"`
+		MinAmount   *float64 `json:"min_amount" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.Enabled == nil || req.BonusAmount == nil || req.MinAmount == nil {
+		response.BadRequest(c, "enabled, bonus_amount and min_amount are required")
+		return
+	}
+	cfg := service.NewUserRechargeBonusConfig{Enabled: *req.Enabled, BonusAmount: *req.BonusAmount, MinAmount: *req.MinAmount}
+	if err := h.configService.UpdateNewUserRechargeBonus(c.Request.Context(), cfg); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	h.GetNewUserRechargeBonus(c)
+}
+
 func (h *PaymentHandler) GetProgrammersDay(c *gin.Context) {
 	state, err := h.configService.GetProgrammersDay(c.Request.Context(), time.Now())
 	if err != nil {

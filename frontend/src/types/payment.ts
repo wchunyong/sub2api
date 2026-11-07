@@ -120,6 +120,14 @@ export interface CheckoutInfoResponse {
   ten_yuan_activity?: TenYuanActivityCheckout
   programmers_day?: ProgrammersDayCheckout
   new_user_recharge_available?: boolean
+  new_user_recharge_bonus?: NewUserRechargeBonusConfig
+}
+
+/** 新用户首笔充值赠送配置（管理员在活动页配置，默认关闭） */
+export interface NewUserRechargeBonusConfig {
+  enabled: boolean
+  bonus_amount: number
+  min_amount: number
 }
 
 // ==================== Orders ====================

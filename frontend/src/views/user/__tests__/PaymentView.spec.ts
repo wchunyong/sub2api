@@ -497,6 +497,22 @@ describe('PaymentView recharge-only user checkout', () => {
     await flushPromises()
     expect(wrapper.find('[data-test="new-user-benefit-hint"]').exists()).toBe(false)
   })
+
+  it('uses the admin-configured minimum amount for the new user first recharge offer', async () => {
+    const wrapper = await mountRechargePage({
+      checkout: {
+        new_user_recharge_available: true,
+        new_user_recharge_bonus: { enabled: true, bonus_amount: 8, min_amount: 30 },
+      },
+    })
+    const amountInput = wrapper.findComponent(AmountInput)
+    await amountInput.vm.$emit('update:modelValue', 10)
+    await flushPromises()
+    expect(wrapper.find('[data-test="new-user-benefit-hint"]').exists()).toBe(false)
+    await amountInput.vm.$emit('update:modelValue', 30)
+    await flushPromises()
+    expect(wrapper.find('[data-test="new-user-benefit-hint"]').exists()).toBe(true)
+  })
 })
 
 describe('PaymentView help text', () => {

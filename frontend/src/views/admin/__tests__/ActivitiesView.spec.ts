@@ -8,6 +8,8 @@ const closeActivity = vi.hoisted(() => vi.fn())
 const getGroups = vi.hoisted(() => vi.fn())
 const getProgrammersDay = vi.hoisted(() => vi.fn())
 const updateProgrammersDay = vi.hoisted(() => vi.fn())
+const getNewUserBenefit = vi.hoisted(() => vi.fn())
+const updateNewUserBenefit = vi.hoisted(() => vi.fn())
 
 vi.mock('@/api/admin/activities', () => ({
   getTenYuanActivityAdmin: getActivity,
@@ -15,6 +17,8 @@ vi.mock('@/api/admin/activities', () => ({
   closeTenYuanActivity: closeActivity,
   getProgrammersDayAdmin: getProgrammersDay,
   updateProgrammersDay,
+  getNewUserRechargeBonusAdmin: getNewUserBenefit,
+  updateNewUserRechargeBonus: updateNewUserBenefit,
 }))
 vi.mock('@/api/admin/groups', async () => ({ ...(await vi.importActual<typeof import('@/api/admin/groups')>('@/api/admin/groups')), getAll: getGroups }))
 vi.mock('vue-i18n', async () => ({ ...(await vi.importActual<typeof import('vue-i18n')>('vue-i18n')), useI18n: () => ({ t: (key: string) => key }) }))
@@ -36,6 +40,28 @@ describe('admin ten yuan activity', () => {
     closeActivity.mockReset().mockResolvedValue(undefined)
     getProgrammersDay.mockReset().mockResolvedValue({ enabled: true, active: false, bonus_percent: 24, starts_at: '2026-10-24T00:00:00+08:00', ends_at: '2026-10-27T00:00:00+08:00' })
     updateProgrammersDay.mockReset().mockResolvedValue({ enabled: false, active: false, bonus_percent: 30, starts_at: '2026-10-24T00:00:00+08:00', ends_at: '2026-10-27T00:00:00+08:00' })
+    getNewUserBenefit.mockReset().mockResolvedValue({ enabled: false, bonus_amount: 5, min_amount: 10 })
+    updateNewUserBenefit.mockReset().mockImplementation(async (config: unknown) => config)
+  })
+
+  it('loads and saves the new user first recharge benefit switch and amounts', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    const enabled = wrapper.get('[data-test="new-user-benefit-enabled"]').element as HTMLInputElement
+    expect(enabled.checked).toBe(false)
+    await wrapper.get('[data-test="new-user-benefit-enabled"]').setValue(true)
+    await wrapper.get('[data-test="new-user-benefit-amount"]').setValue(8.5)
+    await wrapper.get('[data-test="new-user-benefit-min"]').setValue(30)
+    await wrapper.get('[data-test="new-user-benefit-save"]').trigger('click')
+    await flushPromises()
+    expect(updateNewUserBenefit).toHaveBeenCalledWith({ enabled: true, bonus_amount: 8.5, min_amount: 30 })
+  })
+
+  it('blocks saving invalid new user benefit amounts', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    await wrapper.get('[data-test="new-user-benefit-amount"]').setValue(0)
+    expect((wrapper.get('[data-test="new-user-benefit-save"]').element as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('selects the exact default group and sends Beijing time to the second', async () => {

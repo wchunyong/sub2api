@@ -1,4 +1,5 @@
 import { apiClient } from './client'
+import type { NewUserRechargeBonusConfig } from '@/types/payment'
 
 export interface TenYuanActivityState {
   enabled: boolean
@@ -30,5 +31,10 @@ export interface ProgrammersDayState {
 
 export async function getProgrammersDay(): Promise<ProgrammersDayState> {
   const { data } = await apiClient.get<ProgrammersDayState>('/payment/activities/programmers-day')
+  return data
+}
+
+export async function getNewUserRechargeBonus(): Promise<NewUserRechargeBonusConfig> {
+  const { data } = await apiClient.get<NewUserRechargeBonusConfig>('/payment/activities/new-user-recharge-bonus')
   return data
 }

@@ -13,12 +13,71 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewUserRechargeCandidateRequiresFirstDayAndMinimumTen(t *testing.T) {
+type newUserBenefitSettingRepo struct {
+	SettingRepository
+	values map[string]string
+}
+
+func (r *newUserBenefitSettingRepo) GetMultiple(_ context.Context, keys []string) (map[string]string, error) {
+	out := make(map[string]string, len(keys))
+	for _, key := range keys {
+		if v, ok := r.values[key]; ok {
+			out[key] = v
+		}
+	}
+	return out, nil
+}
+
+func (r *newUserBenefitSettingRepo) SetMultiple(_ context.Context, settings map[string]string) error {
+	for k, v := range settings {
+		r.values[k] = v
+	}
+	return nil
+}
+
+func newUserBenefitConfigService(values map[string]string) *PaymentConfigService {
+	return NewPaymentConfigService(nil, &newUserBenefitSettingRepo{values: values}, nil)
+}
+
+func TestNewUserRechargeCandidateRequiresFirstDayAndMinimumAmount(t *testing.T) {
 	created := time.Date(2026, 10, 15, 9, 0, 0, 0, time.UTC)
-	require.True(t, newUserRechargeCandidate(created, created.Add(23*time.Hour), 10))
-	require.True(t, newUserRechargeCandidate(created, created.Add(23*time.Hour), 20))
-	require.False(t, newUserRechargeCandidate(created, created.Add(23*time.Hour), 9.99))
-	require.False(t, newUserRechargeCandidate(created, created.Add(24*time.Hour), 10))
+	require.True(t, newUserRechargeCandidate(created, created.Add(23*time.Hour), 10, 10))
+	require.True(t, newUserRechargeCandidate(created, created.Add(23*time.Hour), 20, 10))
+	require.False(t, newUserRechargeCandidate(created, created.Add(23*time.Hour), 9.99, 10))
+	require.False(t, newUserRechargeCandidate(created, created.Add(24*time.Hour), 10, 10))
+	require.True(t, newUserRechargeCandidate(created, created.Add(time.Hour), 50, 50))
+	require.False(t, newUserRechargeCandidate(created, created.Add(time.Hour), 49.99, 50))
+}
+
+func TestNewUserRechargeBonusConfigDefaultsToDisabled(t *testing.T) {
+	ctx := context.Background()
+	cfg, err := newUserBenefitConfigService(map[string]string{}).GetNewUserRechargeBonus(ctx)
+	require.NoError(t, err)
+	require.False(t, cfg.Enabled)
+	require.Equal(t, 5.0, cfg.BonusAmount)
+	require.Equal(t, 10.0, cfg.MinAmount)
+
+	cfg, err = newUserBenefitConfigService(map[string]string{
+		SettingNewUserRechargeBonusEnabled: "true", SettingNewUserRechargeBonusAmount: "bad", SettingNewUserRechargeMinAmount: "-1",
+	}).GetNewUserRechargeBonus(ctx)
+	require.NoError(t, err)
+	require.True(t, cfg.Enabled)
+	require.Equal(t, 5.0, cfg.BonusAmount)
+	require.Equal(t, 10.0, cfg.MinAmount)
+}
+
+func TestUpdateNewUserRechargeBonusValidatesAmounts(t *testing.T) {
+	ctx := context.Background()
+	repo := &newUserBenefitSettingRepo{values: map[string]string{}}
+	svc := NewPaymentConfigService(nil, repo, nil)
+	require.NoError(t, svc.UpdateNewUserRechargeBonus(ctx, NewUserRechargeBonusConfig{Enabled: true, BonusAmount: 8.5, MinAmount: 30}))
+	cfg, err := svc.GetNewUserRechargeBonus(ctx)
+	require.NoError(t, err)
+	require.Equal(t, NewUserRechargeBonusConfig{Enabled: true, BonusAmount: 8.5, MinAmount: 30}, *cfg)
+
+	require.Error(t, svc.UpdateNewUserRechargeBonus(ctx, NewUserRechargeBonusConfig{Enabled: true, BonusAmount: 0, MinAmount: 10}))
+	require.Error(t, svc.UpdateNewUserRechargeBonus(ctx, NewUserRechargeBonusConfig{Enabled: true, BonusAmount: 5, MinAmount: 0.001}))
+	require.Error(t, svc.UpdateNewUserRechargeBonus(ctx, NewUserRechargeBonusConfig{Enabled: true, BonusAmount: 5, MinAmount: 1e9}))
 }
 
 func TestPrepareNewUserRechargeBonusCreditsOnlyFirstPaidOrder(t *testing.T) {
@@ -72,6 +131,7 @@ func TestPrepareNewUserRechargeBonusCreditsOnlyFirstPaidOrder(t *testing.T) {
 func TestNewUserRechargeAvailableClosesAtTwentyFourHours(t *testing.T) {
 	ctx := context.Background()
 	svc := tenYuanScheduleService(t)
+	svc.configService = newUserBenefitConfigService(map[string]string{SettingNewUserRechargeBonusEnabled: "true"})
 	created := time.Now().Add(-time.Hour).Truncate(time.Second)
 	user, err := svc.entClient.User.Create().SetEmail("offer@example.com").SetPasswordHash("hash").
 		SetRole(RoleUser).SetStatus(StatusActive).SetCreatedAt(created).Save(ctx)
@@ -80,6 +140,19 @@ func TestNewUserRechargeAvailableClosesAtTwentyFourHours(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, available)
 	available, err = svc.NewUserRechargeAvailable(ctx, user.ID, created.Add(24*time.Hour))
+	require.NoError(t, err)
+	require.False(t, available)
+}
+
+func TestNewUserRechargeAvailableRespectsDisabledSwitch(t *testing.T) {
+	ctx := context.Background()
+	svc := tenYuanScheduleService(t)
+	svc.configService = newUserBenefitConfigService(map[string]string{SettingNewUserRechargeBonusEnabled: "false"})
+	created := time.Now().Add(-time.Hour).Truncate(time.Second)
+	user, err := svc.entClient.User.Create().SetEmail("offer-disabled@example.com").SetPasswordHash("hash").
+		SetRole(RoleUser).SetStatus(StatusActive).SetCreatedAt(created).Save(ctx)
+	require.NoError(t, err)
+	available, err := svc.NewUserRechargeAvailable(ctx, user.ID, created.Add(time.Hour))
 	require.NoError(t, err)
 	require.False(t, available)
 }

@@ -185,6 +185,7 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 		TenYuanActivity:               tenYuanActivity,
 		ProgrammersDay:                programmersDay,
 		NewUserRechargeAvailable:      newUserRechargeAvailable,
+		NewUserRechargeBonus:          cfg.NewUserRechargeBonus,
 	})
 }
 
@@ -209,6 +210,7 @@ type checkoutInfoResponse struct {
 	TenYuanActivity               *service.TenYuanActivityUserState     `json:"ten_yuan_activity,omitempty"`
 	ProgrammersDay                *service.ProgrammersDayState          `json:"programmers_day,omitempty"`
 	NewUserRechargeAvailable      bool                                  `json:"new_user_recharge_available"`
+	NewUserRechargeBonus          service.NewUserRechargeBonusConfig    `json:"new_user_recharge_bonus"`
 }
 
 type checkoutPlan struct {

@@ -241,6 +241,8 @@ import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
 import { getTenYuanActivity, getProgrammersDay, type TenYuanActivityState, type ProgrammersDayState } from '@/api/activities'
 import { activityNavigationVisible } from '@/features/activity/countdown'
 import { isNewUserBenefitActive } from '@/features/newUserBenefits/eligibility'
+import { refreshNewUserBenefitConfig } from '@/features/newUserBenefits/config'
+import { newUserBenefitConfig } from '@/features/newUserBenefits/state'
 import { insertCampaignsAfterCanvas } from './sidebarCampaignOrder'
 
 interface NavItem {
@@ -306,6 +308,7 @@ let activityRefreshTimer: ReturnType<typeof setInterval> | undefined
 let activityClockTimer: ReturnType<typeof setInterval> | undefined
 const activityNavEnabled = computed(() => activityNavigationVisible(tenYuanActivity.value, activityNow.value + activityClockOffset.value))
 const programmersDayNavEnabled = computed(() => programmersDay.value?.visible === true && activityNow.value + activityClockOffset.value < new Date(programmersDay.value.ends_at).getTime())
+const newUserBenefitNavEnabled = computed(() => newUserBenefitConfig.value?.enabled === true && authStore.user?.role === 'user' && isNewUserBenefitActive(authStore.user?.created_at, activityNow.value))
 
 async function refreshTenYuanActivity() {
   if (isAdmin.value || appStore.backendModeEnabled) return
@@ -323,7 +326,7 @@ async function refreshProgrammersDay() {
   catch { programmersDay.value = null }
 }
 
-function refreshActivityOnFocus() { void refreshTenYuanActivity(); void refreshProgrammersDay() }
+function refreshActivityOnFocus() { void refreshTenYuanActivity(); void refreshProgrammersDay(); void refreshNewUserBenefitConfig() }
 
 const homePath = computed(() => (isAdmin.value ? '/admin/dashboard' : '/dashboard'))
 
@@ -827,7 +830,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   }))
   if (!withDashboard) return [...items, ...customItems]
   const campaigns: NavItem[] = [
-    { path: '/new-user-benefits', label: t('nav.newUserBenefits'), icon: GiftIcon, promoTone: 'welcome', promoText: t('nav.newUserBenefitsTicker'), featureFlag: () => authStore.user?.role === 'user' && isNewUserBenefitActive(authStore.user?.created_at, activityNow.value) },
+    { path: '/new-user-benefits', label: t('nav.newUserBenefits'), icon: GiftIcon, promoTone: 'welcome', promoText: t('nav.newUserBenefitsTicker'), featureFlag: () => newUserBenefitNavEnabled.value },
     { path: '/ten-yuan-seven-days', label: t('nav.tenYuanActivity'), icon: PriceTagIcon, promoTone: 'activity', promoText: t('nav.tenYuanActivityTicker'), hideInSimpleMode: true, featureFlag: () => flagPayment() !== false && activityNavEnabled.value },
     { path: '/crazy-monday', label: t('nav.crazyMonday'), icon: GiftIcon, promoTone: 'activity', promoText: t('nav.crazyMondayTicker'), hideInSimpleMode: true },
     { path: '/programmers-day', label: t('nav.programmersDay'), icon: PriceTagIcon, promoTone: 'activity', promoText: t('nav.programmersDayTicker'), hideInSimpleMode: true, featureFlag: () => flagPayment() !== false && programmersDayNavEnabled.value },
@@ -1056,6 +1059,7 @@ onMounted(() => {
   void refreshBatchImageAccess()
   void refreshTenYuanActivity()
   void refreshProgrammersDay()
+  void refreshNewUserBenefitConfig()
   activityClockTimer = setInterval(() => { activityNow.value = Date.now() }, 1000)
   activityRefreshTimer = setInterval(() => { void refreshTenYuanActivity(); void refreshProgrammersDay() }, 30000)
   window.addEventListener('focus', refreshActivityOnFocus)

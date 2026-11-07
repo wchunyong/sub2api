@@ -34,6 +34,8 @@ import AppSidebar from './AppSidebar.vue'
 import AppHeader from './AppHeader.vue'
 import NewUserBenefitsDialog from '@/features/newUserBenefits/NewUserBenefitsDialog.vue'
 import { isNewUserBenefitActive, newUserBenefitDismissalKey } from '@/features/newUserBenefits/eligibility'
+import { refreshNewUserBenefitConfig } from '@/features/newUserBenefits/config'
+import { newUserBenefitConfig } from '@/features/newUserBenefits/state'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -43,9 +45,9 @@ const benefitNow = ref(Date.now())
 const showNewUserBenefits = ref(false)
 let benefitTimer: ReturnType<typeof setInterval> | undefined
 
-watch([() => authStore.user?.id, () => authStore.user?.created_at, benefitNow], () => {
+watch([() => authStore.user?.id, () => authStore.user?.created_at, () => newUserBenefitConfig.value?.enabled, benefitNow], () => {
   const user = authStore.user
-  if (!user || user.role !== 'user' || !isNewUserBenefitActive(user.created_at, benefitNow.value)) {
+  if (!user || user.role !== 'user' || newUserBenefitConfig.value?.enabled !== true || !isNewUserBenefitActive(user.created_at, benefitNow.value)) {
     showNewUserBenefits.value = false
     return
   }
@@ -68,6 +70,7 @@ const onboardingStore = useOnboardingStore()
 onMounted(() => {
   onboardingStore.setReplayCallback(replayTour)
   benefitTimer = setInterval(() => { benefitNow.value = Date.now() }, 1000)
+  void refreshNewUserBenefitConfig()
 })
 onBeforeUnmount(() => { if (benefitTimer) clearInterval(benefitTimer) })
 
