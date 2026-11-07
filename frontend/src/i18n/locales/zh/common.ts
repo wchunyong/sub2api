@@ -188,6 +188,8 @@ export default {
     programmersDayTicker: '充值多送 24%',
     newUserBenefits: '新用户权益',
     newUserBenefitsTicker: '24小时有效',
+    newUserGuide: '新手引导',
+    newUserGuideTicker: '10 分钟完成配置',
     channels: '渠道管理',
     availableChannels: '可用渠道',
     modelPlaza: '模型广场',

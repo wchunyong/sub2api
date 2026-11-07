@@ -1,6 +1,6 @@
 import { apiClient } from '../client'
 import type { ProgrammersDayState } from '../activities'
-import type { NewUserRechargeBonusConfig } from '@/types/payment'
+import type { NewUserGuideConfig, NewUserRechargeBonusConfig } from '@/types/payment'
 
 export interface TenYuanActivityRun {
   id: number
@@ -50,6 +50,18 @@ const newUserRechargeBonusPath = '/admin/payment/activities/new-user-recharge-bo
 
 export async function getNewUserRechargeBonusAdmin(): Promise<NewUserRechargeBonusConfig> {
   const { data } = await apiClient.get<NewUserRechargeBonusConfig>(newUserRechargeBonusPath)
+  return data
+}
+
+const newUserGuidePath = '/admin/payment/activities/new-user-guide'
+
+export async function getNewUserGuideAdmin(): Promise<NewUserGuideConfig> {
+  const { data } = await apiClient.get<NewUserGuideConfig>(newUserGuidePath)
+  return data
+}
+
+export async function updateNewUserGuide(config: NewUserGuideConfig): Promise<NewUserGuideConfig> {
+  const { data } = await apiClient.put<NewUserGuideConfig>(newUserGuidePath, config)
   return data
 }
 

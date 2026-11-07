@@ -20,6 +20,18 @@ func (h *PaymentHandler) GetTenYuanActivity(c *gin.Context) {
 	response.Success(c, state)
 }
 
+func (h *PaymentHandler) GetNewUserGuide(c *gin.Context) {
+	if _, ok := requireAuth(c); !ok {
+		return
+	}
+	cfg, err := h.configService.GetNewUserGuide(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, cfg)
+}
+
 func (h *PaymentHandler) GetNewUserRechargeBonus(c *gin.Context) {
 	if _, ok := requireAuth(c); !ok {
 		return

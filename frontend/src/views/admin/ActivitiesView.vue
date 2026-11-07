@@ -31,6 +31,28 @@
           <p v-if="programmersDay" class="mt-4 text-sm text-gray-500 dark:text-gray-400">{{ formatBeijing(programmersDay.starts_at) }} — {{ formatBeijing(programmersDay.ends_at) }}</p>
           <button class="btn btn-primary mt-5" :disabled="savingProgrammersDay || !Number.isFinite(programmersDayPercent) || programmersDayPercent < 0 || programmersDayPercent > 1000" @click="saveProgrammersDay">{{ savingProgrammersDay ? t('common.saving') : t('admin.activity.save') }}</button>
         </section>
+        <section class="card p-6" data-test="new-user-guide-settings">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 class="text-xl font-semibold text-gray-900 dark:text-white">{{ t('admin.activity.guideTitle') }}</h2>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('admin.activity.guideRule') }}</p>
+            </div>
+            <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">{{ t('admin.activity.status.permanent') }}</span>
+          </div>
+          <div class="mt-5 grid gap-5 sm:grid-cols-2">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">
+              {{ t('admin.activity.guideVideoUrl') }}
+              <input v-model="newUserGuide.video_url" type="url" class="input mt-2 w-full" data-test="new-user-guide-video" placeholder="https://" />
+            </label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">
+              {{ t('admin.activity.guidePdfUrl') }}
+              <input v-model="newUserGuide.pdf_url" type="url" class="input mt-2 w-full" data-test="new-user-guide-pdf" placeholder="https://" />
+            </label>
+          </div>
+          <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.activity.guideHint') }}</p>
+          <button class="btn btn-primary mt-5" data-test="new-user-guide-save" :disabled="savingNewUserGuide" @click="saveNewUserGuide">{{ savingNewUserGuide ? t('common.saving') : t('admin.activity.save') }}</button>
+        </section>
+
         <section class="card p-6" data-test="new-user-benefit-settings">
           <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -110,10 +132,10 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { getAll } from '@/api/admin/groups'
-import { closeTenYuanActivity, getTenYuanActivityAdmin, scheduleTenYuanActivity, getProgrammersDayAdmin, updateProgrammersDay, getNewUserRechargeBonusAdmin, updateNewUserRechargeBonus, type TenYuanActivityAdminState } from '@/api/admin/activities'
+import { closeTenYuanActivity, getTenYuanActivityAdmin, scheduleTenYuanActivity, getProgrammersDayAdmin, updateProgrammersDay, getNewUserRechargeBonusAdmin, updateNewUserRechargeBonus, getNewUserGuideAdmin, updateNewUserGuide, type TenYuanActivityAdminState } from '@/api/admin/activities'
 import type { ProgrammersDayState } from '@/api/activities'
 import type { AdminGroup } from '@/types'
-import type { NewUserRechargeBonusConfig } from '@/types/payment'
+import type { NewUserGuideConfig, NewUserRechargeBonusConfig } from '@/types/payment'
 import { extractApiErrorMessage } from '@/utils/apiError'
 
 const { t } = useI18n()
@@ -124,6 +146,8 @@ const programmersDayPercent = ref(24)
 const savingProgrammersDay = ref(false)
 const newUserBenefit = ref<NewUserRechargeBonusConfig>({ enabled: false, bonus_amount: 5, min_amount: 10 })
 const savingNewUserBenefit = ref(false)
+const newUserGuide = ref<NewUserGuideConfig>({ video_url: '', pdf_url: '' })
+const savingNewUserGuide = ref(false)
 const groups = ref<AdminGroup[]>([])
 const groupId = ref(0)
 const startsAtLocal = ref('')
@@ -161,7 +185,8 @@ async function load() {
   error.value = ''
   loading.value = true
   try {
-    const [activity, allGroups, festival, newUser] = await Promise.all([getTenYuanActivityAdmin(), getAll(), getProgrammersDayAdmin(), getNewUserRechargeBonusAdmin()])
+    const [activity, allGroups, festival, newUser, guide] = await Promise.all([getTenYuanActivityAdmin(), getAll(), getProgrammersDayAdmin(), getNewUserRechargeBonusAdmin(), getNewUserGuideAdmin()])
+    newUserGuide.value = { video_url: guide.video_url, pdf_url: guide.pdf_url }
     state.value = activity
     programmersDay.value = festival
     programmersDayEnabled.value = festival.enabled
@@ -185,6 +210,17 @@ async function saveProgrammersDay() {
   } catch (cause) {
     error.value = extractApiErrorMessage(cause, t('common.unknownError'))
   } finally { savingProgrammersDay.value = false }
+}
+
+async function saveNewUserGuide() {
+  savingNewUserGuide.value = true
+  error.value = ''
+  try {
+    const saved = await updateNewUserGuide({ ...newUserGuide.value })
+    newUserGuide.value = { video_url: saved.video_url, pdf_url: saved.pdf_url }
+  } catch (cause) {
+    error.value = extractApiErrorMessage(cause, t('common.unknownError'))
+  } finally { savingNewUserGuide.value = false }
 }
 
 async function saveNewUserBenefit() {

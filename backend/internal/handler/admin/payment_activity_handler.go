@@ -74,6 +74,31 @@ func (h *PaymentHandler) CloseTenYuanActivity(c *gin.Context) {
 	response.Success(c, gin.H{"closed": true})
 }
 
+func (h *PaymentHandler) GetNewUserGuide(c *gin.Context) {
+	cfg, err := h.configService.GetNewUserGuide(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, cfg)
+}
+
+func (h *PaymentHandler) UpdateNewUserGuide(c *gin.Context) {
+	var req struct {
+		VideoURL string `json:"video_url"`
+		PDFURL   string `json:"pdf_url"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	if err := h.configService.UpdateNewUserGuide(c.Request.Context(), service.NewUserGuideConfig{VideoURL: req.VideoURL, PDFURL: req.PDFURL}); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	h.GetNewUserGuide(c)
+}
+
 func (h *PaymentHandler) GetNewUserRechargeBonus(c *gin.Context) {
 	cfg, err := h.configService.GetNewUserRechargeBonus(c.Request.Context())
 	if err != nil {

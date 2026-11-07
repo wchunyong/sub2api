@@ -188,6 +188,8 @@ export default {
     programmersDayTicker: '24% extra credit',
     newUserBenefits: 'New User Benefits',
     newUserBenefitsTicker: 'Valid for 24 hours',
+    newUserGuide: 'New User Guide',
+    newUserGuideTicker: 'Set up in 10 minutes',
     channels: 'Channels',
     availableChannels: 'Available Channels',
     modelPlaza: 'Model Plaza',

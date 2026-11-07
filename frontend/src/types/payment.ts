@@ -123,6 +123,12 @@ export interface CheckoutInfoResponse {
   new_user_recharge_bonus?: NewUserRechargeBonusConfig
 }
 
+/** 新手引导链接（管理员在活动页配置，长期有效） */
+export interface NewUserGuideConfig {
+  video_url: string
+  pdf_url: string
+}
+
 /** 新用户首笔充值赠送配置（管理员在活动页配置，默认关闭） */
 export interface NewUserRechargeBonusConfig {
   enabled: boolean

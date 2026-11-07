@@ -1,4 +1,12 @@
 export default {
+  newUserGuide: {
+    kicker: '新手必看', title: '新手使用指南',
+    subtitle: '先看视频或文案，10 分钟完成全部配置。',
+    videoTitle: '视频教程', videoDescription: '跟着视频一步步操作，适合边看边配。', watchVideo: '观看视频 →',
+    docTitle: '文案教程', docDescription: '图文步骤，适合对照检查每个参数。', readDoc: '阅读文案 →',
+    helpTitle: '配置中遇到问题？', wechatLabel: '客服微信', copyWechat: '复制微信号', copied: '已复制',
+    footer: '教程可反复查看 · 配置完成后如仍有问题，随时联系客服', close: '关闭',
+  },
   newUserBenefits: {
     kicker: '限时专属', title: '新用户权益，24小时有效',
     description: '从注册完成起 24 小时内领取。两项权益可分别参与。',

@@ -746,6 +746,21 @@ const ShieldIcon = {
     )
 }
 
+const GuideIcon = {
+  render: () =>
+    h(
+      'svg',
+      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
+      [
+        h('path', {
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          d: 'M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25',
+        }),
+      ],
+    ),
+}
+
 const PriceTagIcon = {
   render: () =>
     h(
@@ -831,6 +846,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   if (!withDashboard) return [...items, ...customItems]
   const campaigns: NavItem[] = [
     { path: '/new-user-benefits', label: t('nav.newUserBenefits'), icon: GiftIcon, promoTone: 'welcome', promoText: t('nav.newUserBenefitsTicker'), featureFlag: () => newUserBenefitNavEnabled.value },
+    { path: '/new-user-guide', label: t('nav.newUserGuide'), icon: GuideIcon, promoTone: 'activity', promoText: t('nav.newUserGuideTicker'), featureFlag: () => authStore.user?.role === 'user' },
     { path: '/ten-yuan-seven-days', label: t('nav.tenYuanActivity'), icon: PriceTagIcon, promoTone: 'activity', promoText: t('nav.tenYuanActivityTicker'), hideInSimpleMode: true, featureFlag: () => flagPayment() !== false && activityNavEnabled.value },
     { path: '/crazy-monday', label: t('nav.crazyMonday'), icon: GiftIcon, promoTone: 'activity', promoText: t('nav.crazyMondayTicker'), hideInSimpleMode: true },
     { path: '/programmers-day', label: t('nav.programmersDay'), icon: PriceTagIcon, promoTone: 'activity', promoText: t('nav.programmersDayTicker'), hideInSimpleMode: true, featureFlag: () => flagPayment() !== false && programmersDayNavEnabled.value },

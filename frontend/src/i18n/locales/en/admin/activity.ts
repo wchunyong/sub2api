@@ -2,6 +2,10 @@ export default {
   activity: {
     kicker: 'Campaign management', title: 'Campaigns',
     description: 'Manage Ten Yuan Seven Days, the Programmers\' Day offer and the new user first recharge benefit.',
+    guideTitle: 'New User Guide',
+    guideRule: 'Stays in the activity list permanently. The user popup offers a video tutorial and a written guide, with no time limit.',
+    guideVideoUrl: 'Video tutorial link', guidePdfUrl: 'Written guide (PDF) link',
+    guideHint: 'Links must be http or https URLs. Saving a blank link restores the default.',
     newUserTitle: 'New User First Recharge Benefit',
     newUserRule: 'Within 24 hours after registration, the first successful recharge that reaches the minimum amount receives the bonus credit. Once per user.',
     newUserEnabled: 'Enable new user first recharge benefit', newUserBonusAmount: 'Bonus amount', newUserMinAmount: 'Minimum recharge amount',
@@ -19,6 +23,6 @@ export default {
     closedNote: 'New claims have stopped. Existing benefits remain until the original end time.',
     schedule: 'Start campaign', edit: 'Edit schedule', save: 'Save campaign', close: 'Close campaign',
     closeWarning: 'Closing stops new claims. Existing benefits remain until the original end time. Close this campaign?',
-    status: { off: 'Off', scheduled: 'Scheduled', active: 'Active', closed: 'Closed', ended: 'Ended' }
+    status: { off: 'Off', scheduled: 'Scheduled', active: 'Active', closed: 'Closed', ended: 'Ended', permanent: 'Always on' }
   }
 }

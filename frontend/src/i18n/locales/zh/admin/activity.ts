@@ -2,6 +2,10 @@ export default {
   activity: {
     kicker: '活动管理', title: '活动',
     description: '管理十元七天乐、程序员 1024 节和新用户首充权益活动。',
+    guideTitle: '新手引导',
+    guideRule: '长期挂在活动列表中，用户端弹窗提供视频教程与文案教程，无时间限制。',
+    guideVideoUrl: '视频教程链接', guidePdfUrl: '文案教程（PDF）链接',
+    guideHint: '链接需为 http 或 https 地址；留空保存则恢复为默认链接。',
     newUserTitle: '新用户首充权益',
     newUserRule: '用户注册后 24 小时内，首笔成功充值达到最低金额即赠送指定余额；每位用户仅一次。',
     newUserEnabled: '开启新用户首充权益', newUserBonusAmount: '赠送金额（元）', newUserMinAmount: '最低充值金额（元）',
@@ -20,6 +24,6 @@ export default {
     closedNote: '已停止新用户解锁；已领取的福利保留到原结束时间。',
     schedule: '开启活动', edit: '修改预约', save: '保存活动', close: '关闭活动',
     closeWarning: '关闭后停止新用户解锁。已领取的福利继续保留到本轮原结束时间。确认关闭吗？',
-    status: { off: '未开启', scheduled: '待开始', active: '进行中', closed: '已关闭', ended: '已结束' }
+    status: { off: '未开启', scheduled: '待开始', active: '进行中', closed: '已关闭', ended: '已结束', permanent: '长期有效' }
   }
 }

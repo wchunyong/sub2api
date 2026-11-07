@@ -10,8 +10,12 @@ const getProgrammersDay = vi.hoisted(() => vi.fn())
 const updateProgrammersDay = vi.hoisted(() => vi.fn())
 const getNewUserBenefit = vi.hoisted(() => vi.fn())
 const updateNewUserBenefit = vi.hoisted(() => vi.fn())
+const getNewUserGuide = vi.hoisted(() => vi.fn())
+const updateNewUserGuide = vi.hoisted(() => vi.fn())
 
 vi.mock('@/api/admin/activities', () => ({
+  getNewUserGuideAdmin: getNewUserGuide,
+  updateNewUserGuide,
   getTenYuanActivityAdmin: getActivity,
   scheduleTenYuanActivity: scheduleActivity,
   closeTenYuanActivity: closeActivity,
@@ -42,6 +46,18 @@ describe('admin ten yuan activity', () => {
     updateProgrammersDay.mockReset().mockResolvedValue({ enabled: false, active: false, bonus_percent: 30, starts_at: '2026-10-24T00:00:00+08:00', ends_at: '2026-10-27T00:00:00+08:00' })
     getNewUserBenefit.mockReset().mockResolvedValue({ enabled: false, bonus_amount: 5, min_amount: 10 })
     updateNewUserBenefit.mockReset().mockImplementation(async (config: unknown) => config)
+    getNewUserGuide.mockReset().mockResolvedValue({ video_url: 'https://video.example/a', pdf_url: 'https://pdf.example/a.pdf' })
+    updateNewUserGuide.mockReset().mockImplementation(async (config: unknown) => config)
+  })
+
+  it('loads and saves the new user guide links', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    expect((wrapper.get('[data-test="new-user-guide-video"]').element as HTMLInputElement).value).toBe('https://video.example/a')
+    await wrapper.get('[data-test="new-user-guide-pdf"]').setValue('https://pdf.example/b.pdf')
+    await wrapper.get('[data-test="new-user-guide-save"]').trigger('click')
+    await flushPromises()
+    expect(updateNewUserGuide).toHaveBeenCalledWith({ video_url: 'https://video.example/a', pdf_url: 'https://pdf.example/b.pdf' })
   })
 
   it('loads and saves the new user first recharge benefit switch and amounts', async () => {

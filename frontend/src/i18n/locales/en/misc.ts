@@ -1,4 +1,12 @@
 export default {
+  newUserGuide: {
+    kicker: 'Read first', title: 'New User Guide',
+    subtitle: 'Watch the video or read the guide. Finish the full setup in about 10 minutes.',
+    videoTitle: 'Video Tutorial', videoDescription: 'Follow the video step by step. Good for setting up while you watch.', watchVideo: 'Watch video →',
+    docTitle: 'Written Guide', docDescription: 'Step-by-step text with screenshots. Good for checking each parameter.', readDoc: 'Read guide →',
+    helpTitle: 'Stuck during setup?', wechatLabel: 'Support WeChat', copyWechat: 'Copy WeChat ID', copied: 'Copied',
+    footer: 'Tutorials can be reviewed anytime · If you still have issues after setup, contact support.', close: 'Close',
+  },
   newUserBenefits: {
     kicker: 'Limited-time offer', title: 'New User Benefits · Valid for 24 Hours',
     description: 'Claim within 24 hours of registration. Both offers are available separately.',
