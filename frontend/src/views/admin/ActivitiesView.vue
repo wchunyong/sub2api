@@ -31,6 +31,32 @@
           <p v-if="programmersDay" class="mt-4 text-sm text-gray-500 dark:text-gray-400">{{ formatBeijing(programmersDay.starts_at) }} — {{ formatBeijing(programmersDay.ends_at) }}</p>
           <button class="btn btn-primary mt-5" :disabled="savingProgrammersDay || !Number.isFinite(programmersDayPercent) || programmersDayPercent < 0 || programmersDayPercent > 1000" @click="saveProgrammersDay">{{ savingProgrammersDay ? t('common.saving') : t('admin.activity.save') }}</button>
         </section>
+        <section class="card p-6" data-test="new-user-benefit-settings">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 class="text-xl font-semibold text-gray-900 dark:text-white">{{ t('admin.activity.newUserTitle') }}</h2>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('admin.activity.newUserRule') }}</p>
+            </div>
+            <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">{{ newUserBenefit.enabled ? t('admin.activity.status.active') : t('admin.activity.status.off') }}</span>
+          </div>
+          <div class="mt-5 grid gap-5 sm:grid-cols-3">
+            <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200">
+              <input v-model="newUserBenefit.enabled" type="checkbox" data-test="new-user-benefit-enabled" />
+              {{ t('admin.activity.newUserEnabled') }}
+            </label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">
+              {{ t('admin.activity.newUserBonusAmount') }}
+              <input v-model.number="newUserBenefit.bonus_amount" type="number" min="0.01" max="100000" step="0.01" class="input mt-2 w-full" data-test="new-user-benefit-amount" />
+            </label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">
+              {{ t('admin.activity.newUserMinAmount') }}
+              <input v-model.number="newUserBenefit.min_amount" type="number" min="0.01" max="100000" step="0.01" class="input mt-2 w-full" data-test="new-user-benefit-min" />
+            </label>
+          </div>
+          <p v-if="!newUserBenefit.enabled" class="mt-4 text-sm text-gray-500 dark:text-gray-400">{{ t('admin.activity.newUserDisabledNote') }}</p>
+          <button class="btn btn-primary mt-5" data-test="new-user-benefit-save" :disabled="savingNewUserBenefit || !validNewUserBenefit" @click="saveNewUserBenefit">{{ savingNewUserBenefit ? t('common.saving') : t('admin.activity.save') }}</button>
+        </section>
+
         <section class="card p-6">
           <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -84,9 +110,10 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { getAll } from '@/api/admin/groups'
-import { closeTenYuanActivity, getTenYuanActivityAdmin, scheduleTenYuanActivity, getProgrammersDayAdmin, updateProgrammersDay, type TenYuanActivityAdminState } from '@/api/admin/activities'
+import { closeTenYuanActivity, getTenYuanActivityAdmin, scheduleTenYuanActivity, getProgrammersDayAdmin, updateProgrammersDay, getNewUserRechargeBonusAdmin, updateNewUserRechargeBonus, type TenYuanActivityAdminState } from '@/api/admin/activities'
 import type { ProgrammersDayState } from '@/api/activities'
 import type { AdminGroup } from '@/types'
+import type { NewUserRechargeBonusConfig } from '@/types/payment'
 import { extractApiErrorMessage } from '@/utils/apiError'
 
 const { t } = useI18n()
@@ -95,12 +122,18 @@ const programmersDay = ref<ProgrammersDayState | null>(null)
 const programmersDayEnabled = ref(true)
 const programmersDayPercent = ref(24)
 const savingProgrammersDay = ref(false)
+const newUserBenefit = ref<NewUserRechargeBonusConfig>({ enabled: false, bonus_amount: 5, min_amount: 10 })
+const savingNewUserBenefit = ref(false)
 const groups = ref<AdminGroup[]>([])
 const groupId = ref(0)
 const startsAtLocal = ref('')
 const loading = ref(true)
 const saving = ref(false)
 const error = ref('')
+function isValidNewUserAmount(value: number): boolean {
+  return Number.isFinite(value) && value > 0 && value <= 100000 && Math.abs(value * 100 - Math.round(value * 100)) < 1e-6
+}
+const validNewUserBenefit = computed(() => isValidNewUserAmount(newUserBenefit.value.bonus_amount) && isValidNewUserAmount(newUserBenefit.value.min_amount))
 const selectedGroup = computed(() => groups.value.find(group => group.id === state.value?.current?.group_id))
 const canSchedule = computed(() => !state.value?.current || state.value.current.status === 'scheduled' || state.value.current.status === 'ended')
 const statusLabel = computed(() => t(`admin.activity.status.${state.value?.current?.status ?? 'off'}`))
@@ -128,11 +161,12 @@ async function load() {
   error.value = ''
   loading.value = true
   try {
-    const [activity, allGroups, festival] = await Promise.all([getTenYuanActivityAdmin(), getAll(), getProgrammersDayAdmin()])
+    const [activity, allGroups, festival, newUser] = await Promise.all([getTenYuanActivityAdmin(), getAll(), getProgrammersDayAdmin(), getNewUserRechargeBonusAdmin()])
     state.value = activity
     programmersDay.value = festival
     programmersDayEnabled.value = festival.enabled
     programmersDayPercent.value = festival.bonus_percent
+    newUserBenefit.value = { enabled: newUser.enabled, bonus_amount: newUser.bonus_amount, min_amount: newUser.min_amount }
     groups.value = allGroups.filter(group => group.subscription_type === 'subscription' && group.status === 'active')
     groupId.value = activity.current?.status === 'scheduled' ? activity.current.group_id : activity.default_group_id ?? 0
     startsAtLocal.value = activity.current?.status === 'scheduled' ? beijingInput(activity.current.starts_at) : beijingInput(new Date(Date.now() + 60 * 60 * 1000).toISOString())
@@ -151,6 +185,17 @@ async function saveProgrammersDay() {
   } catch (cause) {
     error.value = extractApiErrorMessage(cause, t('common.unknownError'))
   } finally { savingProgrammersDay.value = false }
+}
+
+async function saveNewUserBenefit() {
+  if (!validNewUserBenefit.value) return
+  savingNewUserBenefit.value = true
+  error.value = ''
+  try {
+    newUserBenefit.value = await updateNewUserRechargeBonus({ ...newUserBenefit.value })
+  } catch (cause) {
+    error.value = extractApiErrorMessage(cause, t('common.unknownError'))
+  } finally { savingNewUserBenefit.value = false }
 }
 
 async function save() {

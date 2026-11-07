@@ -2,12 +2,12 @@ export default {
   newUserBenefits: {
     kicker: '限时专属', title: '新用户权益，24小时有效',
     description: '从注册完成起 24 小时内领取。两项权益可分别参与。',
-    wechatTitle: '添加客服微信领取 5 元',
+    wechatTitle: '添加客服微信领取 {amount} 元',
     wechatDescription: '添加客服微信并说明新用户权益，由客服核实后手动发放。',
     copyWechat: '复制微信号', copied: '已复制',
-    rechargeTitle: '充 10 元送 5 元',
-    rechargeDescription: '权益期内首笔成功充值满 10 元，额外赠送 5 元余额。',
-    rechargeAction: '去充值', checkoutHint: '权益期内首笔成功充值满 10 元，到账额外赠送 5 元。', closeAfter: '{seconds} 秒后可关闭', expired: '新用户权益已结束。'
+    rechargeTitle: '充 {min} 元送 {amount} 元',
+    rechargeDescription: '权益期内首笔成功充值满 {min} 元，额外赠送 {amount} 元余额。',
+    rechargeAction: '去充值', checkoutHint: '权益期内首笔成功充值满 {min} 元，到账额外赠送 {amount} 元。', closeAfter: '{seconds} 秒后可关闭', expired: '新用户权益已结束。'
   },
   tenYuanActivity: {
     kicker: '限时福利', title: '十元七天乐',

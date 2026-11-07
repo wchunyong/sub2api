@@ -1,7 +1,11 @@
 export default {
   activity: {
     kicker: 'Campaign management', title: 'Campaigns',
-    description: 'Manage Ten Yuan Seven Days and the Programmers\' Day offer.',
+    description: 'Manage Ten Yuan Seven Days, the Programmers\' Day offer and the new user first recharge benefit.',
+    newUserTitle: 'New User First Recharge Benefit',
+    newUserRule: 'Within 24 hours after registration, the first successful recharge that reaches the minimum amount receives the bonus credit. Once per user.',
+    newUserEnabled: 'Enable new user first recharge benefit', newUserBonusAmount: 'Bonus amount', newUserMinAmount: 'Minimum recharge amount',
+    newUserDisabledNote: 'Currently disabled. The new user benefit is hidden from users.',
     programmersDayTitle: "Programmers' Day",
     programmersDayRule: 'Active each year from October 24 at 00:00 to October 27 at 00:00 Beijing time, when enabled.',
     programmersDayEnabled: 'Enable annual offer', programmersDayPercent: 'Extra credit percentage (%)',

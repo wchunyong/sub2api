@@ -2,12 +2,12 @@ export default {
   newUserBenefits: {
     kicker: 'Limited-time offer', title: 'New User Benefits · Valid for 24 Hours',
     description: 'Claim within 24 hours of registration. Both offers are available separately.',
-    wechatTitle: 'Add support on WeChat for 5 credits',
+    wechatTitle: 'Add support on WeChat for {amount} credits',
     wechatDescription: 'Add our support contact and mention the new user offer. Support will verify and credit your account manually.',
     copyWechat: 'Copy WeChat ID', copied: 'Copied',
-    rechargeTitle: 'Recharge 10, get 5 extra',
-    rechargeDescription: 'Your first successful recharge of at least 10 during the benefit period receives 5 extra credits.',
-    rechargeAction: 'Recharge now', checkoutHint: 'Your first successful recharge of at least 10 during the benefit period receives 5 extra credits.', closeAfter: 'Close available in {seconds}s', expired: 'The new user benefit period has ended.'
+    rechargeTitle: 'Recharge {min}, get {amount} extra',
+    rechargeDescription: 'Your first successful recharge of at least {min} during the benefit period receives {amount} extra credits.',
+    rechargeAction: 'Recharge now', checkoutHint: 'Your first successful recharge of at least {min} during the benefit period receives {amount} extra credits.', closeAfter: 'Close available in {seconds}s', expired: 'The new user benefit period has ended.'
   },
   tenYuanActivity: {
     kicker: 'Limited benefit', title: 'Ten Yuan Seven Days',

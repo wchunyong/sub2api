@@ -70,12 +70,14 @@ type PaymentConfig struct {
 	RechargeBonusNotice        string  `json:"recharge_bonus_notice"`
 	ProgrammersDayEnabled      bool    `json:"programmers_day_enabled"`
 	ProgrammersDayBonusPercent float64 `json:"programmers_day_bonus_percent"`
-	LoadBalanceStrategy        string  `json:"load_balance_strategy"`
-	ProductNamePrefix          string  `json:"product_name_prefix"`
-	ProductNameSuffix          string  `json:"product_name_suffix"`
-	HelpImageURL               string  `json:"help_image_url"`
-	HelpText                   string  `json:"help_text"`
-	StripePublishableKey       string  `json:"stripe_publishable_key,omitempty"`
+	// NewUserRechargeBonus 新用户首笔充值赠送配置（默认关闭）。
+	NewUserRechargeBonus NewUserRechargeBonusConfig `json:"new_user_recharge_bonus"`
+	LoadBalanceStrategy  string                     `json:"load_balance_strategy"`
+	ProductNamePrefix    string                     `json:"product_name_prefix"`
+	ProductNameSuffix    string                     `json:"product_name_suffix"`
+	HelpImageURL         string                     `json:"help_image_url"`
+	HelpText             string                     `json:"help_text"`
+	StripePublishableKey string                     `json:"stripe_publishable_key,omitempty"`
 
 	// Cancel rate limit settings
 	CancelRateLimitEnabled bool   `json:"cancel_rate_limit_enabled"`
@@ -234,6 +236,7 @@ func (s *PaymentConfigService) GetPaymentConfig(ctx context.Context) (*PaymentCo
 		SettingEnabledPaymentTypes, SettingBalancePayDisabled, SettingBalanceRechargeMult, SettingSubscriptionUSDToCNYRate, SettingRechargeFeeRate, SettingLoadBalanceStrategy,
 		SettingRechargeBonusTiers, SettingRechargeBonusMode, SettingRechargeBonusNotice,
 		SettingProgrammersDayEnabled, SettingProgrammersDayBonusPercent,
+		SettingNewUserRechargeBonusEnabled, SettingNewUserRechargeBonusAmount, SettingNewUserRechargeMinAmount,
 		SettingProductNamePrefix, SettingProductNameSuffix,
 		SettingHelpImageURL, SettingHelpText,
 		SettingCancelRateLimitOn, SettingCancelRateLimitMax,
@@ -268,6 +271,7 @@ func (s *PaymentConfigService) parsePaymentConfig(vals map[string]string) *Payme
 		RechargeBonusNotice:        vals[SettingRechargeBonusNotice],
 		ProgrammersDayEnabled:      vals[SettingProgrammersDayEnabled] != "false",
 		ProgrammersDayBonusPercent: parseProgrammersDayBonusPercent(vals[SettingProgrammersDayBonusPercent]),
+		NewUserRechargeBonus:       parseNewUserRechargeBonusConfig(vals),
 		LoadBalanceStrategy:        vals[SettingLoadBalanceStrategy],
 		ProductNamePrefix:          vals[SettingProductNamePrefix],
 		ProductNameSuffix:          vals[SettingProductNameSuffix],

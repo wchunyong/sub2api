@@ -1,7 +1,11 @@
 export default {
   activity: {
     kicker: '活动管理', title: '活动',
-    description: '管理十元七天乐和程序员 1024 节活动。',
+    description: '管理十元七天乐、程序员 1024 节和新用户首充权益活动。',
+    newUserTitle: '新用户首充权益',
+    newUserRule: '用户注册后 24 小时内，首笔成功充值达到最低金额即赠送指定余额；每位用户仅一次。',
+    newUserEnabled: '开启新用户首充权益', newUserBonusAmount: '赠送金额（元）', newUserMinAmount: '最低充值金额（元）',
+    newUserDisabledNote: '当前未开启，用户端不展示新用户权益。',
     programmersDayTitle: '程序员 1024 节',
     programmersDayRule: '每年北京时间 10 月 24 日 00:00 至 27 日 00:00 生效，活动期内充值多送指定比例。',
     programmersDayEnabled: '开启年度活动', programmersDayPercent: '额外赠送百分比（%）',
