@@ -378,8 +378,8 @@ func (e *EasyPay) queryOrder(ctx context.Context, outTradeNo string) (*easyPayQu
 		return nil, fmt.Errorf("easypay parse query: %w", err)
 	}
 	// An explicit failure code wins over any paid-looking status field that
-	// may accompany it.
-	if resp.Code != nil && !easyPayResponseCodeIsSuccess(resp.Code, easypayCodeSuccess) {
+	// may accompany it; a missing code also fails closed.
+	if !easyPayResponseCodeIsSuccess(resp.Code, easypayCodeSuccess) {
 		msg := strings.TrimSpace(resp.Msg)
 		if msg == "" {
 			msg = summarizeEasyPayResponse(body)
